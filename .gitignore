@@ -1,0 +1,8 @@
+**/__pychache__
+
+_ancillary/*
+_dev/*
+_resultInterpretation/*
+
+output/*
+!output/readme.txt
