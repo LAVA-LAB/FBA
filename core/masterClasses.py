@@ -5,7 +5,6 @@ Created on Wed May  5 10:03:21 2021
 @author: Thom Badings
 """
 
-import math
 import os                       # Import OS to allow creationg of folders
 
 from datetime import datetime   # Import Datetime to retreive current date/time
@@ -45,12 +44,11 @@ class settings(object):
         # Mode is either 'scenario' or 'gaussian'
         if mode == 'scenario':
             sa['switch'] = True        
-            sa['samples'] = 1000 # N
-            sa['confidence']   = 1e-1 #beta value
-            sa['log_factorial_N'] = math.log(math.factorial(sa['samples']))
-            sa['usetable']     = 'input/probabilityTable_N='+ \
-                                    str(sa['samples'])+'_beta='+ \
-                                    str(sa['confidence'])+'.csv'
+            sa['samples'] = 25 # Sample complexity used in scenario approach
+            sa['gamma'] = 2 # Factor by which N is multiplied in every iteration
+            sa['samples_max'] = 800 # Maximum number of samples in iterative scheme
+            sa['confidence']   = 1e-1 # Confidence level (beta)
+            
         else:
             sa['switch'] = False
             
@@ -67,10 +65,12 @@ class settings(object):
         # Default MDP and prism settings
         mdp = dict()
         mdp['filename'] = 'Abstraction'
-        mdp['mode'] = 'interval' #['default','interval']
+        mdp['mode'] = ['estimate','interval'][1]
         mdp['horizon'] = ['infinite','finite'][0]
-        mdp['solver'] = ['Python', 'PRISM']   
-        mdp['prism_java_memory'] = 7 # PRISM java memory allocation in GB
+        mdp['solver'] = ['PRISM', 'Python'][0]
+        mdp['prism_java_memory'] = 1 # PRISM java memory allocation in GB
+        mdp['prism_model_writer'] = ['default','explicit'][1]
+        mdp['prism_folder'] = "/Users/..."
         
         # Default time/date settings
         timing = dict()

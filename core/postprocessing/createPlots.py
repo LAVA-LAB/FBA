@@ -4,7 +4,7 @@
 import numpy as np
 
 import matplotlib as mpl
-mpl.use("pgf")
+# mpl.use("pgf")
 import matplotlib.pyplot as plt
 
 from matplotlib import cm
@@ -268,7 +268,7 @@ def createProbabilityPlots(setup, plot, N, model, results, abstr, mc):
         color = next(ax._get_lines.prop_cycler)['color']
         
         plt.plot(results['optimal_reward'][plot['N']['start'],:], label='k='+str(plot['T']['start']), linewidth=1, color=color)
-        if setup.montecarlo['enabled'] and not setup.montecarlo['init_states'] and not setup.montecarlo['init_timesteps']:
+        if setup.montecarlo['enabled'] and not setup.montecarlo['init_states']:
             plt.plot(mc['results']['reachability_probability'][:,0], label='Monte carlo (k='+str(plot['T']['start'])+')', \
                      linewidth=1, color=color, linestyle='dashed')
     
@@ -276,7 +276,7 @@ def createProbabilityPlots(setup, plot, N, model, results, abstr, mc):
         color = next(ax._get_lines.prop_cycler)['color']
         
         plt.plot(results['optimal_reward'][plot['N']['half'],:], label='k='+str(plot['T']['half']), linewidth=1, color=color)
-        if setup.montecarlo['enabled'] and not setup.montecarlo['init_states'] and not setup.montecarlo['init_timesteps']:
+        if setup.montecarlo['enabled'] and not setup.montecarlo['init_states']:
             plt.plot(mc['results']['reachability_probability'][:,1], label='Monte carlo (k='+str(plot['T']['half'])+')', \
                      linewidth=1, color=color, linestyle='dashed')
     
@@ -284,7 +284,7 @@ def createProbabilityPlots(setup, plot, N, model, results, abstr, mc):
         color = next(ax._get_lines.prop_cycler)['color']
         
         plt.plot(results['optimal_reward'][plot['N']['final'],:], label='k='+str(plot['T']['final']), linewidth=1, color=color)
-        if setup.montecarlo['enabled'] and not setup.montecarlo['init_states'] and not setup.montecarlo['init_timesteps']:
+        if setup.montecarlo['enabled'] and not setup.montecarlo['init_states']:
             plt.plot(mc['results']['reachability_probability'][:,2], label='Monte carlo (k='+str(plot['T']['final'])+')', \
                      linewidth=1, color=color, linestyle='dashed')
     
@@ -370,8 +370,8 @@ def createProbabilityPlots(setup, plot, N, model, results, abstr, mc):
                                  (max(y_col) - min(y_col))/n_ticks ))
             plt.tick_params(pad=-3)
                 
-            plt.xlabel('$x_1$', labelpad=-6)
-            plt.ylabel('$x_2$', labelpad=-6)
+            plt.xlabel('x_1', labelpad=-6)
+            plt.ylabel('x_2', labelpad=-6)
             
             # Set tight layout
             fig.tight_layout()
@@ -389,8 +389,8 @@ def createProbabilityPlots(setup, plot, N, model, results, abstr, mc):
             ax_comb[fig_ind].set_yticks(np.arange(min(y_col), max(y_col)+1, \
                                  (max(y_col) - min(y_col))/n_ticks ))
             ax_comb[fig_ind].tick_params(pad=-3)
-            ax_comb[fig_ind].set_xlabel('$x_1$', labelpad=-6)
-            ax_comb[fig_ind].set_ylabel('$x_2$', labelpad=-6)
+            ax_comb[fig_ind].set_xlabel('x_1', labelpad=-6)
+            ax_comb[fig_ind].set_ylabel('x_2', labelpad=-6)
             
             ax.set_box_aspect([1,1,1])
             set_axes_equal(ax)

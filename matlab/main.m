@@ -1,11 +1,8 @@
-beta = 0.01;
+beta = 0.1;
 
-% createTable(10, beta)
-% createTable(25, beta)
-% createTable(50, beta)
-% createTable(100, beta)
-% createTable(250, beta)
-% createTable(500, beta)
-% createTable(1000, beta)
-createTable(2500, beta)
-createTable(5000, beta)
+N_list = [25,50,100,200,400,800,1600,3200,6400];
+N_list = [6400]
+
+for N = 1:length(N_list)    
+    createTable(N_list(N), beta)
+end

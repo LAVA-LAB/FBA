@@ -37,16 +37,30 @@ class mdp(object):
         self.N = N
         
         self.nr_regions = abstr['nr_regions']
-        self.nr_states  = self.nr_regions * self.N
         self.nr_actions = abstr['nr_actions']
         
-        # Specify goal state set
-        self.goodStates = [g + x*self.nr_regions for x in range(N) for g in abstr['goal']]
+        if self.setup.mdp['horizon'] == 'finite':
         
-        # Specify sets that can never reach target set
-        self.badStates  = [c + x*self.nr_regions for x in range(N) for c in abstr['critical']]
-        
-    def createPython(self, abstr, kalman=False):
+            self.nr_states  = self.nr_regions * self.N
+            
+            # Specify goal state set
+            self.goodStates = [g + x*self.nr_regions for x in range(N) for g in abstr['goal']]
+            
+            # Specify sets that can never reach target set
+            self.badStates  = [c + x*self.nr_regions for x in range(N) for c in abstr['critical']]
+            
+        else:
+            
+            self.nr_states = self.nr_regions
+            
+            # Specify goal state set
+            self.goodStates = abstr['goal']
+            
+            # Specify sets that can never reach target set
+            self.badStates  = abstr['critical']
+            
+            
+    def createPython(self, abstr, trans, kalman=False):
         
         # Create MDP internally in Python
         
@@ -86,7 +100,7 @@ class mdp(object):
                         # For every enabled action
                         for action in actions:
                             
-                            to_probs_all    = abstr['prob'][delta][k][action]['approx']
+                            to_probs_all    = trans['prob'][delta][k][action]['approx']
                             
                             to_probs = to_probs_all #[ to_probs_all.nonzero() ]
                             to_states = np.arange(self.nr_regions) #[ to_probs_all.nonzero() ]
@@ -133,14 +147,14 @@ class mdp(object):
                                 # Increment the number of actions
                                 # self.nr_actions += 1
 
-    def writePRISM_scenario(self, abstr, mode='default', horizon='infinite'):
+    def writePRISM_scenario(self, abstr, trans, mode='estimate', horizon='infinite'):
         '''
         Converts the model to the PRISM language, and write the model to a file.
     
         Parameters
         ----------
         mode : str, optional
-            Is either 'default' or 'interval'.
+            Is either 'estimate' or 'interval'.
         horizon : str, optional
             Is either 'finite' or 'infinite'.
     
@@ -172,7 +186,7 @@ class mdp(object):
                 "mdp \n\n",
                 # "const int xInit; \n\n",
                 "const int regions = "+str(int(self.nr_regions-1))+"; \n\n",
-                "module iMDP \n\n",
+                "module "+modeltype+"_abstraction \n\n",
                 ]
             
             # Define variables in module
@@ -256,41 +270,43 @@ class mdp(object):
                                 # Compute successor state time step
                                 kprime = "&(k'=k+"+str(int(delta/min_delta))+")"
                             
+                            
+                            
                             if self.setup.scenarios['switch'] and mode == 'interval':
                                 
-                                # Create scenario-based interval MDP
-                                succProbs_lb = floor_decimal(abstr['prob'][delta][k][a]['lb'], 5)
-                                succProbs_ub = floor_decimal(abstr['prob'][delta][k][a]['ub'], 5)
+                                # Retreive probability intervals (and corresponding state ID's)
+                                interval_idxs    = trans['prob'][delta][k][a]['interval_idxs']
+                                interval_strings = trans['prob'][delta][k][a]['interval_strings']
                                 
                                 # If mode is interval, use intervals on probs.
-                                succPieces = ["["+
-                                              str(floor_decimal(max(1e-4, lb),5))+","+
-                                              str(floor_decimal(min(1,    ub),5))+"] : (x'="+
+                                succPieces = [intv+" : (x'="+
                                               str(i)+")"+kprime 
-                                              for i,(lb, ub) in enumerate(zip(succProbs_lb, succProbs_ub)) if ub > 0]
+                                              for (i,intv) in zip(interval_idxs,interval_strings)]
                                 
                                 # Use absorbing state to make sure that probs sum to one
-                                deadlock_lb = floor_decimal(abstr['prob'][delta][k][a]['deadlock_lb'], 5)
-                                deadlock_ub = floor_decimal(abstr['prob'][delta][k][a]['deadlock_ub'], 5)
-                                succPieces += ["["+
-                                              str(floor_decimal(max(1e-4, deadlock_lb),5))+","+
-                                              str(floor_decimal(min(1,    deadlock_ub),5))+"] : (x'=-1)"+kprime]
+                                deadlock_string = trans['prob'][delta][k][a]['deadlock_interval_string']
+                                succPieces += [deadlock_string+" : (x'=-1)"+kprime]
                                 
                             else:
                                 
-                                # Write resulting states with their probabilities
-                                succProbs = floor_decimal(abstr['prob'][delta][k][a]['approx'], 5)
-                                
-                                if mode == 'default':
+                                if mode == 'estimate':
+                                    # Write resulting states with their probabilities
+                                    succProbStrings = trans['prob'][delta][k][a]['approx_strings']
+                                    succProbIdxs    = trans['prob'][delta][k][a]['approx_idxs']
+                                    
                                     # If mode is default, use concrete probabilities
                                     succPieces = [str(p)+":(x'="+str(i)+")"+kprime
-                                                  for i,p in enumerate(succProbs) if p > 0]
+                                                  for (i,p) in zip(succProbIdxs,succProbStrings)]
                                     
                                     # Use absorbing state to make sure that probs sum to one
-                                    deadlockProb = np.round(1-sum(succProbs),6)
-                                    succPieces += [str(deadlockProb)+":(x'=-1)"+kprime]
+                                    deadlockProb = trans['prob'][delta][k][a]['deadlock_approx']
+                                    if float(deadlockProb) > 0:
+                                        succPieces += [str(deadlockProb)+":(x'=-1)"+kprime]
                                     
                                 else:
+                                    # Write resulting states with their probabilities
+                                    succProbs = trans['prob'][delta][k][a]['approx']
+                                    
                                     # If mode is interval, use intervals on probs.
                                     succPieces = ["["+
                                                   str(floor_decimal(max(1e-4, p - self.setup.gaussian['margin']),5))+","+
@@ -345,12 +361,31 @@ class mdp(object):
         writeFile(PRISM_file, "a", footer + labels)
         
         #########
+        specfile, specification = self.writePRISM_specification(mode, horizon)
+        
+        # # Define terminal command (may be user-dependent)
+        # commandfile = self.setup.directories['outputFcase']+ \
+        #     self.setup.mdp['filename']+"_"+mode+"_command.txt"
+            
+        # # Write command file
+        # command = "bin/prism models/m2/Abstraction_interval.prism -pf 'Pmaxmin=?[F<="+\
+        #     str(horizonLen)+" \"reached\"]' -exportadv strat.csv -exportstates states.csv -exportvector vector.csv"
+        # writeFile(commandfile, 'w', command)
+        
+        if mode == 'estimate':
+            printSuccess('MDP ('+horizon+' horizon) exported as PRISM file')
+        else:
+            printSuccess('iMDP ('+horizon+' horizon) exported as PRISM file')
+        
+        return PRISM_file, specfile, specification
+    
+    def writePRISM_specification(self, mode, horizon):
         
         if horizon == 'infinite':
             # Infer number of time steps in horizon (at minimum delta value)
             horizonLen = int(self.N/min(self.setup.deltas))
             
-            if mode == 'default':
+            if mode == 'estimate':
                 # If mode is default, set maximum probability as specification
                 specification = 'Pmax=? [ F<='+str(horizonLen)+' "reached" ]'
                 
@@ -359,7 +394,7 @@ class mdp(object):
                 specification = 'Pmaxmin=? [ F<='+str(horizonLen)+' "reached" ]'
             
         else:
-            if mode == 'default':
+            if mode == 'estimate':
                 # If mode is default, set maximum probability as specification
                 specification = 'Pmax=? [ F "reached" ]'
                 
@@ -374,18 +409,184 @@ class mdp(object):
         # Write specification file
         writeFile(specfile, 'w', specification)
         
-        # # Define terminal command (may be user-dependent)
-        # commandfile = self.setup.directories['outputFcase']+ \
-        #     self.setup.mdp['filename']+"_"+mode+"_command.txt"
+        return specfile, specification
+    
+    def writePRISM_explicit(self, abstr, trans, mode='estimate'):
+        
+        # Define PRISM filename
+        PRISM_allfiles = self.setup.directories['outputFcase']+ \
+            self.setup.mdp['filename']+"_"+mode+".all"
+        
+        print(' --- Writing PRISM states file')
+        
+        ### Write states file
+        PRISM_statefile = self.setup.directories['outputFcase']+ \
+            self.setup.mdp['filename']+"_"+mode+".sta"
+        
+        state_file_string = '\n'.join(['(x)\n0:(-1)'] + [str(i+1)+':('+str(i)+')' for i in range(self.nr_regions)])
+        
+        # Write content to file
+        writeFile(PRISM_statefile, 'w', state_file_string)
+        
+        print(' --- Writing PRISM label file')
+        
+        ### Write label file
+        PRISM_labelfile = self.setup.directories['outputFcase']+ \
+            self.setup.mdp['filename']+"_"+mode+".lab"
             
-        # # Write command file
-        # command = "bin/prism models/m2/Abstraction_interval.prism -pf 'Pmaxmin=?[F<="+\
-        #     str(horizonLen)+" \"reached\"]' -exportadv strat.csv -exportstates states.csv -exportvector vector.csv"
-        # writeFile(commandfile, 'w', command)
+        label_file_list = ['0="init" 1="deadlock" 2="reached"'] + \
+                          ['0: 1'] + \
+                          ['' for i in range(self.nr_regions)]
         
-        if mode == 'default':
-            printSuccess('MDP ('+horizon+' horizon) exported as PRISM file')
+        for i in range(self.nr_regions):
+            substring = str(i+1)+': 0'
+            
+            # Check if region is a deadlock state
+            for delta in self.setup.deltas:
+                if len(abstr['actions'][delta][i]) == 0:
+                    substring += ' 1'
+                    break
+            
+            # Check if region is in goal set
+            if i in self.goodStates:
+                substring += ' 2'
+            
+            label_file_list[i+2] = substring
+            
+        label_file_string = '\n'.join(label_file_list)
+           
+        # Write content to file
+        writeFile(PRISM_labelfile, 'w', label_file_string)
+        
+        print(' --- Writing PRISM transition file')
+        
+        ### Write transition file
+        PRISM_transitionfile = self.setup.directories['outputFcase']+ \
+            self.setup.mdp['filename']+"_"+mode+".tra"
+            
+        transition_file_list = ['' for i in range(self.nr_regions)]
+            
+        nr_choices_absolute = 0
+        nr_transitions_absolute = 0
+        
+        printEvery = min(100, max(1, int(self.nr_regions/10)))
+        
+        # For every state
+        for s in range(self.nr_regions):
+            
+            
+            if s % printEvery == 0:
+                print(' ---- Write for region',s)
+            
+            substring = ['' for i in range(len(self.setup.deltas))]
+            
+            choice = 0
+            selfloop = False
+            
+            # Check if region is a deadlock state
+            for delta_idx,delta in enumerate(self.setup.deltas):    
+            
+                if len(abstr['actions'][delta][s]) > 0:
+            
+                    subsubstring = ['' for i in range(len(abstr['actions'][delta][s]))]
+            
+                    # For every enabled action                
+                    for a_idx,a in enumerate(abstr['actions'][delta][s]):
+                        
+                        # Define name of action
+                        actionLabel = "a_"+str(a)+"_d_"+str(delta)
+                        
+                        substring_start = str(s+1) +' '+ str(choice)
+                        
+                        if self.setup.scenarios['switch'] and mode == 'interval':
+                        
+                            # Add probability to end in absorbing state
+                            deadlock_string = trans['prob'][delta][0][a]['deadlock_interval_string']
+                        
+                            # Retreive probability intervals (and corresponding state ID's)
+                            probability_strings = trans['prob'][delta][0][a]['interval_strings']
+                            probability_idxs    = trans['prob'][delta][0][a]['interval_idxs']
+                        
+                            # Absorbing state has index zero
+                            subsubstring_a = [substring_start+' 0 '+deadlock_string+' '+actionLabel]
+                            
+                            # Add resulting entries to the list
+                            subsubstring_b = [substring_start +" "+str(i+1)+" "+intv+" "+actionLabel 
+                                          for (i,intv) in zip(probability_idxs,probability_strings) if intv]
+                            
+                        else:
+                            
+                            # Add probability to end in absorbing state
+                            deadlock_string = str(trans['prob'][delta][0][a]['deadlock_approx'])
+                            
+                            # Retreive probability intervals (and corresponding state ID's)
+                            probability_strings = trans['prob'][delta][0][a]['approx_strings']
+                            probability_idxs    = trans['prob'][delta][0][a]['approx_idxs']
+                            
+                            if float(deadlock_string) > 0:
+                                # Absorbing state has index zero
+                                subsubstring_a = [substring_start+' 0 '+deadlock_string+' '+actionLabel]
+                            else:
+                                subsubstring_a = []
+                                
+                            # Add resulting entries to the list
+                            subsubstring_b = [substring_start +" "+str(i+1)+" "+intv+" "+actionLabel 
+                                          for (i,intv) in zip(probability_idxs,probability_strings) if intv]
+                            
+                        # Increase choice counter
+                        choice += 1
+                        nr_choices_absolute += 1
+                        
+                        nr_transitions_absolute += len(subsubstring_a) + len(subsubstring_b)
+                        
+                        subsubstring[a_idx] = '\n'.join(subsubstring_a + subsubstring_b)
+                        
+                    # subsubstring = '\n'.join(subsubstring)
+                    
+                else:
+                    
+                    # No actions enabled, so only add self-loop
+                    if selfloop is False:
+                        if self.setup.scenarios['switch'] and mode == 'interval':
+                            selfloop_prob = '[1.0,1.0]'
+                        else:
+                            selfloop_prob = '1.0'
+                            
+                        subsubstring = [str(s+1) +' 0 '+str(s+1)+' '+selfloop_prob]
+            
+                        selfloop = True
+                        
+                        # Increment choices and transitions both by one
+                        nr_choices_absolute += 1
+                        nr_transitions_absolute += 1
+                        choice += 1
+                    
+                    else:
+                        subsubstring = []
+                        
+                substring[delta_idx] = subsubstring
+                
+            # transition_file_list[s] = '\n'.join(substring)
+            transition_file_list[s] = substring
+            
+        # transition_file_list = '\n'.join(transition_file_list)
+        flatten = lambda t: [item for sublist in t for subsublist in sublist for item in subsublist]
+        transition_file_list = '\n'.join(flatten(transition_file_list))
+        
+        print(' ---- String ready; write to file...')
+        
+        # Header contains nr of states, choices, and transitions
+        header = str(self.nr_regions+1)+' '+str(nr_choices_absolute+1)+' '+str(nr_transitions_absolute+1)+'\n'
+        
+        if self.setup.scenarios['switch'] and mode == 'interval':
+            firstrow = '0 0 0 [1.0,1.0]\n'
         else:
-            printSuccess('iMDP ('+horizon+' horizon) exported as PRISM file')
+            firstrow = '0 0 0 1.0\n'
         
-        return PRISM_file, specification
+        # Write content to file
+        writeFile(PRISM_transitionfile, 'w', header+firstrow+transition_file_list)
+            
+        ### Write specification file
+        specfile, specification = self.writePRISM_specification(mode, horizon='infinite')
+        
+        return PRISM_allfiles, specfile, specification

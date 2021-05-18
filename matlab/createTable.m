@@ -3,7 +3,7 @@ function out = createTable(N,beta)
     tic
     prevtoc = toc;
 
-    for k = 0:N
+    for k = 0:N/2
         disp("Compute for k = "+k)
 
         disp("Time difference: "+(toc-prevtoc))

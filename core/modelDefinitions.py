@@ -35,18 +35,18 @@ class robot(master.LTI_master):
         
         # Covariance values of the process noise (w) and measurement noise (v)
         self.setup['noise']['sigma_w_value'] = 0.15
-    
-    def setModel(self, tau, observer):
         
-        self.tau = tau
+        self.tau = 1.0
+    
+    def setModel(self, observer):
         
         # State transition matrix
-        self.A  = np.array([[1, tau],
+        self.A  = np.array([[1, self.tau],
                                 [0, 1]])
         
         # Input matrix
-        self.B  = np.array([[tau**2/2],
-                                [tau]])
+        self.B  = np.array([[self.tau**2/2],
+                                [self.tau]])
         
         if observer:
             # Observation matrix
@@ -65,7 +65,7 @@ class robot(master.LTI_master):
         self.noise['w_mean'] = self.W.flatten()
         
 
-class drone(master.LTI_master):
+class UAV(master.LTI_master):
     
     def __init__(self):
         # Initialize superclass
@@ -73,12 +73,12 @@ class drone(master.LTI_master):
         
         # Let the user make a choice for the model dimension
         self.modelDim, _  = ui.user_choice('model dimension',[2,3])
-        
-        # Authority limit for the control u, both positive and negative
-        self.setup['control']['limits']['uMin'] = [-6]
-        self.setup['control']['limits']['uMax'] = [6]
     
         if self.modelDim == 2:
+    
+            # Authority limit for the control u, both positive and negative
+            self.setup['control']['limits']['uMin'] = [-6, -6]
+            self.setup['control']['limits']['uMax'] = [6, 6]        
     
             # Partition size
             self.setup['partition']['nrPerDim']  = [9,9,9,9]#[11, 11, 11, 11]
@@ -108,6 +108,10 @@ class drone(master.LTI_master):
             
         elif self.modelDim == 3:
             
+            # Authority limit for the control u, both positive and negative
+            self.setup['control']['limits']['uMin'] = [-6, -6, -6]
+            self.setup['control']['limits']['uMax'] = [6, 6, 6]
+            
             # Partition size
             self.setup['partition']['nrPerDim']  = [7, 7, 7, 7, 7, 7]
             self.setup['partition']['width']     = [2, 2, 2, 2, 2, 2]
@@ -127,8 +131,10 @@ class drone(master.LTI_master):
 
         # Covariance values of the process noise (w) and measurement noise (v)
         self.setup['noise']['sigma_w_value'] = 0.15
+        
+        self.tau = 0.8
 
-    def setModel(self, tau, observer):
+    def setModel(self, observer):
         '''
         Define LTI system for the robot defined on a 2-dimensional state space
     
@@ -143,16 +149,14 @@ class drone(master.LTI_master):
             Output model dictionary, with LTI system definitions added to it.
     
         '''
-           
-        self.tau = tau
         
         # State transition matrix
-        Ablock = np.array([[1, tau],
+        Ablock = np.array([[1, self.tau],
                           [0, 1]])
         
         # Input matrix
-        Bblock = np.array([[tau**2/2],
-                           [tau]])
+        Bblock = np.array([[self.tau**2/2],
+                           [self.tau]])
         
         if self.modelDim==3:
             self.A  = scipy.linalg.block_diag(Ablock, Ablock, Ablock)
@@ -185,7 +189,125 @@ class drone(master.LTI_master):
         self.noise = dict()
         self.noise['w_cov'] = np.eye(np.size(self.A,1))*self.setup['noise']['sigma_w_value']
         self.noise['w_mean'] = self.W.flatten()
-       
+   
+   
+class building_automation_system_2room(master.LTI_master):
+    
+    def __init__(self):
+        # Initialize superclass
+        master.LTI_master.__init__(self)
+        
+        # Let the user make a choice for the model dimension
+        
+        # Authority limit for the control u, both positive and negative
+        self.setup['control']['limits']['uMin'] = [10, 10]
+        self.setup['control']['limits']['uMax'] = [35, 35]
+            
+        # Partition size
+        self.setup['partition']['nrPerDim']  = [11, 11, 21, 21]
+        self.setup['partition']['width']     = [0.5, 0.5, 0.05, 0.05]
+        self.setup['partition']['origin']    = [21, 21, 35, 35]
+        
+        # Number of actions per dimension (if 'auto', then equal to nr of regions)
+        self.setup['targets']['nrPerDim']    = 'auto'
+        self.setup['targets']['domain']      = 'auto'
+        
+        # Specification information
+        self.setup['specification']['goal']           = [[a,b,c,d] 
+                              for a in [21] 
+                              for b in [21]
+                              for c in np.arange(31,39+1,.05)
+                              for d in np.arange(31,39+1,.05)]
+        
+        self.setup['specification']['critical'] = None
+        
+        self.tau = 30 # NOTE: in minutes for BAS!
+
+    def setModel(self, observer):           
+        '''
+    
+        Parameters
+        ----------
+        model : dict
+            Input model dictionary.
+        zones : int, default=1
+            The number of temperature zones in the cold store
+    
+        Returns
+        -------
+        model : dict
+            Output model dictionary, with LTI system definitions added to it.
+    
+        '''
+        
+        import core.BAS.parameters as BAS_class
+        
+        BAS = BAS_class.parameters()
+        
+        # Steady state values
+        Tswb    = BAS.Boiler['Tswbss']
+        Tsp     = BAS.Zone1['Tsp']             
+        Twss    = BAS.Zone1['Twss']
+        Trwrss  = BAS.Radiator['Trwrss']
+        Pout1   = BAS.Radiator['Zone1']['Prad']    
+        Pout2   = BAS.Radiator['Zone2']['Prad']    
+        m       = BAS.Zone1['m']
+        w       = BAS.Radiator['w_r']
+        
+        # Defining Deterministic Model corresponding matrices
+        A_cont      = np.zeros((4,4));
+        A_cont[0,0] = -(1/(BAS.Zone1['Rn']*BAS.Zone1['Cz']))-((Pout1*BAS.Radiator['alpha2'] )/(BAS.Zone1['Cz'])) - ((m*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz']))
+        A_cont[0,2] = (Pout1*BAS.Radiator['alpha2'] )/(BAS.Zone1['Cz'])
+        A_cont[1,1] = -(1/(BAS.Zone2['Rn']*BAS.Zone2['Cz']))-(Pout2*BAS.Radiator['alpha2'] )/(BAS.Zone2['Cz']) - (m*BAS.Materials['air']['Cpa'])/(BAS.Zone2['Cz'])
+        A_cont[1,3] = (Pout2*BAS.Radiator['alpha2'] )/(BAS.Zone2['Cz'])
+        A_cont[2,0] = 5*(BAS.Radiator['k1'])
+        A_cont[2,2] = -(BAS.Radiator['k0']*w) - 5*BAS.Radiator['k1']
+        A_cont[3,1] = 5*(BAS.Radiator['k1'])
+        A_cont[3,3] = -(BAS.Radiator['k0']*w) - 5*BAS.Radiator['k1']
+        
+        print(A_cont)
+        
+        B_cont      = np.zeros((4,2))
+        B_cont[0,0] = (m*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz'])
+        B_cont[1,1] = (m*BAS.Materials['air']['Cpa'])/(BAS.Zone2['Cz'])
+        B_cont[2,0] = 0
+        B_cont[3,1] =0
+
+        # B_cont = np.array([
+        #         [ (m*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz']) ],
+        #         [ (m*BAS.Materials['air']['Cpa'])/(BAS.Zone2['Cz']) ],
+        #         [ 0 ],
+        #         [ 0 ]
+        #         ])
+        
+        W_cont  = np.array([
+                [ (Twss/(BAS.Zone1['Rn']*BAS.Zone1['Cz']))+ (BAS.Radiator['alpha1'])/(BAS.Zone1['Cz']) ],
+                [ ((Twss-1)/(BAS.Zone2['Rn']*BAS.Zone2['Cz']))+ (BAS.Radiator['alpha1'])/(BAS.Zone1['Cz']) ],
+                [ (BAS.Radiator['k0']*w*Tswb) ],
+                [ (BAS.Radiator['k0']*w*Tswb) ]
+                ])
+        
+        # Discretize model with respect to time
+        # self.A, self.B, self.W = discretizeGearsMethod(A_cont, B_cont, W_cont, self.tau)
+        
+        self.A = np.eye(4) + self.tau*A_cont
+        self.B = B_cont*self.tau
+        self.W = W_cont*self.tau
+        
+        # Determine system dimensions
+        self.n = np.size(self.A,1)
+        self.p = np.size(self.B,1)
+
+        self.noise = dict()
+        self.noise['w_cov'] = 0.5*np.diag([ BAS.Zone1['Tz']['sigma'], BAS.Zone2['Tz']['sigma'], BAS.Radiator['rw']['sigma'], BAS.Radiator['rw']['sigma'] ])
+        
+        self.noise['w_mean'] = self.W.flatten()
+        
+        
+#####################################
+# BELOW ARE VARIOUS (OUTDATED) MODELS
+#####################################
+   
         
 class aircraft_altitude(master.LTI_master):
     
@@ -194,8 +316,8 @@ class aircraft_altitude(master.LTI_master):
         master.LTI_master.__init__(self)
         
         # Authority limit for the control u, both positive and negative
-        self.setup['control']['limits']['uMin'] = [-100]
-        self.setup['control']['limits']['uMax'] = [100]
+        self.setup['control']['limits']['uMin'] = [-100, -100, -100]
+        self.setup['control']['limits']['uMax'] = [100, 100, 100]
     
         # Partition size
         self.setup['partition']['nrPerDim']  = [7, 7, 7, 7,]
@@ -212,8 +334,10 @@ class aircraft_altitude(master.LTI_master):
         
         # Covariance values of the process noise (w) and measurement noise (v)
         self.setup['noise']['sigma_w_value'] = 0.1
+        
+        self.tau = 1
 
-    def setModel(self, tau, observer):
+    def setModel(self, observer):
         '''
     
         Parameters
@@ -227,11 +351,6 @@ class aircraft_altitude(master.LTI_master):
             Output model dictionary, with LTI system definitions added to it.
     
         '''
-        
-        self.tau = tau
-        
-        # Discretization time
-        n = 4
         
         A_cont = np.array([
                 [-0.4272e-1,    -0.8541e1,      -0.4451,        -0.3216e2],
@@ -255,14 +374,7 @@ class aircraft_altitude(master.LTI_master):
             ])
         
         # Discretize model with respect to time
-        alpha, beta0, alphaSum  = gears.gears_order(s=1)
-        
-        A_bar = np.linalg.inv( np.eye(n) - tau*beta0*A_cont )
-        O_bar = tau * beta0 * A_bar
-        
-        self.A = A_bar * alphaSum
-        self.B = O_bar @ B_cont
-        self.W = O_bar @ W_cont
+        self.A, self.B, self.W = discretizeGearsMethod(A_cont, B_cont, W_cont, self.tau)
         
         # Determine system dimensions
         self.n = np.size(self.A,1)
@@ -298,8 +410,10 @@ class anaesthesia_delivery(master.LTI_master):
         
         # Covariance values of the process noise (w) and measurement noise (v)
         self.setup['noise']['sigma_w_value'] = 1e-3
+        
+        self.tau = 30
 
-    def setModel(self, tau, observer):
+    def setModel(self, observer):
         '''
         Define 3-dimensional linear dynamical system for anaesthesia delivery
         benchmark
@@ -315,11 +429,6 @@ class anaesthesia_delivery(master.LTI_master):
             Output model dictionary, with LTI system definitions added to it.
     
         '''
-        
-        self.tau = tau
-        
-        # Discretization time
-        n   = 3
         
         k10 = 0.4436
         k12 = 0.1140
@@ -346,14 +455,7 @@ class anaesthesia_delivery(master.LTI_master):
                 ])
             
         # Discretize model with respect to time
-        alpha, beta0, alphaSum  = gears.gears_order(s=1)
-        
-        A_bar = np.linalg.inv( np.eye(n) - tau*beta0*A_cont )
-        O_bar = tau * beta0 * A_bar
-        
-        self.A = A_bar * alphaSum
-        self.B = O_bar @ B_cont
-        self.W = O_bar @ W_cont
+        self.A, self.B, self.W = discretizeGearsMethod(A_cont, B_cont, W_cont, self.tau)
         
         # Determine system dimensions
         self.n = np.size(self.A,1)
@@ -372,12 +474,12 @@ class cold_store(master.LTI_master):
         
         # Let the user make a choice for the model dimension
         self.modelDim, _  = ui.user_choice('number of temperature zones',[2,3])
-        
-        # Authority limit for the control u, both positive and negative
-        self.setup['control']['limits']['uMin'] = [0]
-        self.setup['control']['limits']['uMax'] = [1500]
     
         if self.modelDim == 2:
+    
+            # Authority limit for the control u, both positive and negative
+            self.setup['control']['limits']['uMin'] = [0, 0]
+            self.setup['control']['limits']['uMax'] = [1500, 1500]        
     
             # Partition size
             self.setup['partition']['nrPerDim']  = [23, 23, 23]
@@ -389,10 +491,14 @@ class cold_store(master.LTI_master):
             self.setup['targets']['domain']      = 'auto'
             
             # Specification information
-            self.setup['specification']['goal']           = [[-5, -5, 0]]
-            self.setup['specification']['critical']       = None
+            self.setup['specification']['goal']     = [[-5, -5, 0]]
+            self.setup['specification']['critical'] = None
             
         elif self.modelDim == 3:
+            
+            # Authority limit for the control u, both positive and negative
+            self.setup['control']['limits']['uMin'] = [0, 0 ,0]
+            self.setup['control']['limits']['uMax'] = [1500, 1500, 1500]
             
             # Partition size
             self.setup['partition']['nrPerDim']  = [23, 23, 23, 23]
@@ -404,8 +510,8 @@ class cold_store(master.LTI_master):
             self.setup['targets']['domain']      = 'auto'
             
             # Specification information
-            self.setup['specification']['goal']           = [-5, -5, -5, 0]
-            self.setup['specification']['critical']       = None
+            self.setup['specification']['goal']     = [[-5, -5, -5, 0]]
+            self.setup['specification']['critical'] = None
         
         else:
             print('No valid dimension for the drone model was provided')
@@ -413,8 +519,10 @@ class cold_store(master.LTI_master):
 
         # Covariance values of the process noise (w) and measurement noise (v)
         self.setup['noise']['sigma_w_value'] = 0.05
+        
+        self.tau = 180
 
-    def setModel(self, tau, observer):           
+    def setModel(self, observer):           
         '''
         Define LTI system for the cold store multiple of temperature zones
     
@@ -431,12 +539,6 @@ class cold_store(master.LTI_master):
             Output model dictionary, with LTI system definitions added to it.
     
         '''
-            
-        # Define number of state features
-        n       = self.modelDim + 1
-        
-        # Discretization time
-        tau     = 180
         
         # Ambient temperature
         T_amb   = 10
@@ -526,14 +628,7 @@ class cold_store(master.LTI_master):
                 self.C = np.array([[1,  0,  0,  0]])
         
         # Discretize model with respect to time
-        alpha, beta0, alphaSum  = gears.gears_order(s=1)
-        
-        A_bar = np.linalg.inv( np.eye(n) - tau*beta0*A_cont )
-        O_bar = tau * beta0 * A_bar
-        
-        self.A = A_bar * alphaSum
-        self.B = O_bar @ B_cont
-        self.W = O_bar @ W_cont
+        self.A, self.B, self.W = discretizeGearsMethod(A_cont, B_cont, W_cont, self.tau)
         
         # Determine system dimensions
         self.n = np.size(self.A,1)
@@ -542,3 +637,115 @@ class cold_store(master.LTI_master):
         self.noise = dict()
         self.noise['w_cov'] = np.eye(np.size(self.A,1))*self.setup['noise']['sigma_w_value']
         self.noise['w_mean'] = self.W.flatten()
+        
+        
+class building_automation_system(master.LTI_master):
+    
+    def __init__(self):
+        # Initialize superclass
+        master.LTI_master.__init__(self)
+        
+        # Let the user make a choice for the model dimension
+        
+        # Authority limit for the control u, both positive and negative
+        self.setup['control']['limits']['uMin'] = [10]
+        self.setup['control']['limits']['uMax'] = [35]
+            
+        # Partition size
+        self.setup['partition']['nrPerDim']  = [11, 21]
+        self.setup['partition']['width']     = [0.5, 0.05]
+        self.setup['partition']['origin']    = [21, 35]
+        
+        # Number of actions per dimension (if 'auto', then equal to nr of regions)
+        self.setup['targets']['nrPerDim']    = 'auto'
+        self.setup['targets']['domain']      = 'auto'
+        
+        # Specification information
+        self.setup['specification']['goal'] = [[a,c] 
+                              for a in [21] 
+                              for c in np.arange(31,39+1,.05)]
+        
+        self.setup['specification']['critical'] = None
+        
+        self.tau = 30 # NOTE: in minutes for BAS!
+
+    def setModel(self, observer):           
+        '''
+    
+        Parameters
+        ----------
+        model : dict
+            Input model dictionary.
+        zones : int, default=1
+            The number of temperature zones in the cold store
+    
+        Returns
+        -------
+        model : dict
+            Output model dictionary, with LTI system definitions added to it.
+    
+        '''
+        
+        import core.BAS.parameters as BAS_class
+        
+        BAS = BAS_class.parameters()
+        
+        # Steady state values
+        Tswb    = BAS.Boiler['Tswbss']
+        Tsp     = BAS.Zone1['Tsp']             
+        Twss    = BAS.Zone1['Twss']
+        Trwrss  = BAS.Radiator['Trwrss']
+        Pout1   = BAS.Radiator['Zone1']['Prad']    
+        Pout2   = BAS.Radiator['Zone2']['Prad']    
+        m       = BAS.Zone1['m']
+        w       = BAS.Radiator['w_r']
+        
+        # Defining Deterministic Model corresponding matrices
+        A_cont      = np.zeros((2,2));
+        A_cont[0,0] = -(1/(BAS.Zone1['Rn']*BAS.Zone1['Cz']))-((Pout1*BAS.Radiator['alpha2'] )/(BAS.Zone1['Cz'])) - ((m*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz']))
+        A_cont[0,1] = (Pout1*BAS.Radiator['alpha2'] )/(BAS.Zone1['Cz'])
+        A_cont[1,0] = 5*(BAS.Radiator['k1'])
+        A_cont[1,1] = -(BAS.Radiator['k0']*w) - 5*BAS.Radiator['k1']
+        
+        B_cont      = np.zeros((2,1))
+        B_cont[0,0] = (m*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz'])
+
+        
+        W_cont  = np.array([
+                [ (Twss/(BAS.Zone1['Rn']*BAS.Zone1['Cz']))+ (BAS.Radiator['alpha1'])/(BAS.Zone1['Cz']) ],
+                [ (BAS.Radiator['k0']*w*Tswb) ],
+                ])
+        
+        # Discretize model with respect to time
+        # self.A, self.B, self.W = discretizeGearsMethod(A_cont, B_cont, W_cont, self.tau)
+        
+        self.A = np.eye(2) + self.tau*A_cont
+        self.B = B_cont*self.tau
+        self.W = W_cont*self.tau
+        
+        # Determine system dimensions
+        self.n = np.size(self.A,1)
+        self.p = np.size(self.B,1)
+
+        self.noise = dict()
+        self.noise['w_cov'] = 0.5*np.diag([ BAS.Zone1['Tz']['sigma'], BAS.Radiator['rw']['sigma'] ])
+        
+        self.noise['w_mean'] = self.W.flatten()
+        
+        
+def discretizeGearsMethod(A_cont, B_cont, W_cont, tau):
+    
+    # Dimension of the state
+    n = len(A_cont)
+    
+    # Discretize model with respect to time
+    alpha, beta0, alphaSum  = gears.gears_order(s=1)
+    
+    A_bar = np.linalg.inv( np.eye(n) - tau*beta0*A_cont )
+    O_bar = tau * beta0 * A_bar
+    
+    A = A_bar * alphaSum
+    B = O_bar @ B_cont
+    W = O_bar @ W_cont
+    
+    return A,B,W
