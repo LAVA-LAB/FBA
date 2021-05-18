@@ -18,7 +18,8 @@ import os
 from scipy.spatial import Delaunay
 
 from .mainFunctions import definePartitions, defineDistances, \
-    in_hull, makeModelFullyActuated, computeScenarioBounds, computeRegionCenters
+    in_hull, makeModelFullyActuated, computeScenarioBounds, computeScenarioBounds_sparse, \
+    computeRegionCenters
 from .commons import tic, toc, ticDiff, tocDiff, \
     nearest_point_in_hull, table, printWarning
 from .postprocessing.createPlots import createPartitionPlot
@@ -561,10 +562,9 @@ class scenarioBasedAbstraction(Abstraction):
                 Sigma = self.model[delta].noise['w_cov']
                 samples = np.random.multivariate_normal(mu, Sigma, 
                                         size=self.setup.scenarios['samples'])
-            
-                # Calculate transition probability
+                    
                 self.trans['memory'], prob[a] = \
-                    computeScenarioBounds(self.setup, 
+                    computeScenarioBounds_sparse(self.setup, 
                       self.basemodel.setup['partition'], 
                       self.abstr, self.trans, samples)
                 

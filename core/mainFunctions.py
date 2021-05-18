@@ -177,7 +177,121 @@ def computeScenarioBounds(setup, partition, abstr, trans, samples):
     returnDict = {
         #'lb': probs_lb,
         #'ub': probs_ub,
-        'approx': probability_approx,
+        #'approx': probability_approx,
+        'interval_strings': interval_strings,
+        'interval_idxs': interval_idxs,
+        'approx_strings': approx_strings,
+        'approx_idxs': approx_idxs,
+        #'deadlock_lb': deadlock_lb,
+        #'deadlock_ub': deadlock_ub,
+        'deadlock_interval_string': deadlock_string,
+        'deadlock_approx': deadlock_approx,
+    }
+    
+    return trans['memory'], returnDict
+
+def computeScenarioBounds_sparse(setup, partition, abstr, trans, samples):
+    
+    # Number of decision variables always equal to one
+    d = 1
+    Nsamples = setup.scenarios['samples']
+    beta = setup.scenarios['confidence']
+    
+    # Initialize counts array
+    counts = dict()
+    
+    centers = computeRegionCenters(samples, partition)
+    
+    for s in range(Nsamples):
+        
+        key = tuple(centers[s])
+        
+        if key in abstr['allCenters']:
+            idx = abstr['allCenters'][ key ]
+            if idx in counts:
+                counts[idx] += 1
+            else:
+                counts[idx] = 1
+
+    #nonEmpty = counts.keys()
+    
+    # Count number of samples not in any region (i.e. in absorbing state)
+    k = Nsamples - sum(counts.values()) + d
+
+    key_lb = tuple( [Nsamples, k, beta] )
+    key_ub = tuple( [Nsamples, k-1, beta] ) 
+    
+    deadlock_low = trans['memory'][key_ub][0]
+    if k > Nsamples:
+        deadlock_upp = 1
+    else:
+        deadlock_upp = trans['memory'][key_lb][1]
+
+    # Initialize vectors for probability bounds
+    probability_low = np.zeros(len(counts))
+    probability_upp = np.zeros(len(counts))
+    probability_approx = np.zeros(len(counts))
+    
+    interval_idxs = np.zeros(len(counts), dtype=int)
+    approx_idxs = np.zeros(len(counts), dtype=int)
+
+    # Enumerate over all the non-zero bins
+    for i, (region,count) in enumerate(counts.items()): #zip(np.arange(abstr['nr_regions'])[nonEmpty], counts[nonEmpty]):
+        
+        k = Nsamples - count + d
+        
+        key_lb = tuple( [Nsamples, k,   beta] )
+        key_ub = tuple( [Nsamples, k-1, beta] )
+        
+        if k > Nsamples:
+            probability_low[i] = 0                
+        else:
+            probability_low[i] = 1 - trans['memory'][key_lb][1]
+        probability_upp[i] = 1 - trans['memory'][key_ub][0]
+        
+        interval_idxs[i] = int(region)
+        
+        # Point estimate transition probability (count / total)
+        probability_approx[i] = count / Nsamples
+        approx_idxs[i] = int(region)
+    
+    nr_decimals = 5
+    
+    # PROBABILITY INTERVALS
+    probs_lb = floor_decimal(probability_low, nr_decimals)
+    probs_ub = floor_decimal(probability_upp, nr_decimals)
+    
+    # Create interval strings (only entries for prob > 0)
+    interval_strings = ["["+
+                      str(floor_decimal(max(1e-4, lb),5))+","+
+                      str(floor_decimal(min(1,    ub),5))+"]"
+                      for (lb, ub) in zip(probs_lb, probs_ub)]# if ub > 0]
+    
+    #interval_idxs = [i for i,(ub) in enumerate(probs_ub)]# if ub > 0]
+    
+    # Compute deadlock probability intervals
+    deadlock_lb = floor_decimal(deadlock_low, nr_decimals)
+    deadlock_ub = floor_decimal(deadlock_upp, nr_decimals)
+    
+    deadlock_string = '['+ \
+                       str(floor_decimal(max(1e-4, deadlock_lb),5))+','+ \
+                       str(floor_decimal(min(1,    deadlock_ub),5))+']'
+    
+    # POINT ESTIMATE PROBABILITIES
+    probability_approx = np.round(probability_approx, nr_decimals)
+    
+    # Create approximate prob. strings (only entries for prob > 0)
+    approx_strings = [str(p) for p in probability_approx]# if p > 0]
+    
+    #approx_idxs = [i for i,(p) in enumerate(probability_approx)]# if p > 0]
+    
+    # Compute approximate deadlock transition probabilities
+    deadlock_approx = np.round(1-sum(probability_approx), nr_decimals)
+    
+    returnDict = {
+        #'lb': probs_lb,
+        #'ub': probs_ub,
+        #'approx': probability_approx,
         'interval_strings': interval_strings,
         'interval_idxs': interval_idxs,
         'approx_strings': approx_strings,

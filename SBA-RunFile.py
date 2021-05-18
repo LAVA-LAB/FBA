@@ -52,6 +52,8 @@ application, application_id  = user_choice('application',list(modelClasses[:,0])
 # PLOT FONT SIZES
 #------------------------------------------------------------------------------
 
+np.random.seed(33)
+
 # Plot font family and size
 plt.rc('font', family='serif')
 SMALL_SIZE = 7
@@ -92,7 +94,7 @@ setup.setOptions(category='mdp',
                  prism_folder="/Users/thom/Documents/PRISM/prism-imc-v3/prism/") # Folder where PRISM is located
 # setup.setOptions(category='montecarlo', init_states=[7])
     
-setup.setOptions(category='mdp', mode='estimate')
+setup.setOptions(category='mdp', mode='interval')
 
 #-----------------------------------------------------------------------------
 # General settings (independent of application)
