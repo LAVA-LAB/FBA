@@ -246,7 +246,7 @@ class UAV_v2(master.LTI_master):
                             for e in [-6,-4,-2]
                             for f in np.arange(-3,3+1,2)] + \
                                                         [[a,b,c,d,e,f] 
-                            for a in [-6,-4] 
+                            for a in [-6,-4,-2] 
                             for b in np.arange(-3,3+1,2)
                             for c in [-6,-4] 
                             for d in np.arange(-3,3+1,2)
