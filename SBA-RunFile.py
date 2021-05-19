@@ -89,7 +89,7 @@ setup = settings(mode='scenario', application=model.name)
 # Manual changes in general settings
 setup.setOptions(category='plotting', exportFormats=['pdf'], partitionPlot=False)
 setup.setOptions(category='mdp', 
-                 prism_java_memory=7,
+                 prism_java_memory=32,
                  prism_model_writer='explicit', # Is either default or explicit
                  prism_folder="/Users/thom/Documents/PRISM/prism-imc-v3/prism/") # Folder where PRISM is located
 # setup.setOptions(category='montecarlo', init_states=[7])
@@ -225,9 +225,9 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max']:
     
     # Write results to dataframes
     horizon_len = int(ScAb.N/min(ScAb.setup.deltas))
-    policy_df   = pd.DataFrame( ScAb.results['optimal_policy'], columns=range(S), index=range(horizon_len) )
-    delta_df    = pd.DataFrame( ScAb.results['optimal_delta'], columns=range(S), index=range(horizon_len) )
-    reward_df   = pd.DataFrame( ScAb.results['optimal_reward'], columns=range(S), index=range(horizon_len) )
+    policy_df   = pd.DataFrame( ScAb.results['optimal_policy'], columns=range(S), index=range(horizon_len) ).T
+    delta_df    = pd.DataFrame( ScAb.results['optimal_delta'], columns=range(S), index=range(horizon_len) ).T
+    reward_df   = pd.DataFrame( ScAb.results['optimal_reward'], columns=range(S), index=range(horizon_len) ).T
     
     # Write dataframes to a different worksheet
     policy_df.to_excel(writer, sheet_name='Optimal policy')
@@ -276,7 +276,7 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max']:
         ScAb.setup.montecarlo['iterations'] = 3
         ScAb.monteCarlo()
         
-        itersToShow = 3
+        itersToShow = 1
         
         traces = []
         for i in state_idxs:
@@ -286,10 +286,57 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max']:
         min_delta = int(min(ScAb.setup.deltas))
         
         if ScAb.basemodel.modelDim == 2:
-            UAVplot2D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces )
+            cut_value = [0,0]
+            UAVplot2D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value )
         
         elif ScAb.basemodel.modelDim == 3:
-            UAVplot3D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces )
+            cut_value = [0,0,0]
+            UAVplot3D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value )
+            
+    if ScAb.basemodel.name == 'UAV_v2':
+    
+        from core.postprocessing.createPlots import UAVplot2D, UAVplot3D
+        from core.mainFunctions import computeRegionCenters
+        
+        # Determine desired state IDs
+        if ScAb.basemodel.modelDim == 2:
+            point_list = [[a,b,c,d] 
+                        for a in [-6] 
+                        for b in [0]
+                        for c in [-6] 
+                        for d in [0]]
+        
+        # Compute all centers of regions associated with points
+        centers = computeRegionCenters(np.array(point_list), ScAb.basemodel.setup['partition'])
+        
+        # Filter to only keep unique centers
+        centers_unique = np.unique(centers, axis=0)
+        
+        state_idxs = [ScAb.abstr['allCenters'][tuple(c)] for c in centers_unique 
+                                       if tuple(c) in ScAb.abstr['allCenters']]
+        
+        print(' -- Perform simulations for initial states:',state_idxs)
+        
+        ScAb.setup.montecarlo['init_states'] = state_idxs
+        ScAb.setup.montecarlo['iterations'] = 3
+        ScAb.monteCarlo()
+        
+        itersToShow = 1
+        
+        traces = []
+        for i in state_idxs:
+            for j in range(itersToShow):
+                traces += [ScAb.mc['traces'][0][i][j]]
+        
+        min_delta = int(min(ScAb.setup.deltas))
+        
+        if ScAb.basemodel.modelDim == 2:
+            cut_value = [1,1]
+            UAVplot2D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value )
+            
+        elif ScAb.basemodel.modelDim == 3:
+            cut_value = [1,1,1]
+            UAVplot2D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value )
         
     # %%
     

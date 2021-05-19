@@ -29,6 +29,25 @@ class robot(master.LTI_master):
         self.setup['targets']['nrPerDim']    = 'auto'
         self.setup['targets']['domain']      = 'auto'
         
+        
+        
+        
+        # Authority limit for the control u, both positive and negative
+        self.setup['control']['limits']['uMin'] =  [-6]
+        self.setup['control']['limits']['uMax'] =  [6]
+        
+        # Partition size
+        self.setup['partition']['nrPerDim']  = [7, 5]
+        self.setup['partition']['width']     = [2, 2]
+        self.setup['partition']['origin']    = [0, 0]
+        
+        # Number of actions per dimension (if 'auto', then equal to nr of regions)
+        self.setup['targets']['nrPerDim']    = 'auto' #[5, 5]
+        self.setup['targets']['domain']      = 'auto' #[7, 7]
+        
+        
+        
+        
         # Specification information
         self.setup['specification']['goal']           = [[0, 0]]
         self.setup['specification']['critical']       = None
@@ -143,6 +162,102 @@ class UAV(master.LTI_master):
                             for c in [-3,-1] 
                             for d in np.arange(-3,3+1,2)
                             for e in [3]
+                            for f in np.arange(-3,3+1,2)]
+        
+        else:
+            print('No valid dimension for the drone model was provided')
+            sys.exit()
+
+        # Covariance values of the process noise (w) and measurement noise (v)
+        self.setup['noise']['sigma_w_value'] = 0.15
+        
+        self.tau = 0.75
+        
+class UAV_v2(master.LTI_master):
+    
+    def __init__(self):
+        # Initialize superclass
+        master.LTI_master.__init__(self)
+        
+        # Let the user make a choice for the model dimension
+        self.modelDim, _  = ui.user_choice('model dimension',[2,3])
+    
+        if self.modelDim == 2:
+    
+            # Authority limit for the control u, both positive and negative
+            self.setup['control']['limits']['uMin'] = [-6, -6]
+            self.setup['control']['limits']['uMax'] = [6, 6]        
+    
+            # Partition size
+            self.setup['partition']['nrPerDim']  = [7,4,7,4]#[11, 11, 11, 11]
+            self.setup['partition']['width']     = [2, 2, 2, 2]
+            self.setup['partition']['origin']    = [0, 0, 0, 0]
+            
+            # Number of actions per dimension (if 'auto', then equal to nr of regions)
+            self.setup['targets']['nrPerDim']    = 'auto'
+            self.setup['targets']['domain']      = 'auto'
+            
+            # Specification information
+            self.setup['specification']['goal']           = [[a,b,c,d] 
+                             for a in [6] 
+                             for b in np.arange(-3,3+1,2) 
+                             for c in [6] 
+                             for d in np.arange(-3,3+1,2)]
+            self.setup['specification']['critical']       = [[a,b,c,d] 
+                             for a in [-6,-4,-2] 
+                             for b in np.arange(-3,3+1,2) 
+                             for c in [2] 
+                             for d in np.arange(-3,3+1,2)] + \
+                                                            [[a,b,c,d]
+                             for a in [4,6] 
+                             for b in np.arange(-3,3+1,2) 
+                             for c in [-6,-4] 
+                             for d in np.arange(-3,3+1,2)]
+            
+        elif self.modelDim == 3:
+            
+            # Authority limit for the control u, both positive and negative
+            self.setup['control']['limits']['uMin'] = [-6, -6, -6]
+            self.setup['control']['limits']['uMax'] = [6, 6, 6]
+            
+            # Partition size
+            self.setup['partition']['nrPerDim']  = [7, 4, 7, 4, 7, 4] #[7, 7, 7, 7, 7, 7]
+            self.setup['partition']['width']     = [2, 2, 2, 2, 2, 2] #[2, 2, 2, 2, 2, 2]
+            self.setup['partition']['origin']    = [0, 0, 0, 0, 0, 0]
+            
+            # Number of actions per dimension (if 'auto', then equal to nr of regions)
+            self.setup['targets']['nrPerDim']    = 'auto'
+            self.setup['targets']['domain']      = 'auto'
+            
+            # Specification information
+            self.setup['specification']['goal']       = [[a,b,c,d,e,f] 
+                            for a in [4,6] 
+                            for b in np.arange(-3,3+1,2)
+                            for c in [4,6] 
+                            for d in np.arange(-3,3+1,2)
+                            for e in [4,6]
+                            for f in np.arange(-3,3+1,2)]
+            
+            self.setup['specification']['critical']   = [[a,b,c,d,e,f] 
+                            for a in [0,2] 
+                            for b in np.arange(-3,3+1,2)
+                            for c in [2,4,6] 
+                            for d in np.arange(-3,3+1,2)
+                            for e in [-6,-4,-2]
+                            for f in np.arange(-3,3+1,2)] + \
+                                                        [[a,b,c,d,e,f] 
+                            for a in [-6,-4] 
+                            for b in np.arange(-3,3+1,2)
+                            for c in [-6,-4] 
+                            for d in np.arange(-3,3+1,2)
+                            for e in [4,6]
+                            for f in np.arange(-3,3+1,2)] + \
+                                                        [[a,b,c,d,e,f] 
+                            for a in [4,6] 
+                            for b in np.arange(-3,3+1,2)
+                            for c in [-6,-4] 
+                            for d in np.arange(-3,3+1,2)
+                            for e in [-6,-4]
                             for f in np.arange(-3,3+1,2)]
         
         else:

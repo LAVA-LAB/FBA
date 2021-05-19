@@ -36,7 +36,7 @@ class settings(object):
             sa['switch'] = True        
             sa['samples'] = 25 # Sample complexity used in scenario approach
             sa['gamma'] = 2 # Factor by which N is multiplied in every iteration
-            sa['samples_max'] = 800 # Maximum number of samples in iterative scheme
+            sa['samples_max'] = 3200 # Maximum number of samples in iterative scheme
             sa['confidence']   = 1e-1 # Confidence level (beta)
             
         else:

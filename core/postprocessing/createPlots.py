@@ -627,14 +627,12 @@ def createTimegroupingPlot(setup, plot, model, results, abstr, max_delta):
     else:
         print('Number of dimensions is larger than 2, so partition plots omitted')
         
-def UAVplot2D(setup, model, abstr, traces):
+def UAVplot2D(setup, model, abstr, traces, cut_value):
     
     from scipy.interpolate import interp1d
     
     ix = 0
     iy = 2
-    
-    cut_value = [0,0]
     
     fig, ax = plt.subplots(figsize=cm2inch(6.1, 5))
     
@@ -735,54 +733,15 @@ def UAVplot2D(setup, model, abstr, traces):
     filename = setup.directories['outputFcase']+'drone_trajectory'
     for form in setup.plotting['exportFormats']:
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
-      
-def plotCube(ax, center, width, alpha, color):
-    
-    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-    
-    alpha = float(alpha)
-    color = str(color)
-    
-    points = np.array([ [-1, -1, -1],
-                        [1, -1, -1 ],
-                        [1, 1, -1],
-                        [-1, 1, -1],
-                        [-1, -1, 1],
-                        [1, -1, 1 ],
-                        [1, 1, 1],
-                        [-1, 1, 1] ])
-    
-    Z = center + points * 0.5 * width
-
-    r = [-1,1]
-    
-    X, Y = np.meshgrid(r, r)
-    
-    # plot vertices
-    # ax.scatter3D(Z[:, 0], Z[:, 1], Z[:, 2])
-    
-    # list of sides' polygons of figure
-    verts = [[Z[0],Z[1],Z[2],Z[3]],
-     [Z[4],Z[5],Z[6],Z[7]], 
-     [Z[0],Z[1],Z[5],Z[4]], 
-     [Z[2],Z[3],Z[7],Z[6]], 
-     [Z[1],Z[2],Z[6],Z[5]],
-     [Z[4],Z[7],Z[3],Z[0]]]
-    
-    # plot sides
-    ax.add_collection3d(Poly3DCollection(verts, 
-     facecolors=color, linewidths=1, edgecolors=color, alpha=alpha))
     
       
-def UAVplot3D(setup, model, abstr, traces):
+def UAVplot3D(setup, model, abstr, traces, cut_value):
     
     from scipy.interpolate import interp1d
     
     ix = 0
     iy = 2
     iz = 4
-    
-    cut_value = [1,1,1]
     
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -870,3 +829,40 @@ def UAVplot3D(setup, model, abstr, traces):
         
     plt.show()
     
+    
+def plotCube(ax, center, width, alpha, color):
+    
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    
+    alpha = float(alpha)
+    color = str(color)
+    
+    points = np.array([ [-1, -1, -1],
+                        [1, -1, -1 ],
+                        [1, 1, -1],
+                        [-1, 1, -1],
+                        [-1, -1, 1],
+                        [1, -1, 1 ],
+                        [1, 1, 1],
+                        [-1, 1, 1] ])
+    
+    Z = center + points * 0.5 * width
+
+    r = [-1,1]
+    
+    X, Y = np.meshgrid(r, r)
+    
+    # plot vertices
+    # ax.scatter3D(Z[:, 0], Z[:, 1], Z[:, 2])
+    
+    # list of sides' polygons of figure
+    verts = [[Z[0],Z[1],Z[2],Z[3]],
+     [Z[4],Z[5],Z[6],Z[7]], 
+     [Z[0],Z[1],Z[5],Z[4]], 
+     [Z[2],Z[3],Z[7],Z[6]], 
+     [Z[1],Z[2],Z[6],Z[5]],
+     [Z[4],Z[7],Z[3],Z[0]]]
+    
+    # plot sides
+    ax.add_collection3d(Poly3DCollection(verts, 
+     facecolors=color, linewidths=1, edgecolors=color, alpha=alpha))
