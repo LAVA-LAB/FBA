@@ -131,7 +131,7 @@ class UAV(master.LTI_master):
                             for f in np.arange(-3,3+1,2)]
             
             self.setup['specification']['critical']   = [[a,b,c,d,e,f] 
-                            for a in [-1,1] 
+                            for a in [-3,-1] 
                             for b in np.arange(-3,3+1,2)
                             for c in [1,3] 
                             for d in np.arange(-3,3+1,2)
@@ -140,7 +140,7 @@ class UAV(master.LTI_master):
                                                         [[a,b,c,d,e,f] 
                             for a in [-3,-1] 
                             for b in np.arange(-3,3+1,2)
-                            for c in [-3,-1,1] 
+                            for c in [-3,-1] 
                             for d in np.arange(-3,3+1,2)
                             for e in [3]
                             for f in np.arange(-3,3+1,2)]

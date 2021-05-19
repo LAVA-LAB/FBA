@@ -1036,7 +1036,7 @@ class scenarioBasedAbstraction(Abstraction):
                                 break
                             
                             if self.setup.main['verbose']:
-                                tab.print_row([n0, i, m, k, 'Take action: '+str(actionToTake[k])+' (delta='+str(delta)+')'])
+                                tab.print_row([n0, i, m, k, 'In state: '+str(x_region[k])+', take action: '+str(actionToTake[k])+' (delta='+str(delta)+')'])
                             
                             # Only perform another movement if k < N-tau (of base model)
                             if k < self.N:
