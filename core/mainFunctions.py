@@ -56,16 +56,17 @@ def computeRegionCenters(points, partition):
     Function to compute to which region (center) a list of points belong
     '''
     
+    # Check if 'points' is a vector or matrix
+    if len(np.shape(points)) == 1:
+        points = np.reshape(points, (1,len(points)))
+    
     # Retreive partition parameters
     region_width = np.array(partition['width'])
     region_nrPerDim = partition['nrPerDim']
     dim = len(region_width)
     
     # Boolean list per dimension if it has a region with the origin as center
-    originCentered = np.zeros(dim)
-    for q in range(dim):
-        if region_nrPerDim[q]/2 != int(region_nrPerDim[q]/2):
-            originCentered[q] = True
+    originCentered = [True if nr % 2 != 0 else False for nr in region_nrPerDim]
 
     # Initialize centers array
     centers = np.zeros(np.shape(points)) 
@@ -77,9 +78,12 @@ def computeRegionCenters(points, partition):
     for q in range(dim):
         # Compute the center coordinates of every shifted point
         if originCentered[q]:
+            
             centers[:,q] = ((pointsShift[:,q]+0.5*region_width[q]) // region_width[q]) * region_width[q]
+        
         else:
-            centers[q] = (pointsShift[:,q] // region_width[q]) * region_width[q] + 0.5*region_width[q]
+            
+            centers[:,q] = (pointsShift[:,q] // region_width[q]) * region_width[q] + 0.5*region_width[q]
     
     # Add the origin again to obtain the absolute center coordinates
     return centers + originShift

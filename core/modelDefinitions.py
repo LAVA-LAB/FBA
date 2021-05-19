@@ -21,7 +21,7 @@ class robot(master.LTI_master):
         self.setup['control']['limits']['uMax'] =  [5]
         
         # Partition size
-        self.setup['partition']['nrPerDim']  = [21, 21]
+        self.setup['partition']['nrPerDim']  = [22, 21]
         self.setup['partition']['width']     = [1, 1]
         self.setup['partition']['origin']    = [0, 0]
         
@@ -113,17 +113,37 @@ class UAV(master.LTI_master):
             self.setup['control']['limits']['uMax'] = [6, 6, 6]
             
             # Partition size
-            self.setup['partition']['nrPerDim']  = [7, 7, 7, 7, 7, 7]
-            self.setup['partition']['width']     = [2, 2, 2, 2, 2, 2]
+            self.setup['partition']['nrPerDim']  = [4, 4, 4, 4, 4, 4] #[7, 7, 7, 7, 7, 7]
+            self.setup['partition']['width']     = [2, 2, 2, 2, 2, 2] #[2, 2, 2, 2, 2, 2]
             self.setup['partition']['origin']    = [0, 0, 0, 0, 0, 0]
             
             # Number of actions per dimension (if 'auto', then equal to nr of regions)
-            self.setup['targets']['nrPerDim']    = [5, 5, 5, 5, 5, 5]
-            self.setup['targets']['domain']      = [7,7,7,7,7,7]
+            self.setup['targets']['nrPerDim']    = 'auto' #[5, 5, 5, 5, 5, 5]
+            self.setup['targets']['domain']      = 'auto' #[7,7,7,7,7,7]
             
             # Specification information
-            self.setup['specification']['goal']       = [[0, 0, 0, 0, 0, 0]]
-            self.setup['specification']['critical']   = None
+            self.setup['specification']['goal']       = [[a,b,c,d,e,f] 
+                            for a in [3] 
+                            for b in np.arange(-3,3+1,2)
+                            for c in [3] 
+                            for d in np.arange(-3,3+1,2)
+                            for e in [3]
+                            for f in np.arange(-3,3+1,2)]
+            
+            self.setup['specification']['critical']   = [[a,b,c,d,e,f] 
+                            for a in [-1,1] 
+                            for b in np.arange(-3,3+1,2)
+                            for c in [1,3] 
+                            for d in np.arange(-3,3+1,2)
+                            for e in [-3,-1]
+                            for f in np.arange(-3,3+1,2)] + \
+                                                        [[a,b,c,d,e,f] 
+                            for a in [-3,-1] 
+                            for b in np.arange(-3,3+1,2)
+                            for c in [-3,-1,1] 
+                            for d in np.arange(-3,3+1,2)
+                            for e in [3]
+                            for f in np.arange(-3,3+1,2)]
         
         else:
             print('No valid dimension for the drone model was provided')
@@ -132,7 +152,7 @@ class UAV(master.LTI_master):
         # Covariance values of the process noise (w) and measurement noise (v)
         self.setup['noise']['sigma_w_value'] = 0.15
         
-        self.tau = 0.8
+        self.tau = 0.75
 
     def setModel(self, observer):
         '''

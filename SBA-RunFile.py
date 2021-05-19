@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
- ____________________________________
-|                                    |
-|  FILTER-BASED ABSTRACTION PROGRAM  |
-|____________________________________|
+ ______________________________________
+|                                      |
+|  SCENARIO-BASED ABSTRACTION PROGRAM  |
+|______________________________________|
 
 Implementation of the method proposed in the paper:
     "Filter-based abstractions with correctness guarantees for planning under
@@ -94,7 +94,12 @@ setup.setOptions(category='mdp',
                  prism_folder="/Users/thom/Documents/PRISM/prism-imc-v3/prism/") # Folder where PRISM is located
 # setup.setOptions(category='montecarlo', init_states=[7])
     
+setup.setOptions(category='main', iterative=False)
+setup.setOptions(category='mdp', samples=1600)
+
 setup.setOptions(category='mdp', mode='interval')
+
+# %%
 
 #-----------------------------------------------------------------------------
 # General settings (independent of application)
@@ -234,23 +239,27 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max']:
     
     # %%
     
-    datestring_end = datetime.now().strftime("%m-%d-%Y %H-%M-%S")             
-    print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
-    print('APPLICATION FINISHED AT', datestring_end)
+    if ScAb.basemodel.name == 'UAV':
     
-    # %%
-    
-    if ScAb.basemodel.name == 'UAV' and ScAb.basemodel.modelDim == 2:
-    
-        from core.postprocessing.createPlots import dronePositionPlot
+        from core.postprocessing.createPlots import UAVplot2D, UAVplot3D
         from core.mainFunctions import computeRegionCenters
         
         # Determine desired state IDs
-        point_list = [[a,b,c,d] 
-                    for a in [-8,-6] 
-                    for b in [0]
-                    for c in [-8,-6] 
-                    for d in [0]]
+        if ScAb.basemodel.modelDim == 2:
+            point_list = [[a,b,c,d] 
+                        for a in [-8,-6] 
+                        for b in [0]
+                        for c in [-8,-6] 
+                        for d in [0]]
+            
+        elif ScAb.basemodel.modelDim == 3:
+            point_list = [[a,b,c,d,e,f] 
+                        for a in [-3] 
+                        for b in [0]
+                        for c in [-3] 
+                        for d in [0]
+                        for e in [-3]
+                        for f in [0]]
         
         # Compute all centers of regions associated with points
         centers = computeRegionCenters(np.array(point_list), ScAb.basemodel.setup['partition'])
@@ -267,12 +276,30 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max']:
         ScAb.setup.montecarlo['iterations'] = 3
         ScAb.monteCarlo()
         
+        itersToShow = 3
+        
         traces = []
         for i in state_idxs:
-            traces += [ScAb.mc['traces'][0][i][0]]
+            for j in range(itersToShow):
+                traces += [ScAb.mc['traces'][0][i][j]]
         
         min_delta = int(min(ScAb.setup.deltas))
-        dronePositionPlot( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces )
+        
+        if ScAb.basemodel.modelDim == 2:
+            UAVplot2D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces )
+        
+        elif ScAb.basemodel.modelDim == 3:
+            UAVplot3D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces )
         
     # %%
-    ScAb.setup.scenarios['samples'] = int(ScAb.setup.scenarios['samples']*ScAb.setup.scenarios['gamma'])
+    
+    if ScAb.setup.main['iterative'] is True:
+        ScAb.setup.scenarios['samples'] = int(ScAb.setup.scenarios['samples']*ScAb.setup.scenarios['gamma'])
+        
+    else:
+        print('\nITERATIVE SCHEME DISABLED, SO TERMINATE LOOP')
+        break
+        
+datestring_end = datetime.now().strftime("%m-%d-%Y %H-%M-%S")             
+print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
+print('APPLICATION FINISHED AT', datestring_end)

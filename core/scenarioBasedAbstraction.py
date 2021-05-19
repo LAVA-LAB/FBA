@@ -620,7 +620,7 @@ class scenarioBasedAbstraction(Abstraction):
             for k in k_range:
                 
                 # Print header row
-                if self.setup.verbose:
+                if self.setup.main['verbose']:
                     tab.print_row(['DELTA','K','ACTION','STATUS'], head=True)    
                 else:
                     print(' -- Calculate transitions for delta',delta,'at time',k)
@@ -822,7 +822,7 @@ class scenarioBasedAbstraction(Abstraction):
         '''
         
         tocDiff(False)
-        if self.setup.verbose:
+        if self.setup.main['verbose']:
             print(' -- Starting Monte Carlo simulations...')
         
         self.mc['results']  = dict()
@@ -849,18 +849,18 @@ class scenarioBasedAbstraction(Abstraction):
             
         n_list = self.setup.montecarlo['init_timesteps']
         
-        print(' -- Creating hulls for all regions...')
+        # print(' -- Creating hulls for all regions...')
         
         # Create hull for every region in the partition
-        if 'hull' not in self.abstr['P'][0]:
-            for i in self.abstr['P']:
-                self.abstr['P'][i]['hull'] = self._defRegionHull(self.abstr['allCorners'][i])
+        # if 'hull' not in self.abstr['P'][0]:
+        #     for i in self.abstr['P']:
+        #         self.abstr['P'][i]['hull'] = self._defRegionHull(self.abstr['allCorners'][i])
         
         self.mc['results']['reachability_probability'] = \
             np.zeros((self.abstr['nr_regions'],len(n_list)))
         
         # Column widths for tabular prints
-        if self.setup.verbose:
+        if self.setup.main['verbose']:
             col_width = [6,8,6,6,46]
             tab = table(col_width)
 
@@ -888,7 +888,7 @@ class scenarioBasedAbstraction(Abstraction):
                     continue
                 # Otherwise, continue with the Monte Carlo simulation
                 
-                if self.setup.verbose:
+                if self.setup.main['verbose']:
                     tab.print_row(['K0','STATE','ITER','K','STATUS'], head=True)
                 else:
                     print(' -- Monte Carlo for start time',n0,'and state',i)
@@ -912,14 +912,14 @@ class scenarioBasedAbstraction(Abstraction):
                         # Then abort the current iteration, as we have achieved the goal
                         self.mc['results'][n0][i]['goalReached'][m] = True
                         
-                        if self.setup.verbose:
+                        if self.setup.main['verbose']:
                             tab.print_row([n0, i, m, n0, 'Initial state is goal state'], sort="Success")
                     elif delta == 0:
                         # If delta is zero, no policy is known, and reachability is zero
-                        if self.setup.verbose:
+                        if self.setup.main['verbose']:
                             tab.print_row([n0, i, m, n0, 'No initial policy known, so abort'], sort="Warning")
                     else:
-                        if self.setup.verbose:
+                        if self.setup.main['verbose']:
                             tab.print_row([n0, i, m, n0, 'Start Monte Carlo iteration'])
                                             
                         # Initialize the current simulation
@@ -944,60 +944,81 @@ class scenarioBasedAbstraction(Abstraction):
                         # For each time step in the finite time horizon
                         while k < self.N / min(self.setup.deltas):
                             
-                            if self.setup.verbose:
+                            if self.setup.main['verbose']:
                                 tab.print_row([n0, i, m, k, 'New time step'])
                             
-                            if k == n0 or self.setup.mdp['solver'] != 'Python':
-                                region_likelihood_list = np.arange(self.mdp.nr_regions)
-                            else:
-                                # Determine the likehood of being in a state,
-                                # based on previous action taken
-                                prev_k = k - delta
-                                prev_s = x_region[prev_k] + prev_k * self.mdp.nr_regions
+                            # if k == n0 or self.setup.mdp['solver'] != 'Python':
+                            #     region_likelihood_list = np.arange(self.mdp.nr_regions)
+                            # else:
+                            #     # Determine the likehood of being in a state,
+                            #     # based on previous action taken
+                            #     prev_k = k - delta
+                            #     prev_s = x_region[prev_k] + prev_k * self.mdp.nr_regions
                                 
-                                prev_probs = self.mdp.transitions['prob'][prev_k] \
-                                   [prev_s][(delta, actionToTake[prev_k])]
+                            #     prev_probs = self.mdp.transitions['prob'][prev_k] \
+                            #        [prev_s][(delta, actionToTake[prev_k])]
                             
-                                region_likelihood_list = np.array(prev_probs).argsort()[::-1]
+                            #     region_likelihood_list = np.array(prev_probs).argsort()[::-1]
                             
                             # Determine to what region the MDP state belongs   
                             # Default value is -1 (absorbing state)
-                            x_region[k] = -1
-                            for ii in region_likelihood_list:
-                                # If the current true state is in the set of polypoints..                                
-                                if in_hull( x[k], self.abstr['P'][ii]['hull'] ):
-                                    # Save that state is currently in region ii
-                                    x_region[k] = ii
+                            
+                            # x_region[k] = -1
+                            
+                            # for ii in region_likelihood_list:
+                            #     # If the current true state is in the set of polypoints..                                
+                            #     if in_hull( x[k], self.abstr['P'][ii]['hull'] ):
+                            #         # Save that state is currently in region ii
+                            #         x_region[k] = ii
                                     
-                                    # Retreive the action from the policy
-                                    actionToTake[k] = self.results['optimal_policy'][k, x_region[k]]
+                            #         # Retreive the action from the policy
+                            #         actionToTake[k] = self.results['optimal_policy'][k, x_region[k]]
                                         
-                                    # Print current state of the belief
-                                    if self.setup.verbose:
-                                        tab.print_row([n0, i, m, k, 'True state is in region '+str(x_region[k])])
+                            #         # Print current state of the belief
+                            #         if self.setup.main['verbose']:
+                            #             tab.print_row([n0, i, m, k, 'True state is in region '+str(x_region[k])])
                                         
-                                    break
+                            #         break
+                                
+                            ### Method below doesn't use convex hulls (= faster)
+                            
+                            # Determine to what region the MDP state belongs   
+                            # Default value is -1 (absorbing state)
+                            
+                            # Compute all centers of regions associated with points
+                            center_coord = computeRegionCenters(x[k], self.basemodel.setup['partition']).flatten()
+                            
+                            if tuple(center_coord) in self.abstr['allCenters']:
+                                # Save that state is currently in region ii
+                                x_region[k] = self.abstr['allCenters'][tuple(center_coord)]
+                                
+                                # Retreive the action from the policy
+                                actionToTake[k] = self.results['optimal_policy'][k, x_region[k]]
+                            else:
+                                x_region[k] = -1
+                            
+                            ###
                             
                             # If current region is the goal state ... 
                             if x_region[k] in self.abstr['goal']:
                                 # Then abort the current iteration, as we have achieved the goal
                                 self.mc['results'][n0][i]['goalReached'][m] = True
                                 
-                                if self.setup.verbose:
+                                if self.setup.main['verbose']:
                                     tab.print_row([n0, i, m, k, 'Goal state reached'], sort="Success")
                                 break
                             # If current region is in critical states...
                             elif x_region[k] in self.abstr['critical']:
                                 # Then abort current iteration
-                                if self.setup.verbose:
+                                if self.setup.main['verbose']:
                                     tab.print_row([n0, i, m, k, 'Critical state reached, so abort'], sort="Warning")
                                 break
                             elif x_region[k] == -1:
-                                if self.setup.verbose:
+                                if self.setup.main['verbose']:
                                     tab.print_row([n0, i, m, k, 'Absorbing state reached, so abort'], sort="Warning")
                                 break
                             elif actionToTake[k] == -1:
-                                if self.setup.verbose:
+                                if self.setup.main['verbose']:
                                     tab.print_row([n0, i, m, k, 'No policy known, so abort'], sort="Warning")
                                 break
                             
@@ -1010,11 +1031,11 @@ class scenarioBasedAbstraction(Abstraction):
                             
                             # If delta is zero, no policy is known, and reachability is zero
                             if delta == 0:
-                                if self.setup.verbose:
+                                if self.setup.main['verbose']:
                                     tab.print_row([n0, i, m, k, 'Action type undefined, so abort'], sort="Warning")
                                 break
                             
-                            if self.setup.verbose:
+                            if self.setup.main['verbose']:
                                 tab.print_row([n0, i, m, k, 'Take action: '+str(actionToTake[k])+' (delta='+str(delta)+')'])
                             
                             # Only perform another movement if k < N-tau (of base model)

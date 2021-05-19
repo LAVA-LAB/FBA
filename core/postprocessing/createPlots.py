@@ -627,7 +627,7 @@ def createTimegroupingPlot(setup, plot, model, results, abstr, max_delta):
     else:
         print('Number of dimensions is larger than 2, so partition plots omitted')
         
-def dronePositionPlot(setup, model, abstr, traces):
+def UAVplot2D(setup, model, abstr, traces):
     
     from scipy.interpolate import interp1d
     
@@ -735,3 +735,138 @@ def dronePositionPlot(setup, model, abstr, traces):
     filename = setup.directories['outputFcase']+'drone_trajectory'
     for form in setup.plotting['exportFormats']:
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
+      
+def plotCube(ax, center, width, alpha, color):
+    
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    
+    alpha = float(alpha)
+    color = str(color)
+    
+    points = np.array([ [-1, -1, -1],
+                        [1, -1, -1 ],
+                        [1, 1, -1],
+                        [-1, 1, -1],
+                        [-1, -1, 1],
+                        [1, -1, 1 ],
+                        [1, 1, 1],
+                        [-1, 1, 1] ])
+    
+    Z = center + points * 0.5 * width
+
+    r = [-1,1]
+    
+    X, Y = np.meshgrid(r, r)
+    
+    # plot vertices
+    # ax.scatter3D(Z[:, 0], Z[:, 1], Z[:, 2])
+    
+    # list of sides' polygons of figure
+    verts = [[Z[0],Z[1],Z[2],Z[3]],
+     [Z[4],Z[5],Z[6],Z[7]], 
+     [Z[0],Z[1],Z[5],Z[4]], 
+     [Z[2],Z[3],Z[7],Z[6]], 
+     [Z[1],Z[2],Z[6],Z[5]],
+     [Z[4],Z[7],Z[3],Z[0]]]
+    
+    # plot sides
+    ax.add_collection3d(Poly3DCollection(verts, 
+     facecolors=color, linewidths=1, edgecolors=color, alpha=alpha))
+    
+      
+def UAVplot3D(setup, model, abstr, traces):
+    
+    from scipy.interpolate import interp1d
+    
+    ix = 0
+    iy = 2
+    iz = 4
+    
+    cut_value = [1,1,1]
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    regionWidth_xyz = np.array([model.setup['partition']['width'][0], 
+                                model.setup['partition']['width'][2], 
+                                model.setup['partition']['width'][4]])    
+    
+    # Draw goal states
+    for goal in abstr['goal']:
+        
+        goalState = abstr['P'][goal]
+        if goalState['center'][1] == cut_value[0] and goalState['center'][3] == cut_value[1] and goalState['center'][5] == cut_value[2]:
+        
+            center_xyz = np.array([goalState['center'][0], 
+                                   goalState['center'][2], 
+                                   goalState['center'][4]])
+            
+            plotCube(ax, center_xyz, regionWidth_xyz, 0.1, 'g')
+            
+    # Draw critical states
+    for crit in abstr['critical']:
+        
+        critState = abstr['P'][crit]
+        if critState['center'][1] == cut_value[0] and critState['center'][3] == cut_value[1] and critState['center'][5] == cut_value[2]:
+        
+            center_xyz = np.array([critState['center'][0], 
+                                   critState['center'][2], 
+                                   critState['center'][4]])    
+        
+            plotCube(ax, center_xyz, regionWidth_xyz, 0.2, 'r')   
+        
+    # Add traces
+    for trace in traces:
+               
+        # Convert nested list to 2D array
+        trace_array = np.array(trace)
+        
+        # Extract x,y coordinates of trace
+        x = trace_array[:, ix]
+        y = trace_array[:, iy]
+        z = trace_array[:, iz]
+        points = np.array([x,y,z]).T
+        
+        print(points)
+        
+        # Plot precise points
+        plt.plot(*points.T, 'o', markersize=4, color="black");
+        
+        # Linear length along the line:
+        distance = np.cumsum( np.sqrt(np.sum( np.diff(points, axis=0)**2, axis=1 )) )
+        distance = np.insert(distance, 0, 0)/distance[-1]
+        
+        # Interpolation for different methods:
+        alpha = np.linspace(0, 1, 75)
+        
+        interpolator =  interp1d(distance, points, kind='quadratic', axis=0)
+        interpolated_points = interpolator(alpha)
+        
+        # Plot trace
+        plt.plot(*interpolated_points.T, '-', color="blue", linewidth=1);
+        # plt.plot(x_values, y_values, color="blue")
+        
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+           
+    width = np.array(model.setup['partition']['width'])
+    domainMax = width * np.array(model.setup['partition']['nrPerDim']) / 2
+    min_xyz = model.setup['partition']['origin'] - domainMax
+    max_xyz = model.setup['partition']['origin'] + domainMax
+    
+    ax.set_xlim(min_xyz[ix], max_xyz[ix])
+    ax.set_ylim(min_xyz[iy], max_xyz[iy])
+    ax.set_zlim(min_xyz[iz], max_xyz[iz])
+    
+    # Set tight layout
+    fig.tight_layout()
+    
+    # Save figure
+    filename = setup.directories['outputFcase']+'drone_trajectory'
+    for form in setup.plotting['exportFormats']:
+        plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
+        
+    plt.show()
+    

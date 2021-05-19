@@ -14,26 +14,16 @@ class settings(object):
     
     def setOptions(self, category=None, **kwargs):
         # Function to set values in the setup dictionary
-
-        # If category is none, settings are set in main dictionary
-        if category==None:
-            for key, value in kwargs.items():
-                self.key = value
-                
-                print(' >> Changed',key,'to',value)
-                
-        # Otherwise, settings are set within sub-dictionary 'category'
-        else:
             
-            category_upd = getattr(self, category)
+        category_upd = getattr(self, category)
+        
+        for key, value in kwargs.items():
             
-            for key, value in kwargs.items():
-                
-                category_upd[str(key)] = value
-                
-                print(' >> Changed',key,'in',category,'to',value)
-                
-            setattr(self, category, category_upd)
+            category_upd[str(key)] = value
+            
+            print(' >> Changed',key,'in',category,'to',value)
+            
+        setattr(self, category, category_upd)
     
     def __init__(self, mode, application):
         
@@ -100,6 +90,11 @@ class settings(object):
         mc['init_states']           = False
         mc['init_timesteps']        = False
         
+        # Main settings
+        main = dict()
+        main['verbose']             = True
+        main['iterative']           = True
+        
         self.mdp = mdp
         self.plotting = plot
         self.montecarlo = mc
@@ -107,8 +102,7 @@ class settings(object):
         self.scenarios = sa
         self.time = timing
         self.directories = directories
-        
-        self.verbose = True
+        self.main = main
         
         # Create directories
         createDirectory(self.directories['outputF'])
