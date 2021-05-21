@@ -59,7 +59,7 @@ class Abstraction(object):
     
     def _defModel(self, delta):
         
-        if delta == 1:
+        if delta == 0:
             model = makeModelFullyActuated(copy.deepcopy(self.basemodel), manualDimension = 'auto', observer=False)
         else:
             model = makeModelFullyActuated(copy.deepcopy(self.basemodel), manualDimension = delta, observer=False)
@@ -108,7 +108,7 @@ class Abstraction(object):
     
     def _defStateLabelSet(self, allCenters, partition, subset):
         
-        if subset == None:
+        if np.shape(subset)[1] == 0:
             return []
         
         else:
@@ -257,7 +257,7 @@ class Abstraction(object):
         
         nr_corners = 2**self.basemodel.n
         
-        printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
+        printEvery = 1#min(100, max(1, int(self.abstr['nr_actions']/10)))
         
         # Check if dimension of control area equals that if the state vector
         dimEqual = self.model[delta].p == self.basemodel.n
@@ -309,10 +309,10 @@ class Abstraction(object):
             if dimEqual:
             
                 # Shift the origin points (instead of the target point)
-                originShift = self.model[delta].A_inv @ (np.array(targetPoint) - disturbance) @ basis_vectors_inv
+                originShift = self.model[delta].A_inv @ (np.array(targetPoint) - disturbance)
                 
                 # Python implementation
-                originPointsShifted = allCornersTransformed - originShift
+                originPointsShifted = allCornersTransformed - (originShift @ basis_vectors_inv)
                 
                 '''
                 # Numba implementation
@@ -356,14 +356,11 @@ class Abstraction(object):
                 # Polypoints contains the True/False results for all corner points of every partition
                 # An action is enabled in a state if it is enabled in all its corner points
                 enabled_in = np.all(enabled_polypoints[action_id] == True, axis = 1)
-                
-                print( 'total points enabled:',np.sum(enabled_polypoints[action_id] == True) )
             
-            '''
             # Shift the inverse hull to account for the specific target point
-            if self.setup.plotting['partitionPlot']:
-                mu_inv_hull[partition_id] = x_inv_area + np.tile(originPointShift, (nr_corners, 1))
-            '''
+            if self.setup.plotting['partitionPlot'] and action_id == int(self.abstr['nr_regions']/2):
+
+                predecessor_set = x_inv_area + np.tile(originShift, (nr_corners, 1))
             
             # Retreive the ID's of all states in which the action is enabled
             enabled_in_states[action_id] = np.nonzero(enabled_in)[0]
@@ -391,7 +388,8 @@ class Abstraction(object):
             print('Create partition plot...')
             
             createPartitionPlot(self.abstr['goal'], delta, self.setup, \
-                        self.model[delta], self.abstr, self.abstr['allCorners'])
+                        self.model[delta], self.abstr, self.abstr['allCorners'],
+                        predecessor_set)
         
         return total_actions_enabled, enabled_actions, enabledActions_inv
                 
@@ -741,8 +739,8 @@ class scenarioBasedAbstraction(Abstraction):
         policy_file     = file_prefix + '_policy.csv'
         vector_file     = file_prefix + '_vector.csv'
     
-        options = ' -exportadv "'+policy_file+'"'+ \
-                  ' -exportvector "'+vector_file+'" -ex'
+        options = ' -ex -exportadv "'+policy_file+'"'+ \
+                  ' -exportvector "'+vector_file+'"'
     
         # Switch between PRISM command for explicit model vs. default model
         if self.setup.mdp['prism_model_writer'] == 'explicit' and self.setup.mdp['horizon'] != 'finite':
@@ -866,11 +864,17 @@ class scenarioBasedAbstraction(Abstraction):
 
             print(' -- Computing required Gaussian random variables...')
         
+        if self.setup.montecarlo['init_states'] == False:
+            init_state_idxs = np.arange(self.abstr['nr_regions'])
+            
+        else:
+            init_state_idxs = self.setup.montecarlo['init_states']
+        
         # The gaussian random variables are precomputed to speed up the code
         w_array = dict()
         for delta in self.setup.deltas:
             w_array[delta] = np.random.multivariate_normal(self.model[delta].noise['w_mean'], self.model[delta].noise['w_cov'],
-               ( len(n_list), self.abstr['nr_regions'], self.setup.montecarlo['iterations'], self.N ))
+               ( len(n_list), len(init_state_idxs), self.setup.montecarlo['iterations'], self.N ))
         
         # For each starting time step in the list
         for n0id,n0 in enumerate(n_list):
@@ -879,10 +883,13 @@ class scenarioBasedAbstraction(Abstraction):
             self.mc['traces'][n0] = dict()
         
             # For each initial state
-            for i,regionA in self.abstr['P'].items():
+            for i_abs,i in enumerate(init_state_idxs):
+                
+                regionA = self.abstr['P'][i]
                 
                 # Check if we should indeed perform Monte Carlo sims for this state
                 if self.setup.montecarlo['init_states'] is not False and i not in self.setup.montecarlo['init_states']:
+                    print('cannot happen!')
                     # If the current state is not in the list of initial states,
                     # continue to the next iteration
                     continue
@@ -1051,7 +1058,7 @@ class scenarioBasedAbstraction(Abstraction):
                                 # Implement the control into the physical (unobservable) system
                                 x_hat = self.model[delta].A @ x[k] + self.model[delta].B @ u[k]
                                 
-                                x[k+delta] = x_hat + w_array[delta][n0id, i, m, k]
+                                x[k+delta] = x_hat + w_array[delta][n0id, i_abs, m, k]
                             
                                 # Add current state to trace
                                 self.mc['traces'][n0][i][m] += [x[k+delta]]

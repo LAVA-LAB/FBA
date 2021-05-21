@@ -18,7 +18,7 @@ from ..commons import printWarning, mat_to_vec, cm2inch
 
 
 def createPartitionPlot(j, delta_plot, setup, model, \
-                        abstr, allOriginPointsNested):
+                        abstr, allOriginPointsNested, predecessor_set):
     '''
     Create partition plot for the current filter-based abstraction instance.
 
@@ -76,24 +76,18 @@ def createPartitionPlot(j, delta_plot, setup, model, \
             # Plot target point
             plt.scatter(target_point[0], target_point[1], c='k', s=6)
         
-        '''
         if setup.plotting['partitionPlot_plotHull']:
             # Plot convex hull of the preimage of the target point
-            mu_inv_hull = mu_inv_hulls[j]
-            hull = ConvexHull(mu_inv_hull, qhull_options='QJ')
-            ax.plot(mu_inv_hull[hull.vertices,0], mu_inv_hull[hull.vertices,1], 'ro--', lw=1) #2
-            ax.plot([mu_inv_hull[hull.vertices[0],0], mu_inv_hull[hull.vertices[-1],0]], \
-                     [mu_inv_hull[hull.vertices[0],1], mu_inv_hull[hull.vertices[-1],1]], 'ro--', lw=1) #2
-        
-            # Plot target point
-            ax.scatter(abstr['P'][j]['center'][0], abstr['P'][j]['center'][1], c='r', lw=5) #10
-        '''
-    
+            hull = ConvexHull(predecessor_set, qhull_options='QJ')
+            ax.plot(predecessor_set[hull.vertices,0], predecessor_set[hull.vertices,1], 'ro--', lw=1) #2
+            ax.plot([predecessor_set[hull.vertices[0],0], predecessor_set[hull.vertices[-1],0]], \
+                      [predecessor_set[hull.vertices[0],1], predecessor_set[hull.vertices[-1],1]], 'ro--', lw=1) #2
+            
         # Set tight layout
         fig.tight_layout()
                     
         # Save figure
-        filename = setup.directories['outputFcase']+'partitioning_'+str(delta_plot)
+        filename = setup.directories['outputF']+'partitioning_'+str(delta_plot)
         for form in setup.plotting['exportFormats']:
             plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
         
@@ -149,7 +143,7 @@ def createPartitionPlot(j, delta_plot, setup, model, \
         with plt.rc_context({"font.size": 5}):        
             # Draw every X-th label
             skip = 15
-            for i in range(0, abstr['nr_regions']+1, skip):
+            for i in range(0, abstr['nr_regions'], skip):
                 ax.text(abstr['P'][i]['center'][0], abstr['P'][i]['center'][1], i, \
                           verticalalignment='center', horizontalalignment='center' ) 
                 
@@ -157,7 +151,7 @@ def createPartitionPlot(j, delta_plot, setup, model, \
         fig.tight_layout()
         
         # Save figure
-        filename = setup.directories['outputFcase']+'partitioning_v2'
+        filename = setup.directories['outputF']+'partitioning_v2'
         for form in setup.plotting['exportFormats']:
             plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
     
@@ -195,7 +189,7 @@ def createPartitionPlot(j, delta_plot, setup, model, \
         fig.tight_layout()
                     
         # Save figure
-        filename = setup.directories['outputFcase']+'partitioning'
+        filename = setup.directories['outputF']+'partitioning'
         for form in setup.plotting['exportFormats']:
             plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
         
@@ -699,8 +693,12 @@ def UAVplot2D(setup, model, abstr, traces, cut_value):
                           verticalalignment='center', horizontalalignment='center' ) 
             
     # Add traces
-    for trace in traces:
-               
+    for i,trace in enumerate(traces):
+        
+        if len(trace) < 3:
+            printWarning('Warning: trace',i,'has length of',len(trace))
+            continue
+        
         # Convert nested list to 2D array
         trace_array = np.array(trace)
         
@@ -733,6 +731,8 @@ def UAVplot2D(setup, model, abstr, traces, cut_value):
     filename = setup.directories['outputFcase']+'drone_trajectory'
     for form in setup.plotting['exportFormats']:
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
+        
+    plt.show()
     
       
 def UAVplot3D(setup, model, abstr, traces, cut_value):

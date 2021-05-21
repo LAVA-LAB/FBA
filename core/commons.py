@@ -10,7 +10,8 @@ import time
 import numpy as np
 from scipy.spatial import ConvexHull
 import math
-
+import sys
+import itertools
 import os                       # Import OS to allow creationg of folders
 
 class table(object):
@@ -353,3 +354,30 @@ def writeFile(file, operation="w", content=[""]):
     filehandle = open(file, operation)
     filehandle.writelines(content)
     filehandle.close()
+    
+def setStateBlock(partition, **kwargs):
+    
+    nrArgs = len(kwargs)
+    stateDim = len(partition['nrPerDim'])
+    
+    if nrArgs != len(partition['nrPerDim']):
+        print('State dimension is',stateDim,'but only',nrArgs,'arguments given.')
+        sys.exit()
+    
+    row = [None for i in range(stateDim)]
+    
+    center_domain = (np.array(partition['nrPerDim'])-1) * 0.5 * np.array(partition['width'])
+    
+    for i,value in enumerate(kwargs.values()):
+        
+        if value == 'all':
+            
+            row[i] = np.linspace(-center_domain[i] + np.array(partition['origin'][i]), 
+                                  center_domain[i] + np.array(partition['origin'][i]), 
+                                  partition['nrPerDim'][i])
+            
+        else:
+            
+            row[i] = list(value)
+            
+    return np.array(list(itertools.product(*row)))

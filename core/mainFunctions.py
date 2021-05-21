@@ -259,6 +259,18 @@ def computeScenarioBounds_sparse(setup, partition, abstr, trans, samples):
         probability_approx[i] = count / Nsamples
         approx_idxs[i] = int(region)
     
+    '''
+    k = 100 - 42 + d
+    key_lb = tuple( [100, k,   beta] )
+    key_ub = tuple( [100, k-1, beta] )
+    
+    if k > Nsamples:
+        print('low is: 0')                
+    else:
+        print('low is:',(1 - trans['memory'][key_lb][1]))
+    print('upp is:',(1 - trans['memory'][key_ub][0]))
+    '''
+    
     nr_decimals = 5
     
     # PROBABILITY INTERVALS

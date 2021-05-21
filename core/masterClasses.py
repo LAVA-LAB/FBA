@@ -6,6 +6,7 @@ Created on Wed May  5 10:03:21 2021
 """
 
 import os                       # Import OS to allow creationg of folders
+import matplotlib.pyplot as plt # Import to generate plos using Pyplot
 
 from datetime import datetime   # Import Datetime to retreive current date/time
 from core.commons import createDirectory
@@ -21,11 +22,37 @@ class settings(object):
             
             category_upd[str(key)] = value
             
-            print(' >> Changed',key,'in',category,'to',value)
+            print(' >> Changed "'+str(key)+'" in "'+str(category)+'" to "'+str(value)+'"')
             
         setattr(self, category, category_upd)
     
     def __init__(self, mode, application):
+        
+        # Default pyplot style (font size, template, etc.)
+        plt.close('all')
+        plt.ion()
+        plt.style.use('seaborn-deep')
+        plt.rcParams.update({'font.size': 7, 
+                             'pgf.texsystem' : "xelatex"})
+        
+        # Plot font family and size
+        plt.rc('font', family='serif')
+        SMALL_SIZE = 7
+        MEDIUM_SIZE = 9
+        BIGGER_SIZE = 9
+        
+        # Make sure the matplotlib generates editable text (e.g. for Illustrator)
+        plt.rcParams['pdf.fonttype'] = 42
+        plt.rcParams['ps.fonttype'] = 42
+        
+        # Set font sizes
+        plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+        plt.rc('axes', titlesize=BIGGER_SIZE)    # fontsize of the axes title
+        plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+        plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+        plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+        plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+        plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
         
         # Default scenario approach settings
         sa = dict()
@@ -36,7 +63,7 @@ class settings(object):
             sa['switch'] = True        
             sa['samples'] = 25 # Sample complexity used in scenario approach
             sa['gamma'] = 2 # Factor by which N is multiplied in every iteration
-            sa['samples_max'] = 3200 # Maximum number of samples in iterative scheme
+            sa['samples_max'] = 6400 # Maximum number of samples in iterative scheme
             sa['confidence']   = 1e-1 # Confidence level (beta)
             
         else:
@@ -124,7 +151,7 @@ class LTI_master(object):
             for key, value in kwargs.items():
                 self.setup[str(category)][str(key)] = value
     
-                print(' >> Changed',key,'in',category,'to',value)
+                print(' >> Changed "'+str(key)+'" in "'+str(category)+'" to "'+str(value)+'"')
     
     def __init__(self):
         

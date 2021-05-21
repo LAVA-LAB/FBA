@@ -32,13 +32,6 @@ from core.scenarioBasedAbstraction import scenarioBasedAbstraction
 from core.preprocessing.user_interface import user_choice
 from core.commons import printWarning, createDirectory
 
-# Default pyplot style (font size, template, etc.)
-plt.close('all')
-plt.ion()
-plt.style.use('seaborn-deep')
-plt.rcParams.update({'font.size': 7, 
-                     'pgf.texsystem' : "xelatex"})
-
 from inspect import getmembers, isclass
 from core import modelDefinitions
 
@@ -48,33 +41,10 @@ from core.masterClasses import settings
 modelClasses = np.array(getmembers(modelDefinitions, isclass))
 application, application_id  = user_choice('application',list(modelClasses[:,0]))
 
-#------------------------------------------------------------------------------
-# PLOT FONT SIZES
-#------------------------------------------------------------------------------
-
 np.random.seed(33)
 
-# Plot font family and size
-plt.rc('font', family='serif')
-SMALL_SIZE = 7
-MEDIUM_SIZE = 9
-BIGGER_SIZE = 9
-
-# Make sure the matplotlib generates editable text (e.g. for Illustrator)
-plt.rcParams['pdf.fonttype'] = 42
-plt.rcParams['ps.fonttype'] = 42
-
-# Set font sizes
-plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-plt.rc('axes', titlesize=BIGGER_SIZE)    # fontsize of the axes title
-plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
-plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
-plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-
 #-----------------------------------------------------------------------------
-# Main program setup
+# Create model class
 #-----------------------------------------------------------------------------
 
 # Create model object
@@ -83,19 +53,23 @@ model = modelClasses[application_id, 1]()
 # Manual changes in model settings
 model.setOptions(endTime=64)
 
+#-----------------------------------------------------------------------------
+# Create settings object + change manual settings
+#-----------------------------------------------------------------------------
+
 # Create settings object
 setup = settings(mode='scenario', application=model.name)
 
 # Manual changes in general settings
-setup.setOptions(category='plotting', exportFormats=['pdf'], partitionPlot=False)
+setup.setOptions(category='plotting', exportFormats=['pdf'], partitionPlot=True)
 setup.setOptions(category='mdp', 
-                 prism_java_memory=32,
+                 prism_java_memory=7,
                  prism_model_writer='explicit', # Is either default or explicit
-                 prism_folder="/Users/thom/Documents/PRISM/prism-imc-v3/prism/") # Folder where PRISM is located
+                 prism_folder="/Users/thom/Documents/PRISM/prism-imc-v4/prism/") # Folder where PRISM is located
 # setup.setOptions(category='montecarlo', init_states=[7])
     
 setup.setOptions(category='main', iterative=False)
-setup.setOptions(category='mdp', samples=1600)
+setup.setOptions(category='scenarios', samples=1600)
 
 setup.setOptions(category='mdp', mode='interval')
 
@@ -124,17 +98,10 @@ print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
 
 # Dictionary for all instances
 ScAb = dict()
-case_id = 0
-
-# Retreive datetime string
-ScAb['start_time'] = datetime.now().strftime("%H-%M-%S")
 
 if setup.mdp['solver'] == 'Python' and setup.mdp['horizon'] == 'infinite':
     printWarning("Cannot solve infinite horizon MDP internally; switch to PRISM only")
     setup.mdp['solver'] = 'PRISM'
-
-# Close all plots upon start of new case
-plt.close('all')
 
 # Set case-specific parameters
 setup.deltas = [2]
@@ -161,8 +128,10 @@ import math
 #-----------------------------------------------------------------------------
 # Code below is repeated every iteration of the iterative scheme
 #-----------------------------------------------------------------------------
+case_id = 0
 
-while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max']:
+while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or \
+    ScAb.setup.main['iterative'] is False:
 
     # Shortcut to sample complexity
     N = ScAb.setup.scenarios['samples']        
@@ -189,7 +158,7 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max']:
     
     # Save case-specific data in Excel
     output_file = ScAb.setup.directories['outputFcase'] + \
-                        'N='+str(case_id)+'_data_export.xlsx'
+                        'N='+str(N)+'_data_export.xlsx'
     
     # Create a Pandas Excel writer using XlsxWriter as the engine
     writer = pd.ExcelWriter(output_file, engine='xlsxwriter')
@@ -201,9 +170,6 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max']:
     # Solve the MDP
     ScAb.solveMDP()
     
-    # Shortcut to number of regions
-    S = ScAb.abstr['nr_regions']
-    
     if ScAb.setup.montecarlo['enabled']:
         # Perform monte carlo simulation for validation purposes
         
@@ -213,7 +179,7 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max']:
         # Store Monte Carlo results as dataframe
         cols = ScAb.setup.montecarlo['init_timesteps']
         MCsims_df = pd.DataFrame( ScAb.mc['results']['reachability_probability'], \
-                                 columns=cols, index=range(S) )
+                                 columns=cols, index=range(ScAb.abstr['nr_regions']) )
             
         # Write Monte Carlo results to Excel
         MCsims_df.to_excel(writer, sheet_name='Empirical reach.')
@@ -225,58 +191,70 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max']:
     
     # Write results to dataframes
     horizon_len = int(ScAb.N/min(ScAb.setup.deltas))
-    policy_df   = pd.DataFrame( ScAb.results['optimal_policy'], columns=range(S), index=range(horizon_len) ).T
-    delta_df    = pd.DataFrame( ScAb.results['optimal_delta'], columns=range(S), index=range(horizon_len) ).T
-    reward_df   = pd.DataFrame( ScAb.results['optimal_reward'], columns=range(S), index=range(horizon_len) ).T
+    
+    # Load data into dataframes
+    policy_df   = pd.DataFrame( ScAb.results['optimal_policy'], 
+       columns=range(ScAb.abstr['nr_regions']), index=range(horizon_len) ).T
+    delta_df    = pd.DataFrame( ScAb.results['optimal_delta'], 
+       columns=range(ScAb.abstr['nr_regions']), index=range(horizon_len) ).T
+    reward_df   = pd.DataFrame( ScAb.results['optimal_reward'], 
+       columns=range(ScAb.abstr['nr_regions']), index=range(horizon_len) ).T
     
     # Write dataframes to a different worksheet
     policy_df.to_excel(writer, sheet_name='Optimal policy')
     delta_df.to_excel(writer, sheet_name='Optimal delta')
     reward_df.to_excel(writer, sheet_name='Optimal reward')
-        
-    # Close the Pandas Excel writer and output the Excel file.
-    writer.save()
     
     # %%
     
-    if ScAb.basemodel.name == 'UAV':
+    if ScAb.basemodel.name == 'UAV' or ScAb.basemodel.name == 'UAV_v2':
     
         from core.postprocessing.createPlots import UAVplot2D, UAVplot3D
         from core.mainFunctions import computeRegionCenters
+        from core.commons import setStateBlock
         
         # Determine desired state IDs
-        if ScAb.basemodel.modelDim == 2:
-            point_list = [[a,b,c,d] 
-                        for a in [-8,-6] 
-                        for b in [0]
-                        for c in [-8,-6] 
-                        for d in [0]]
-            
-        elif ScAb.basemodel.modelDim == 3:
-            point_list = [[a,b,c,d,e,f] 
-                        for a in [-3] 
-                        for b in [0]
-                        for c in [-3] 
-                        for d in [0]
-                        for e in [-3]
-                        for f in [0]]
+        if ScAb.basemodel.name == 'UAV':
+            if ScAb.basemodel.modelDim == 2:
+                x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-8], b=[0], c=[-8], d=[0])
+                cut_value = [0,0]
+                
+            elif ScAb.basemodel.modelDim == 3:
+                x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-3], b=[0], c=[-3], d=[0], e=[-3], f=[0])
+                cut_value = [0,0,0]
         
+        elif ScAb.basemodel.name == 'UAV_v2':
+            if ScAb.basemodel.modelDim == 2:
+                x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-6], b=[0], c=[-6], d=[0])
+                cut_value = [1,1]
+                
+                
         # Compute all centers of regions associated with points
-        centers = computeRegionCenters(np.array(point_list), ScAb.basemodel.setup['partition'])
+        x_init_centers = computeRegionCenters(np.array(x_init), ScAb.basemodel.setup['partition'])
         
         # Filter to only keep unique centers
-        centers_unique = np.unique(centers, axis=0)
+        x_init_unique = np.unique(x_init_centers, axis=0)
         
-        state_idxs = [ScAb.abstr['allCenters'][tuple(c)] for c in centers_unique 
+        state_idxs = [ScAb.abstr['allCenters'][tuple(c)] for c in x_init_unique 
                                        if tuple(c) in ScAb.abstr['allCenters']]
         
         print(' -- Perform simulations for initial states:',state_idxs)
         
         ScAb.setup.montecarlo['init_states'] = state_idxs
-        ScAb.setup.montecarlo['iterations'] = 3
+        ScAb.setup.montecarlo['iterations'] = 100
         ScAb.monteCarlo()
         
-        itersToShow = 1
+        PRISM_reach = ScAb.results['optimal_reward'][0,state_idxs]
+        empirical_reach = ScAb.mc['results']['reachability_probability'][state_idxs]
+        
+        print('Probabilistic reachability (PRISM): ',PRISM_reach)
+        print('Empirical reachability (Monte Carlo):',empirical_reach)
+        
+        performance_df = pd.DataFrame( {'PRISM reachability': PRISM_reach.flatten(),
+                                        'Empirical reachability': empirical_reach.flatten() } )
+        performance_df.to_excel(writer, sheet_name='Performance')
+        
+        itersToShow = 10
         
         traces = []
         for i in state_idxs:
@@ -286,62 +264,63 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max']:
         min_delta = int(min(ScAb.setup.deltas))
         
         if ScAb.basemodel.modelDim == 2:
-            cut_value = [0,0]
             UAVplot2D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value )
         
         elif ScAb.basemodel.modelDim == 3:
-            cut_value = [0,0,0]
             UAVplot3D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value )
-            
-    if ScAb.basemodel.name == 'UAV_v2':
+        
+    # Close the Pandas Excel writer and output the Excel file.
+    writer.save()
+        
+    # %%
     
-        from core.postprocessing.createPlots import UAVplot2D, UAVplot3D
-        from core.mainFunctions import computeRegionCenters
+    if ScAb.basemodel.name == 'building_2room' or (ScAb.basemodel.name == 'UAV' and ScAb.basemodel.modelDim == 2):
         
-        # Determine desired state IDs
-        if ScAb.basemodel.modelDim == 2:
-            point_list = [[a,b,c,d] 
-                        for a in [-6] 
-                        for b in [0]
-                        for c in [-6] 
-                        for d in [0]]
+        import seaborn as sns
+        from core.mainFunctions import definePartitions
         
-        # Compute all centers of regions associated with points
-        centers = computeRegionCenters(np.array(point_list), ScAb.basemodel.setup['partition'])
+        if ScAb.basemodel.name == 'building_2room':
         
-        # Filter to only keep unique centers
-        centers_unique = np.unique(centers, axis=0)
-        
-        state_idxs = [ScAb.abstr['allCenters'][tuple(c)] for c in centers_unique 
-                                       if tuple(c) in ScAb.abstr['allCenters']]
-        
-        print(' -- Perform simulations for initial states:',state_idxs)
-        
-        ScAb.setup.montecarlo['init_states'] = state_idxs
-        ScAb.setup.montecarlo['iterations'] = 3
-        ScAb.monteCarlo()
-        
-        itersToShow = 1
-        
-        traces = []
-        for i in state_idxs:
-            for j in range(itersToShow):
-                traces += [ScAb.mc['traces'][0][i][j]]
-        
-        min_delta = int(min(ScAb.setup.deltas))
-        
-        if ScAb.basemodel.modelDim == 2:
-            cut_value = [1,1]
-            UAVplot2D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value )
+            x_nr = ScAb.basemodel.setup['partition']['nrPerDim'][0]
+            y_nr = ScAb.basemodel.setup['partition']['nrPerDim'][1]
             
-        elif ScAb.basemodel.modelDim == 3:
-            cut_value = [1,1,1]
-            UAVplot2D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value )
+            cut_centers = definePartitions(ScAb.basemodel.n, [x_nr, y_nr, 1, 1], 
+                   ScAb.basemodel.setup['partition']['width'], 
+                   ScAb.basemodel.setup['partition']['origin'], onlyCenter=True)
+            
+        elif ScAb.basemodel.name == 'UAV':
+            
+            x_nr = ScAb.basemodel.setup['partition']['nrPerDim'][0]
+            y_nr = ScAb.basemodel.setup['partition']['nrPerDim'][2]
+            
+            cut_centers = definePartitions(ScAb.basemodel.n, [x_nr, 1, y_nr, 1], 
+                   ScAb.basemodel.setup['partition']['width'], 
+                   ScAb.basemodel.setup['partition']['origin'], onlyCenter=True)
+                              
+        cut_values = np.zeros((x_nr, y_nr))
+        cut_coords = np.zeros((x_nr, y_nr, ScAb.basemodel.n))
+        
+        cut_idxs = [ScAb.abstr['allCenters'][tuple(c)] for c in cut_centers 
+                                       if tuple(c) in ScAb.abstr['allCenters']]              
+        
+        for i,(idx,center) in enumerate(zip(cut_idxs, cut_centers)):
+            
+            j = i % y_nr
+            k = i // y_nr
+            
+            cut_values[j,k] = ScAb.results['optimal_reward'][0,idx]
+            cut_coords[j,k,:] = center
+        
+        cut_df = pd.DataFrame( cut_values, index=cut_coords[0,:,0], columns=cut_coords[:,0,1] )
+        
+        ax = sns.heatmap(cut_df, cmap="YlGnBu")
+        ax.invert_yaxis()
         
     # %%
     
     if ScAb.setup.main['iterative'] is True:
         ScAb.setup.scenarios['samples'] = int(ScAb.setup.scenarios['samples']*ScAb.setup.scenarios['gamma'])
+        case_id += 1
         
     else:
         print('\nITERATIVE SCHEME DISABLED, SO TERMINATE LOOP')

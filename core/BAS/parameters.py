@@ -48,7 +48,7 @@ class parameters(object):
         self.FCU['mfcu_m'] = 0.175                      # FCU mass air flow when fan is in med mode [m3/s]
         self.FCU['mfcu_h'] = 0.19                       # FCU mass air flow when fan is in high mode [m3/s]
         
-        #--------- Air Hanlding Unit (AHU) Parameters     -------#
+        #--------- Air Handling Unit (AHU) Parameters     -------#
         
         self.AHU = {'sa': {}, 'rw': {}}
         
