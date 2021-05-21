@@ -41,7 +41,7 @@ from core.masterClasses import settings
 modelClasses = np.array(getmembers(modelDefinitions, isclass))
 application, application_id  = user_choice('application',list(modelClasses[:,0]))
 
-np.random.seed(33)
+#np.random.seed(33)
 
 #-----------------------------------------------------------------------------
 # Create model class
@@ -313,8 +313,12 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
         
         cut_df = pd.DataFrame( cut_values, index=cut_coords[0,:,0], columns=cut_coords[:,0,1] )
         
+        # %%
+        
+        fig = plt.figure()
         ax = sns.heatmap(cut_df, cmap="YlGnBu")
         ax.invert_yaxis()
+        plt.show()
         
     # %%
     

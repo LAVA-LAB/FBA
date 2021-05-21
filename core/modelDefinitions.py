@@ -316,8 +316,8 @@ class building_2room(master.LTI_master):
         # Let the user make a choice for the model dimension
         
         # Authority limit for the control u, both positive and negative
-        self.setup['control']['limits']['uMin'] = [10, -10] #[15, -5]
-        self.setup['control']['limits']['uMax'] = [30, 10] #[25, 5]
+        self.setup['control']['limits']['uMin'] = [11, -5] #[15, -5]
+        self.setup['control']['limits']['uMax'] = [31, 5] #[25, 5]
             
         # Partition size
         self.setup['partition']['nrPerDim']  = [11,11,7,7]#[21,     21,     11,     11]
