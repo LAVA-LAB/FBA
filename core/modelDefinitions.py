@@ -91,17 +91,17 @@ class UAV(master.LTI_master):
             self.setup['targets']['domain']      = 'auto'
             
             # Specification information
-            self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=(6,8), b='all', c=(6,8), d='all')
+            self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=[6,8], b='all', c=[6,8], d='all')
             self.setup['specification']['critical'] = np.vstack((
-                setStateBlock(self.setup['partition'], a=(-8,-6,-4), b='all', c=(-2,0), d='all'),
-                setStateBlock(self.setup['partition'], a=(4,6), b='all', c=(-8,-6,-4,-2,0,2), d='all')
+                setStateBlock(self.setup['partition'], a=[-8,-6,-4], b='all', c=[-2,0], d='all'),
+                setStateBlock(self.setup['partition'], a=[4,6], b='all', c=[-8,-6,-4,-2,0,2], d='all')
                 ))
             
         elif self.modelDim == 3:
             
             # Authority limit for the control u, both positive and negative
-            self.setup['control']['limits']['uMin'] = [-6, -6, -6]
-            self.setup['control']['limits']['uMax'] = [6, 6, 6]
+            self.setup['control']['limits']['uMin'] = [-4, -4, -4]
+            self.setup['control']['limits']['uMax'] = [4, 4, 4]
             
             # Partition size
             self.setup['partition']['nrPerDim']  = [4, 4, 4, 4, 4, 4] #[7, 7, 7, 7, 7, 7]
@@ -113,11 +113,11 @@ class UAV(master.LTI_master):
             self.setup['targets']['domain']      = 'auto' #[7,7,7,7,7,7]
             
             # Specification information
-            self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=(3), b='all', c=(3), d='all', e=(3), f='all')
+            self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=[3], b='all', c=[3], d='all', e=[3], f='all')
             
             self.setup['specification']['critical']   = np.vstack((
-                setStateBlock(self.setup['partition'], a=(-3,-1), b='all', c=(1,3), d='all', e=(-3,-1), f='all'),
-                setStateBlock(self.setup['partition'], a=(-3,-1), b='all', c=(-3,-1), d='all', e=(3), f='all')
+                setStateBlock(self.setup['partition'], a=[-3,-1], b='all', c=[1,3], d='all', e=[-3,-1], f='all'),
+                setStateBlock(self.setup['partition'], a=[-3,-1], b='all', c=[-3,-1], d='all', e=[3], f='all')
                 ))
         
         else:
@@ -127,7 +127,7 @@ class UAV(master.LTI_master):
         # Covariance values of the process noise (w) and measurement noise (v)
         self.setup['noise']['sigma_w_value'] = 0.15
         
-        self.tau = 0.75
+        self.tau = 1
         
     def setModel(self, observer):
         '''
@@ -197,8 +197,8 @@ class UAV_v2(master.LTI_master):
         if self.modelDim == 2:
     
             # Authority limit for the control u, both positive and negative
-            self.setup['control']['limits']['uMin'] = [-6, -6]
-            self.setup['control']['limits']['uMax'] = [6, 6]        
+            self.setup['control']['limits']['uMin'] = [-5, -5]
+            self.setup['control']['limits']['uMax'] = [5, 5]        
     
             # Partition size
             self.setup['partition']['nrPerDim']  = [7,4,7,4]#[11, 11, 11, 11]
@@ -233,12 +233,12 @@ class UAV_v2(master.LTI_master):
             self.setup['targets']['domain']      = 'auto'
             
             # Specification information
-            self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=(4,6), b='all', c=(4,6), d='all', e=(4,6), f='all')
+            self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=[4,6], b='all', c=[4,6], d='all', e=[4,6], f='all')
             
             self.setup['specification']['critical']   = np.vstack((
-                setStateBlock(self.setup['partition'], a=(0,2), b='all', c=(2,4,6), d='all', e=(-6,-4,-2), f='all'),
-                setStateBlock(self.setup['partition'], a=(-6,-4,-2), b='all', c=(-6,-4), d='all', e=(4,6), f='all'),
-                setStateBlock(self.setup['partition'], a=(4,6), b='all', c=(-6,-4), d='all', e=(-6,-4), f='all')
+                setStateBlock(self.setup['partition'], a=[0,2], b='all', c=[2,4,6], d='all', e=[-6,-4,-2], f='all'),
+                setStateBlock(self.setup['partition'], a=[-6,-4,-2], b='all', c=[-6,-4], d='all', e=[4,6], f='all'),
+                setStateBlock(self.setup['partition'], a=[4,6], b='all', c=[-6,-4], d='all', e=[-6,-4], f='all')
                 ))
         
         else:

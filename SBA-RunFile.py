@@ -63,9 +63,11 @@ setup = settings(mode='scenario', application=model.name)
 # Manual changes in general settings
 setup.setOptions(category='plotting', exportFormats=['pdf'], partitionPlot=True)
 setup.setOptions(category='mdp', 
-                 prism_java_memory=32,
+                 # prism_java_memory=32,
+                 prism_java_memory=7,
                  prism_model_writer='explicit', # Is either default or explicit
-                 prism_folder="/home/tbadings/Documents/SBA/prism-imc/prism/") # Folder where PRISM is located
+                 # prism_folder="/home/tbadings/Documents/SBA/prism-imc/prism/") # Folder where PRISM is located
+                 prism_folder="/Users/thom/Documents/PRISM/prism-imc-v4/prism/")
 # setup.setOptions(category='montecarlo', init_states=[7])
     
 setup.setOptions(category='main', iterative=False)
@@ -209,7 +211,7 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
     
     if ScAb.basemodel.name == 'UAV' or ScAb.basemodel.name == 'UAV_v2':
     
-        from core.postprocessing.createPlots import UAVplot2D, UAVplot3D
+        from core.postprocessing.createPlots import UAVplot2D, UAVplot3D, UAVplot3d_visvis
         from core.mainFunctions import computeRegionCenters
         from core.commons import setStateBlock
         
@@ -221,7 +223,7 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
                 
             elif ScAb.basemodel.modelDim == 3:
                 x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-3], b=[0], c=[-3], d=[0], e=[-3], f=[0])
-                cut_value = [0,0,0]
+                cut_value = [1,1,1]
         
         elif ScAb.basemodel.name == 'UAV_v2':
             if ScAb.basemodel.modelDim == 2:
@@ -273,6 +275,8 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
         
         elif ScAb.basemodel.modelDim == 3:
             UAVplot3D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value )
+            
+            UAVplot3d_visvis( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value ) 
         
     # Close the Pandas Excel writer and output the Excel file.
     writer.save()

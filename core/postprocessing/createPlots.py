@@ -737,6 +737,8 @@ def UAVplot2D(setup, model, abstr, traces, cut_value):
       
 def UAVplot3D(setup, model, abstr, traces, cut_value):
     
+    import numpy as np
+    
     from scipy.interpolate import interp1d
     
     ix = 0
@@ -775,8 +777,12 @@ def UAVplot3D(setup, model, abstr, traces, cut_value):
             plotCube(ax, center_xyz, regionWidth_xyz, 0.2, 'r')   
         
     # Add traces
-    for trace in traces:
-               
+    for i,trace in enumerate(traces):
+        
+        if len(trace) < 3:
+            printWarning('Warning: trace '+str(i)+' has length of '+str(len(trace)))
+            continue
+        
         # Convert nested list to 2D array
         trace_array = np.array(trace)
         
@@ -829,6 +835,106 @@ def UAVplot3D(setup, model, abstr, traces, cut_value):
         
     plt.show()
     
+def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
+    
+    from scipy.interpolate import interp1d
+    import visvis as vv
+    
+    app = vv.use()
+    
+    f = vv.clf()
+    a = vv.cla()
+    
+    ix = 0
+    iy = 2
+    iz = 4
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    regionWidth_xyz = np.array([model.setup['partition']['width'][0], 
+                                model.setup['partition']['width'][2], 
+                                model.setup['partition']['width'][4]])    
+    
+    # Draw goal states
+    for goal in abstr['goal']:
+        
+        goalState = abstr['P'][goal]
+        if goalState['center'][1] == cut_value[0] and goalState['center'][3] == cut_value[1] and goalState['center'][5] == cut_value[2]:
+        
+            center_xyz = np.array([goalState['center'][0], 
+                                   goalState['center'][2], 
+                                   goalState['center'][4]])
+            
+            goal = vv.solidBox(tuple(center_xyz), scaling=tuple(regionWidth_xyz))
+            goal.faceColor = (0,1,0,0.5)
+            
+    # Draw critical states
+    for crit in abstr['critical']:
+        
+        critState = abstr['P'][crit]
+        if critState['center'][1] == cut_value[0] and critState['center'][3] == cut_value[1] and critState['center'][5] == cut_value[2]:
+        
+            center_xyz = np.array([critState['center'][0], 
+                                   critState['center'][2], 
+                                   critState['center'][4]])    
+        
+            critical = vv.solidBox(tuple(center_xyz), scaling=tuple(regionWidth_xyz))
+            critical.faceColor = (1,0,0,0.5)
+    
+    # Add traces
+    for i,trace in enumerate(traces):
+        
+        if len(trace) < 3:
+            printWarning('Warning: trace '+str(i)+' has length of '+str(len(trace)))
+            continue
+        
+        # Convert nested list to 2D array
+        trace_array = np.array(trace)
+        
+        # Extract x,y coordinates of trace
+        x = trace_array[:, ix]
+        y = trace_array[:, iy]
+        z = trace_array[:, iz]
+        points = np.array([x,y,z]).T
+        
+        print(points)
+        
+        # Plot precise points
+        #plt.plot(x, y, z, lw=4, color="black");
+        
+        # Linear length along the line:
+        distance = np.cumsum( np.sqrt(np.sum( np.diff(points, axis=0)**2, axis=1 )) )
+        distance = np.insert(distance, 0, 0)/distance[-1]
+        
+        # Interpolation for different methods:
+        alpha = np.linspace(0, 1, 75)
+        
+        interpolator =  interp1d(distance, points, kind='quadratic', axis=0)
+        interpolated_points = interpolator(alpha)
+        
+        xp = interpolated_points[:,0]
+        yp = interpolated_points[:,1]
+        zp = interpolated_points[:,2]
+        
+        # Plot trace
+        vv.plot(xp,yp,zp, lw=1);
+        # plt.plot(x_values, y_values, color="blue")
+    
+    # angle = np.linspace(0, 6*np.pi, 1000)
+    # x = np.sin(angle)
+    # y = np.cos(angle)
+    # z = angle / 6.0
+    # vv.plot(x, y, z, lw=10)
+    
+    # angle += np.pi*2/3.0
+    # x = np.sin(angle)
+    # y = np.cos(angle)
+    # z = angle / 6.0 - 0.5
+    # vv.plot(x, y, z, lc ="r", lw=10)
+    
+    app.Run()
+    
     
 def plotCube(ax, center, width, alpha, color):
     
@@ -863,6 +969,8 @@ def plotCube(ax, center, width, alpha, color):
      [Z[1],Z[2],Z[6],Z[5]],
      [Z[4],Z[7],Z[3],Z[0]]]
     
+    cube = Poly3DCollection(verts, 
+     facecolors=color, linewidths=1, edgecolors=color, alpha=alpha)
+    
     # plot sides
-    ax.add_collection3d(Poly3DCollection(verts, 
-     facecolors=color, linewidths=1, edgecolors=color, alpha=alpha))
+    ax.add_collection3d(cube)
