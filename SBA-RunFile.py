@@ -41,7 +41,7 @@ from core.masterClasses import settings
 modelClasses = np.array(getmembers(modelDefinitions, isclass))
 application, application_id  = user_choice('application',list(modelClasses[:,0]))
 
-#np.random.seed(33)
+np.random.seed(33)
 
 #-----------------------------------------------------------------------------
 # Create model class
@@ -63,9 +63,9 @@ setup = settings(mode='scenario', application=model.name)
 # Manual changes in general settings
 setup.setOptions(category='plotting', exportFormats=['pdf'], partitionPlot=True)
 setup.setOptions(category='mdp', 
-                 prism_java_memory=7,
+                 prism_java_memory=32,
                  prism_model_writer='explicit', # Is either default or explicit
-                 prism_folder="/Users/thom/Documents/PRISM/prism-imc-v4/prism/") # Folder where PRISM is located
+                 prism_folder="/home/tbadings/Documents/SBA/prism-imc/prism/") # Folder where PRISM is located
 # setup.setOptions(category='montecarlo', init_states=[7])
     
 setup.setOptions(category='main', iterative=False)
@@ -228,6 +228,11 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
                 x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-6], b=[0], c=[-6], d=[0])
                 cut_value = [1,1]
                 
+            elif ScAb.basemodel.modelDim == 3:
+                x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-6], b=[0], c=[-6], d=[0], e=[-6], f=[0])
+                cut_value = [0,0,0]
+                
+                
                 
         # Compute all centers of regions associated with points
         x_init_centers = computeRegionCenters(np.array(x_init), ScAb.basemodel.setup['partition'])
@@ -308,16 +313,16 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
             j = i % y_nr
             k = i // y_nr
             
-            cut_values[j,k] = ScAb.results['optimal_reward'][0,idx]
-            cut_coords[j,k,:] = center
+            cut_values[k,j] = ScAb.results['optimal_reward'][0,idx]
+            cut_coords[k,j,:] = center
         
-        cut_df = pd.DataFrame( cut_values, index=cut_coords[0,:,0], columns=cut_coords[:,0,1] )
-        
-        # %%
+        cut_df = pd.DataFrame( cut_values, index=cut_coords[:,0,0], columns=cut_coords[0,:,1] )
         
         fig = plt.figure()
-        ax = sns.heatmap(cut_df, cmap="YlGnBu")
+        ax = sns.heatmap(cut_df.T, cmap="YlGnBu")
         ax.invert_yaxis()
+        ax.set_xlabel('Temp. zone 1')
+        ax.set_ylabel('Temp. zone 2')
         plt.show()
         
     # %%

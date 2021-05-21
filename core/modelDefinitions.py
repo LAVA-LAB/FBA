@@ -320,8 +320,8 @@ class building_2room(master.LTI_master):
         self.setup['control']['limits']['uMax'] = [31, 5] #[25, 5]
             
         # Partition size
-        self.setup['partition']['nrPerDim']  = [11,11,7,7]#[21,     21,     11,     11]
-        self.setup['partition']['width']     = [0.25,   0.25,   1,      1]
+        self.setup['partition']['nrPerDim']  = [21,21,9,9]#[21,     21,     11,     11]
+        self.setup['partition']['width']     = [0.2,   0.2,   1,      1]
         self.setup['partition']['origin']    = [21,     21,     35,     35]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
@@ -425,7 +425,7 @@ class building_2room(master.LTI_master):
         self.p = np.size(self.B,1)
 
         self.noise = dict()
-        self.noise['w_cov'] = 0.5*np.diag([ BAS.Zone1['Tz']['sigma'], BAS.Zone2['Tz']['sigma'], BAS.Radiator['rw']['sigma'], BAS.Radiator['rw']['sigma'] ])
+        self.noise['w_cov'] = 0.2*np.diag([ BAS.Zone1['Tz']['sigma'], BAS.Zone2['Tz']['sigma'], BAS.Radiator['rw']['sigma'], BAS.Radiator['rw']['sigma'] ])
         
         self.noise['w_mean'] = self.W.flatten()
         
@@ -445,7 +445,7 @@ class building_1room(master.LTI_master):
         # Partition size
         self.setup['partition']['nrPerDim']  = [21, 11]
         self.setup['partition']['width']     = [0.25, 1]
-        self.setup['partition']['origin']    = [21, 35]
+        self.setup['partition']['origin']    = [21, 32]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
         self.setup['targets']['nrPerDim']    = 'auto'
