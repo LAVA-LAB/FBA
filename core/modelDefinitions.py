@@ -210,6 +210,7 @@ class UAV(master.LTI_master):
             samples[i,:] = timeseries[:,-1] / 30
             
         self.noise['samples'] = samples
+        self.noise['w_mean'] *= 0
 
         
 class UAV_v2(master.LTI_master):
@@ -359,6 +360,7 @@ class UAV_v2(master.LTI_master):
             samples[i,:] = timeseries[:,-1] / 30
             
         self.noise['samples'] = samples
+        self.noise['w_mean'] *= 0
    
    
 class building_2room(master.LTI_master):

@@ -574,11 +574,13 @@ class scenarioBasedAbstraction(Abstraction):
                 Sigma = self.model[delta].noise['w_cov']
                 
                 if self.setup.scenarios['gaussian'] is True:
+                    # Compute Gaussian noise samples
                     samples = np.random.multivariate_normal(mu, Sigma, 
                                             size=self.setup.scenarios['samples'])
                     
                 else:
-                    samples = self.model[delta].noise['samples'][0:self.setup.scenarios['samples'], :]
+                    # Determine non-Gaussian noise samples (relative from target point)
+                    samples = mu + self.model[delta].noise['samples'][0:self.setup.scenarios['samples'], :]
                     
                 self.trans['memory'], prob[a] = \
                     computeScenarioBounds_sparse(self.setup, 
