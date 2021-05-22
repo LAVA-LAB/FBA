@@ -218,23 +218,45 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
         # Determine desired state IDs
         if ScAb.basemodel.name == 'UAV':
             if ScAb.basemodel.modelDim == 2:
-                x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-8], b=[0], c=[-8], d=[0])
-                cut_value = [0,0]
+                x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-8], b=[1.5], c=[-8], d=[0])
+                
+                cut_value = np.zeros(2)
+                for i,d in enumerate(range(1, ScAb.basemodel.n, 2)):
+                    if ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 != round( ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 ):
+                        cut_value[i] = 0
+                    else:
+                        cut_value[i] = ScAb.basemodel.setup['partition']['width'][d] / 2                
                 
             elif ScAb.basemodel.modelDim == 3:
                 x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-3], b=[0], c=[-3], d=[0], e=[-3], f=[0])
-                cut_value = [1,1,1]
+                
+                cut_value = np.zeros(3)
+                for i,d in enumerate(range(1, ScAb.basemodel.n, 2)):
+                    if ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 != round( ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 ):
+                        cut_value[i] = 0
+                    else:
+                        cut_value[i] = ScAb.basemodel.setup['partition']['width'][d] / 2             
         
         elif ScAb.basemodel.name == 'UAV_v2':
             if ScAb.basemodel.modelDim == 2:
                 x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-6], b=[0], c=[-6], d=[0])
-                cut_value = [1,1]
+                
+                cut_value = np.zeros(2)
+                for i,d in enumerate(range(1, ScAb.basemodel.n, 2)):
+                    if ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 != round( ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 ):
+                        cut_value[i] = 0
+                    else:
+                        cut_value[i] = ScAb.basemodel.setup['partition']['width'][d] / 2                
                 
             elif ScAb.basemodel.modelDim == 3:
                 x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-6], b=[0], c=[-6], d=[0], e=[-6], f=[0])
-                cut_value = [0,0,0]
                 
-                
+                cut_value = np.zeros(3)
+                for i,d in enumerate(range(1, ScAb.basemodel.n, 2)):
+                    if ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 != round( ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 ):
+                        cut_value[i] = 0
+                    else:
+                        cut_value[i] = ScAb.basemodel.setup['partition']['width'][d] / 2          
                 
         # Compute all centers of regions associated with points
         x_init_centers = computeRegionCenters(np.array(x_init), ScAb.basemodel.setup['partition'])

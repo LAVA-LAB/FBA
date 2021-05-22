@@ -18,12 +18,12 @@ class robot(master.LTI_master):
         master.LTI_master.__init__(self)
         
         # Authority limit for the control u, both positive and negative
-        self.setup['control']['limits']['uMin'] =  [-5]
-        self.setup['control']['limits']['uMax'] =  [5]
+        self.setup['control']['limits']['uMin'] =  [-3]
+        self.setup['control']['limits']['uMax'] =  [3]
         
         # Partition size
-        self.setup['partition']['nrPerDim']  = [22, 21]
-        self.setup['partition']['width']     = [1, 1]
+        self.setup['partition']['nrPerDim']  = [7, 4]
+        self.setup['partition']['width']     = [2, 1]
         self.setup['partition']['origin']    = [0, 0]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
@@ -78,12 +78,12 @@ class UAV(master.LTI_master):
         if self.modelDim == 2:
     
             # Authority limit for the control u, both positive and negative
-            self.setup['control']['limits']['uMin'] = [-6, -6]
-            self.setup['control']['limits']['uMax'] = [6, 6]        
+            self.setup['control']['limits']['uMin'] = [-4, -4]
+            self.setup['control']['limits']['uMax'] = [4, 4]        
     
             # Partition size
-            self.setup['partition']['nrPerDim']  = [9,9,9,9]#[11, 11, 11, 11]
-            self.setup['partition']['width']     = [2, 2, 2, 2]
+            self.setup['partition']['nrPerDim']  = [9,5,9,5]#[11, 11, 11, 11]
+            self.setup['partition']['width']     = [2, 1.5, 2, 1.5]
             self.setup['partition']['origin']    = [0, 0, 0, 0]
             
             # Number of actions per dimension (if 'auto', then equal to nr of regions)
@@ -91,7 +91,7 @@ class UAV(master.LTI_master):
             self.setup['targets']['domain']      = 'auto'
             
             # Specification information
-            self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=[6,8], b='all', c=[6,8], d='all')
+            self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=[-6,-8], b='all', c=[6,8], d='all')
             self.setup['specification']['critical'] = np.vstack((
                 setStateBlock(self.setup['partition'], a=[-8,-6,-4], b='all', c=[-2,0], d='all'),
                 setStateBlock(self.setup['partition'], a=[4,6], b='all', c=[-8,-6,-4,-2,0,2], d='all')
@@ -220,12 +220,12 @@ class UAV_v2(master.LTI_master):
         elif self.modelDim == 3:
             
             # Authority limit for the control u, both positive and negative
-            self.setup['control']['limits']['uMin'] = [-6, -6, -6]
-            self.setup['control']['limits']['uMax'] = [6, 6, 6]
+            self.setup['control']['limits']['uMin'] = [-4, -4, -4]
+            self.setup['control']['limits']['uMax'] = [4, 4, 4]
             
             # Partition size
-            self.setup['partition']['nrPerDim']  = [7, 4, 7, 4, 7, 4] #[7, 7, 7, 7, 7, 7]
-            self.setup['partition']['width']     = [2, 2, 2, 2, 2, 2] #[2, 2, 2, 2, 2, 2]
+            self.setup['partition']['nrPerDim']  = [7, 5, 7, 5, 7, 5] #[7, 7, 7, 7, 7, 7]
+            self.setup['partition']['width']     = [2, 1.5, 2, 1.5, 2, 1.5] #[2, 2, 2, 2, 2, 2]
             self.setup['partition']['origin']    = [0, 0, 0, 0, 0, 0]
             
             # Number of actions per dimension (if 'auto', then equal to nr of regions)
@@ -236,9 +236,10 @@ class UAV_v2(master.LTI_master):
             self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=[4,6], b='all', c=[4,6], d='all', e=[4,6], f='all')
             
             self.setup['specification']['critical']   = np.vstack((
-                setStateBlock(self.setup['partition'], a=[0,2], b='all', c=[2,4,6], d='all', e=[-6,-4,-2], f='all'),
-                setStateBlock(self.setup['partition'], a=[-6,-4,-2], b='all', c=[-6,-4], d='all', e=[4,6], f='all'),
-                setStateBlock(self.setup['partition'], a=[4,6], b='all', c=[-6,-4], d='all', e=[-6,-4], f='all')
+                setStateBlock(self.setup['partition'], a=[-2,0], b='all', c=[2,4,6], d='all', e='all', f='all'),
+                setStateBlock(self.setup['partition'], a=[-6,-4], b='all', c=[4,6], d='all', e=[4,6], f='all'),
+                setStateBlock(self.setup['partition'], a=[-2,0], b='all', c=[-6,-4,-2,0], d='all', e=[-6,-4], f='all'),
+                setStateBlock(self.setup['partition'], a=[2,4,6], b='all', c=[-6,-4], d='all', e=[-6,-4], f='all')
                 ))
         
         else:
@@ -248,7 +249,7 @@ class UAV_v2(master.LTI_master):
         # Covariance values of the process noise (w) and measurement noise (v)
         self.setup['noise']['sigma_w_value'] = 0.15
         
-        self.tau = 0.75
+        self.tau = 1
 
     def setModel(self, observer):
         '''

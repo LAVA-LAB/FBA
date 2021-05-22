@@ -257,7 +257,7 @@ class Abstraction(object):
         
         nr_corners = 2**self.basemodel.n
         
-        printEvery = 1#min(100, max(1, int(self.abstr['nr_actions']/10)))
+        printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
         
         # Check if dimension of control area equals that if the state vector
         dimEqual = self.model[delta].p == self.basemodel.n
@@ -359,6 +359,10 @@ class Abstraction(object):
             
             # Shift the inverse hull to account for the specific target point
             if self.setup.plotting['partitionPlot'] and action_id == int(self.abstr['nr_regions']/2):
+
+                print('x_inv_area:',x_inv_area)
+                print('origin shift:',originShift)       
+                print('targetPoint:',targetPoint,' - disturbance:',disturbance)
 
                 predecessor_set = x_inv_area + np.tile(originShift, (nr_corners, 1))
             

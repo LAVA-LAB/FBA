@@ -386,10 +386,12 @@ def createProbabilityPlots(setup, plot, N, model, results, abstr, mc):
             ax_comb[fig_ind].set_xlabel('x_1', labelpad=-6)
             ax_comb[fig_ind].set_ylabel('x_2', labelpad=-6)
             
+            '''
             ax.set_box_aspect([1,1,1])
             set_axes_equal(ax)
             ax_comb[fig_ind].set_box_aspect([1,1,1])
             set_axes_equal(ax_comb[fig_ind])
+            '''
         
         # Style combined subplot figure
         fig_comb.tight_layout()
@@ -696,7 +698,7 @@ def UAVplot2D(setup, model, abstr, traces, cut_value):
     for i,trace in enumerate(traces):
         
         if len(trace) < 3:
-            printWarning('Warning: trace',i,'has length of',len(trace))
+            printWarning('Warning: trace '+str(i)+' has length of '+str(len(trace)))
             continue
         
         # Convert nested list to 2D array
@@ -839,18 +841,15 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
     
     from scipy.interpolate import interp1d
     import visvis as vv
-    
-    app = vv.use()
+    from scipy.spatial import Delaunay
     
     f = vv.clf()
     a = vv.cla()
+    ax = vv.gca()
     
     ix = 0
     iy = 2
     iz = 4
-    
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
     
     regionWidth_xyz = np.array([model.setup['partition']['width'][0], 
                                 model.setup['partition']['width'][2], 
@@ -881,6 +880,13 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
         
             critical = vv.solidBox(tuple(center_xyz), scaling=tuple(regionWidth_xyz))
             critical.faceColor = (1,0,0,0.5)
+            
+            # allCorners = abstr['allCorners'][crit][:,0::2]
+            # hull = Delaunay(allCorners)
+            # meshIndx = hull.convex_hull
+    
+            # critical2 = vv.Mesh(ax, allCorners, faces=meshIndx, normals=allCorners)
+            # critical2.faceColor = (1,0,0,0.5)
     
     # Add traces
     for i,trace in enumerate(traces):
@@ -901,7 +907,8 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
         print(points)
         
         # Plot precise points
-        #plt.plot(x, y, z, lw=4, color="black");
+        #plt.plot(x, y, z, lw=4, color="black")
+        vv.plot(x,y,z, lw=0, mc='b', ms='.')
         
         # Linear length along the line:
         distance = np.cumsum( np.sqrt(np.sum( np.diff(points, axis=0)**2, axis=1 )) )
@@ -918,7 +925,7 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
         zp = interpolated_points[:,2]
         
         # Plot trace
-        vv.plot(xp,yp,zp, lw=1);
+        vv.plot(xp,yp,zp, lw=1, lc='b')
         # plt.plot(x_values, y_values, color="blue")
     
     # angle = np.linspace(0, 6*np.pi, 1000)
@@ -933,6 +940,11 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
     # z = angle / 6.0 - 0.5
     # vv.plot(x, y, z, lc ="r", lw=10)
     
+    ax.axis.xLabel = 'X'
+    ax.axis.yLabel = 'Y'
+    ax.axis.zLabel = 'Z'
+    
+    app = vv.use()
     app.Run()
     
     
