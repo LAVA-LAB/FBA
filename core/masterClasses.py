@@ -65,6 +65,7 @@ class settings(object):
             sa['gamma'] = 2 # Factor by which N is multiplied in every iteration
             sa['samples_max'] = 6400 # Maximum number of samples in iterative scheme
             sa['confidence']   = 1e-1 # Confidence level (beta)
+            sa['gaussian'] = True
             
         else:
             sa['switch'] = False

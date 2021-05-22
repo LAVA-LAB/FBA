@@ -77,6 +77,16 @@ class Abstraction(object):
         model.uMin   = np.array( model.setup['control']['limits']['uMin'] * int(model.p/self.basemodel.p) )
         model.uMax   = np.array( model.setup['control']['limits']['uMax'] * int(model.p/self.basemodel.p) )
         
+        # If noise samples are used, recompute them
+        if self.setup.scenarios['gaussian'] is False:
+            
+            model.noise['samples'] = np.vstack((2*model.noise['samples'][:,0],
+                                                  model.noise['samples'][:,0],
+                                                2*model.noise['samples'][:,1],
+                                                  model.noise['samples'][:,1],
+                                                2*model.noise['samples'][:,2],
+                                                  model.noise['samples'][:,2])).T
+        
         return model
     
     def _defPartition(self):
@@ -562,8 +572,13 @@ class scenarioBasedAbstraction(Abstraction):
             
                 mu = self.abstr['target']['d'][a]
                 Sigma = self.model[delta].noise['w_cov']
-                samples = np.random.multivariate_normal(mu, Sigma, 
-                                        size=self.setup.scenarios['samples'])
+                
+                if self.setup.scenarios['gaussian'] is True:
+                    samples = np.random.multivariate_normal(mu, Sigma, 
+                                            size=self.setup.scenarios['samples'])
+                    
+                else:
+                    samples = self.model[delta].noise['samples'][0:self.setup.scenarios['samples'], :]
                     
                 self.trans['memory'], prob[a] = \
                     computeScenarioBounds_sparse(self.setup, 
@@ -875,10 +890,11 @@ class scenarioBasedAbstraction(Abstraction):
             init_state_idxs = self.setup.montecarlo['init_states']
         
         # The gaussian random variables are precomputed to speed up the code
-        w_array = dict()
-        for delta in self.setup.deltas:
-            w_array[delta] = np.random.multivariate_normal(self.model[delta].noise['w_mean'], self.model[delta].noise['w_cov'],
-               ( len(n_list), len(init_state_idxs), self.setup.montecarlo['iterations'], self.N ))
+        if self.setup.scenarios['gaussian'] is True:
+            w_array = dict()
+            for delta in self.setup.deltas:
+                w_array[delta] = np.random.multivariate_normal(self.model[delta].noise['w_mean'], self.model[delta].noise['w_cov'],
+                   ( len(n_list), len(init_state_idxs), self.setup.montecarlo['iterations'], self.N ))
         
         # For each starting time step in the list
         for n0id,n0 in enumerate(n_list):
@@ -1062,7 +1078,16 @@ class scenarioBasedAbstraction(Abstraction):
                                 # Implement the control into the physical (unobservable) system
                                 x_hat = self.model[delta].A @ x[k] + self.model[delta].B @ u[k]
                                 
-                                x[k+delta] = x_hat + w_array[delta][n0id, i_abs, m, k]
+                                if self.setup.scenarios['gaussian'] is True:
+                                    # Use Gaussian process noise
+                                    x[k+delta] = x_hat + w_array[delta][n0id, i_abs, m, k]
+                                else:
+                                    # Use generated samples
+                                    random_index = np.random.randint(0, self.setup.scenarios['samples_max'])
+                                    disturbance = self.model[delta].noise['samples'][random_index]
+                                    x[k+delta] = x_hat + disturbance
+                                    
+                                    print('from x_hat:',x_hat,'with disturbance',disturbance,'to',x[k+delta])
                             
                                 # Add current state to trace
                                 self.mc['traces'][n0][i][m] += [x[k+delta]]

@@ -71,9 +71,11 @@ setup.setOptions(category='mdp',
 # setup.setOptions(category='montecarlo', init_states=[7])
     
 setup.setOptions(category='main', iterative=False)
-setup.setOptions(category='scenarios', samples=1600)
+setup.setOptions(category='scenarios', samples=1600, gaussian=False)
 
 setup.setOptions(category='mdp', mode='interval')
+
+print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
 
 # %%
 
@@ -98,6 +100,9 @@ print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
 # Initialize the main abstraction meethod
 #-----------------------------------------------------------------------------
 
+if setup.main['iterative'] is False:
+    setup.scenarios['samples_max'] = setup.scenarios['samples']
+
 # Dictionary for all instances
 ScAb = dict()
 
@@ -110,6 +115,9 @@ setup.deltas = [2]
 
 # Set LTI model in main object
 model.setModel(observer=False)
+
+# Create noise samples
+model.setTurbulenceNoise(setup.scenarios['samples_max'])
 
 # Create the main object for the current instance
 ScAb = scenarioBasedAbstraction(setup=setup, basemodel=model)
