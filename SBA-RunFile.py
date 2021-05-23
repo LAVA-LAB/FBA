@@ -160,6 +160,7 @@ iterative_results = dict()
 iterative_results['general'] = pd.DataFrame()
 iterative_results['run_times'] = pd.DataFrame()
 iterative_results['performance'] = pd.DataFrame()
+iterative_results['model_size'] = pd.DataFrame()
 
 while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or \
     ScAb.setup.main['iterative'] is False:
@@ -187,15 +188,18 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
         # Calculate transition probabilities
         ScAb.defTransitions()
         
-        # Build MDP
-        ScAb.buildMDP()
-        
         # Save case-specific data in Excel
         output_file = ScAb.setup.directories['outputFcase'] + \
             ScAb.setup.time['datetime'] + '_N='+str(N)+'_data_export.xlsx'
         
         # Create a Pandas Excel writer using XlsxWriter as the engine
         writer = pd.ExcelWriter(output_file, engine='xlsxwriter')
+        
+        # Build MDP
+        model_size = ScAb.buildMDP()
+        
+        model_size_df = pd.DataFrame(model_size, index=[case_id])
+        model_size_df.to_excel(writer, sheet_name='Model size')
         
         # Solve the MDP
         ScAb.solveMDP()
@@ -327,7 +331,7 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
         print('Empirical reachability (Monte Carlo):',empirical_reach)
         
         performance_df = pd.DataFrame( {'PRISM reachability': PRISM_reach.flatten(),
-                                        'Empirical reachability': empirical_reach.flatten() } )
+                                        'Empirical reachability': empirical_reach.flatten() }, index=[case_id] )
         performance_df.to_excel(writer, sheet_name='Performance')
         
         itersToShow = 10
@@ -413,6 +417,7 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
         # Add current results to general dictionary
         iterative_results['general'] = pd.concat([iterative_results['general'], general_df], axis=0)
         iterative_results['run_times'] = pd.concat([iterative_results['run_times'], time_df], axis=0)
+        iterative_results['model_size'] = pd.concat([iterative_results['model_size'], model_size_df], axis=0)
         
         ScAb.setup.scenarios['samples'] = int(ScAb.setup.scenarios['samples']*ScAb.setup.scenarios['gamma'])
         case_id += 1

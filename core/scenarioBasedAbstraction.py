@@ -667,22 +667,28 @@ class scenarioBasedAbstraction(Abstraction):
         if self.setup.mdp['solver'] == 'Python':
             self.mdp.createPython(self.abstr, self.trans)
             
+            model_size = {'States':None,'Choices':None,'Transitions':None}
+            
         elif self.setup.mdp['solver'] == 'PRISM':
             
             if self.setup.mdp['prism_model_writer'] == 'explicit' and self.setup.mdp['horizon'] != 'finite':
                 
                 # Create PRISM file (explicit way)
-                self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
+                model_size, self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
                     self.mdp.writePRISM_explicit(self.abstr, self.trans, self.setup.mdp['mode'])   
             
             else:
             
                 # Create PRISM file (default way)
                 self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
-                    self.mdp.writePRISM_scenario(self.abstr, self.trans, self.setup.mdp['mode'], self.setup.mdp['horizon'])   
+                    self.mdp.writePRISM_scenario(self.abstr, self.trans, self.setup.mdp['mode'], self.setup.mdp['horizon'])  
+                  
+                model_size = {'States':None,'Choices':None,'Transitions':None}
 
         self.time['4_MDPcreated'] = tocDiff(False)
         print('MDP created - time:',self.time['4_MDPcreated'])
+        
+        return model_size
             
     def solveMDP(self):
         

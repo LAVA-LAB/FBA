@@ -576,7 +576,13 @@ class mdp(object):
         print(' ---- String ready; write to file...')
         
         # Header contains nr of states, choices, and transitions
-        header = str(self.nr_regions+1)+' '+str(nr_choices_absolute+1)+' '+str(nr_transitions_absolute+1)+'\n'
+        size_states = self.nr_regions+1
+        size_choices = nr_choices_absolute+1
+        size_transitions = nr_transitions_absolute+1
+        model_size = {'States': size_states, 
+                      'Choices': size_choices, 
+                      'Transitions':size_transitions}
+        header = str(size_states)+' '+str(size_choices)+' '+str(size_transitions)+'\n'
         
         if self.setup.scenarios['switch'] and mode == 'interval':
             firstrow = '0 0 0 [1.0,1.0]\n'
@@ -589,4 +595,4 @@ class mdp(object):
         ### Write specification file
         specfile, specification = self.writePRISM_specification(mode, horizon='infinite')
         
-        return PRISM_allfiles, specfile, specification
+        return model_size, PRISM_allfiles, specfile, specification
