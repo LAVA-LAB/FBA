@@ -267,7 +267,8 @@ class UAV_v2(master.LTI_master):
                 setStateBlock(self.setup['partition'], a=[-2,0], b='all', c=[2,4,6], d='all', e='all', f='all'),
                 setStateBlock(self.setup['partition'], a=[-6,-4], b='all', c=[4,6], d='all', e=[4,6], f='all'),
                 setStateBlock(self.setup['partition'], a=[-2,0], b='all', c=[-6,-4,-2,0], d='all', e=[-6,-4], f='all'),
-                setStateBlock(self.setup['partition'], a=[2,4,6], b='all', c=[-6,-4], d='all', e=[-6,-4], f='all')
+                setStateBlock(self.setup['partition'], a=[2,4,6], b='all', c=[-6,-4], d='all', e=[-6,-4], f='all'),
+                setStateBlock(self.setup['partition'], a=[-2,0], b='all', c=[-6,-4], d='all', e=[-2,0], f='all')
                 ))
         
         else:

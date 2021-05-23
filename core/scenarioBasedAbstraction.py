@@ -1111,7 +1111,7 @@ class scenarioBasedAbstraction(Abstraction):
                                     disturbance = self.model[delta].noise['samples'][random_index]
                                     x[k+delta] = x_hat + disturbance
                                     
-                                    print('from x_hat:',x_hat,'with disturbance',disturbance,'to',x[k+delta])
+                                    # print('from x_hat:',x_hat,'with disturbance',disturbance,'to',x[k+delta])
                             
                                 # Add current state to trace
                                 self.mc['traces'][n0][i][m] += [x[k+delta]]

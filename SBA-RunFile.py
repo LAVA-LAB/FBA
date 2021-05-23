@@ -71,10 +71,10 @@ setup.setOptions(category='mdp',
                   prism_folder="/Users/thom/Documents/PRISM/prism-imc-v4/prism/")
 # setup.setOptions(category='montecarlo', init_states=[7])
     
-setup.setOptions(category='scenarios', samples=25)
+setup.setOptions(category='scenarios', samples=25, samples_max=200)
 
 setup.setOptions(category='main', iterative=True)
-setup.setOptions(category='mdp', mode='interval')
+setup.setOptions(category='mdp', mode='estimate')
 
 print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
 
@@ -117,16 +117,17 @@ setup.deltas = [2]
 # Set LTI model in main object
 model.setModel(observer=False)
 
-# Create noise samples
-if model.name in ['UAV','UAV_v2'] and model.modelDim == 3:
-    setup.setOptions(category='scenarios', gaussian=False)
-    model.setTurbulenceNoise(setup.scenarios['samples_max'])
-
 # If TRUE monte carlo simulations are performed
 _, choice = user_choice( \
     'Start a new abstraction or load existing PRISM results?', 
     ['New abstraction', 'Load existing results'])
 setup.main['newRun'] = not choice
+
+if setup.main['newRun'] is True:
+    # Create noise samples
+    if model.name in ['UAV','UAV_v2'] and model.modelDim == 3:
+        setup.setOptions(category='scenarios', gaussian=False)
+        model.setTurbulenceNoise(setup.scenarios['samples_max'])
 
 if setup.main['iterative'] is True and setup.main['newRun'] is False:
     printWarning("Iterative scheme cannot be combined with loading existing PRISM results, so switch to new run")
