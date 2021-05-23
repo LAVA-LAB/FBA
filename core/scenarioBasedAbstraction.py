@@ -533,6 +533,8 @@ class scenarioBasedAbstraction(Abstraction):
         
         Abstraction.__init__(self)
         
+        Abstraction.definePartition(self)
+        
     def _loadScenarioTable(self, tableFile):
         
         # Create memory for scenario probabilities (6 variables/columns, max N+1 rows)
@@ -560,7 +562,7 @@ class scenarioBasedAbstraction(Abstraction):
         
         prob = dict()
 
-        printEvery = min(10, max(1, int(self.abstr['nr_actions']/10)))
+        printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
 
         # For every action (i.e. target point)
         for a in range(self.abstr['nr_actions']):
@@ -597,7 +599,6 @@ class scenarioBasedAbstraction(Abstraction):
         return prob
     
     def defActions(self):
-        Abstraction.definePartition(self)
         Abstraction.defineActions(self)
     
     def defTransitions(self):
@@ -650,8 +651,8 @@ class scenarioBasedAbstraction(Abstraction):
             del k
         del delta
         
-        self.time['4_probabilities'] = tocDiff(False)
-        print('Transition probabilities calculated - time:',self.time['4_probabilities'])
+        self.time['3_probabilities'] = tocDiff(False)
+        print('Transition probabilities calculated - time:',self.time['3_probabilities'])
 
     def buildMDP(self):
         '''
@@ -680,8 +681,8 @@ class scenarioBasedAbstraction(Abstraction):
                 self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
                     self.mdp.writePRISM_scenario(self.abstr, self.trans, self.setup.mdp['mode'], self.setup.mdp['horizon'])   
 
-        self.time['5_MDPcreated'] = tocDiff(False)
-        print('MDP created - time:',self.time['5_MDPcreated'])
+        self.time['4_MDPcreated'] = tocDiff(False)
+        print('MDP created - time:',self.time['4_MDPcreated'])
             
     def solveMDP(self):
         
@@ -694,7 +695,18 @@ class scenarioBasedAbstraction(Abstraction):
         elif self.setup.mdp['solver'] == 'PRISM':
             
             # Solve the MDP in PRISM (which is called via the terminal)
-            self._solveMDPviaPRISM()
+            policy_file, vector_file = self._solveMDPviaPRISM()
+            
+            # Load PRISM results back into Python
+            self.loadPRISMresults(policy_file, vector_file)
+            
+        self.time['5_MDPsolved'] = tocDiff(False)
+        print('MDP solved in',self.time['5_MDPsolved'])
+            
+        import time
+        time.sleep(3)
+        
+    def preparePlots(self):
         
         # Process results
         self.plot           = dict()
@@ -717,8 +729,7 @@ class scenarioBasedAbstraction(Abstraction):
                 self.plot[delta]['T']['half']  = int(self.plot[delta]['N']['half'] * self.basemodel.tau)
                 self.plot[delta]['T']['final'] = int(self.plot[delta]['N']['final'] * self.basemodel.tau)
            
-        self.time['6_MDPsolved'] = tocDiff(False)
-        print('MDP solved in',self.time['6_MDPsolved'])
+        
         
     def _solveMDPviaPython(self):
         '''
@@ -742,7 +753,6 @@ class scenarioBasedAbstraction(Abstraction):
     def _solveMDPviaPRISM(self):
         
         import subprocess
-        import pandas as pd
 
         prism_folder = self.setup.mdp['prism_folder'] 
         
@@ -785,7 +795,13 @@ class scenarioBasedAbstraction(Abstraction):
                       model_file+" -pf '"+spec+"' "+options    
         
         subprocess.Popen(command, shell=True).wait()    
-            
+        
+        return policy_file, vector_file
+        
+    def loadPRISMresults(self, policy_file, vector_file):
+        
+        import pandas as pd
+        
         self.results = dict()
         
         policy_all = pd.read_csv(policy_file, header=None).iloc[:, 1:].fillna(-1).to_numpy()
@@ -1103,5 +1119,5 @@ class scenarioBasedAbstraction(Abstraction):
                 self.mc['results']['reachability_probability'][i,n0id] = \
                     np.sum(self.mc['results'][n0][i]['goalReached']) / self.setup.montecarlo['iterations']
                     
-        self.time['7_MonteCarlo'] = tocDiff(False)
-        print('Monte Carlo simulations finished:',self.time['7_MonteCarlo'])
+        self.time['6_MonteCarlo'] = tocDiff(False)
+        print('Monte Carlo simulations finished:',self.time['6_MonteCarlo'])

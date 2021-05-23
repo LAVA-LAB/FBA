@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import glob
+import os
+
 def user_choice(title, items):
     '''
     Lets a user choose between the entries of `items`
@@ -56,3 +59,47 @@ def user_choice(title, items):
         choice_id = 0
             
     return choice, choice_id
+
+def load_PRISM_result_file(output_folder, model_name, N):
+
+    suitable_folders = []
+
+    # Select a suitable results file to load
+    folder_list = next(os.walk(output_folder))
+                       
+    for folder in folder_list[1]:
+        if folder.startswith('ScAb_'+model_name):
+        
+            run_folder = output_folder + folder
+            subfolder_list = next(os.walk(run_folder))
+            
+            for subfolder in subfolder_list[1]:
+                if subfolder == 'N='+str(N):
+                    suitable_folders += [subfolder_list[0] + '/' + subfolder]
+
+    suitable_folders_trim = [None for i in range(len(suitable_folders))]
+    for i,folder in enumerate(suitable_folders):
+        # Remove prefix of the folder
+        suitable_folders_trim[i] = '/'.join( folder.split('/')[-2:] )
+        
+    # If TRUE monte carlo simulations are performed
+    _, folder_idx = user_choice( \
+        'Choose a folder to load the PRISM results from...', suitable_folders_trim)
+        
+    folder_to_load = suitable_folders[folder_idx] + '/'
+    os.chdir(folder_to_load)
+    
+    policy_files = glob.glob("*policy.csv")
+    vector_files = glob.glob("*vector.csv")
+    
+    if len(policy_files) > 0 and len(vector_files) > 0:
+        
+        policy_file = folder_to_load + policy_files[0]
+        vector_file = folder_to_load + vector_files[0]
+    
+    else:
+        
+        policy_file = None
+        vector_file = None
+        
+    return folder_to_load, policy_file, vector_file

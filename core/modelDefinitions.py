@@ -193,7 +193,7 @@ class UAV(master.LTI_master):
         turb = DrydenGustModel(dt=1, b=5, h=20, V_a = 25, intensity="moderate")
         
         iters = N
-        sample_length = 10
+        sample_length = 20
         dim = 3
         
         samples = np.zeros((iters,dim))
@@ -207,7 +207,7 @@ class UAV(master.LTI_master):
             turb.simulate(sample_length)
             timeseries = turb.vel_lin
             
-            samples[i,:] = timeseries[:,-1] / 30
+            samples[i,:] = timeseries[:,-1] / 10
             
         self.noise['samples'] = samples
         self.noise['w_mean'] *= 0
@@ -252,7 +252,7 @@ class UAV_v2(master.LTI_master):
             self.setup['control']['limits']['uMax'] = [4, 4, 4]
             
             # Partition size
-            self.setup['partition']['nrPerDim']  = [7, 4, 7, 4, 7, 4] #[7, 7, 7, 7, 7, 7]
+            self.setup['partition']['nrPerDim']  = [7, 5, 7, 5, 7, 5] #[7, 7, 7, 7, 7, 7]
             self.setup['partition']['width']     = [2, 1.5, 2, 1.5, 2, 1.5] #[2, 2, 2, 2, 2, 2]
             self.setup['partition']['origin']    = [0, 0, 0, 0, 0, 0]
             
@@ -343,7 +343,7 @@ class UAV_v2(master.LTI_master):
         turb = DrydenGustModel(dt=1, b=5, h=20, V_a = 25, intensity="moderate")
         
         iters = N
-        sample_length = 10
+        sample_length = 20
         dim = 3
         
         samples = np.zeros((iters,dim))
@@ -357,7 +357,7 @@ class UAV_v2(master.LTI_master):
             turb.simulate(sample_length)
             timeseries = turb.vel_lin
             
-            samples[i,:] = timeseries[:,-1] / 30
+            samples[i,:] = timeseries[:,-1] / 10
             
         self.noise['samples'] = samples
         self.noise['w_mean'] *= 0
