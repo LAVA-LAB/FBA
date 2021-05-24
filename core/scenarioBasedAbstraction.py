@@ -14,6 +14,7 @@ import copy
 import csv
 import sys
 import os
+import random
 
 from scipy.spatial import Delaunay
 
@@ -314,12 +315,12 @@ class Abstraction(object):
             
             targetPoint = self.abstr['target']['d'][action_id]
             
-            disturbance = self.model[delta].noise['w_mean']
+            drift = self.model[delta].noise['w_mean']
             
             if dimEqual:
             
                 # Shift the origin points (instead of the target point)
-                originShift = self.model[delta].A_inv @ (np.array(targetPoint) - disturbance)
+                originShift = self.model[delta].A_inv @ (np.array(targetPoint) - drift)
                 
                 # Python implementation
                 originPointsShifted = allCornersTransformed - (originShift @ basis_vectors_inv)
@@ -351,7 +352,7 @@ class Abstraction(object):
             else:
                 
                 # Shift the origin points (instead of the target point)
-                originShift = self.model[delta].A_inv @ (np.array(targetPoint) - disturbance)
+                originShift = self.model[delta].A_inv @ (np.array(targetPoint) - drift)
             
                 # Subtract the shift from all corner points
                 originPointsShifted = allCornersTransformed - originShift
@@ -372,7 +373,7 @@ class Abstraction(object):
 
                 print('x_inv_area:',x_inv_area)
                 print('origin shift:',originShift)       
-                print('targetPoint:',targetPoint,' - disturbance:',disturbance)
+                print('targetPoint:',targetPoint,' - drift:',drift)
 
                 predecessor_set = x_inv_area + np.tile(originShift, (nr_corners, 1))
             
@@ -582,7 +583,11 @@ class scenarioBasedAbstraction(Abstraction):
                     
                 else:
                     # Determine non-Gaussian noise samples (relative from target point)
+                    # samples = mu + np.array(random.choices(self.model[delta].noise['samples'], k=self.setup.scenarios['samples']))
+                    
+                              
                     samples = mu + self.model[delta].noise['samples'][0:self.setup.scenarios['samples'], :]
+                    print('samples:',samples)
                     
                 self.trans['memory'], prob[a] = \
                     computeScenarioBounds_sparse(self.setup, 
@@ -847,14 +852,18 @@ class scenarioBasedAbstraction(Abstraction):
         
         print('\nGenerate plots')
         
-        from .postprocessing.createPlots import createProbabilityPlots, createTimegroupingPlot
+        if self.abstr['nr_regions'] <= 1000:
         
-        if self.setup.plotting['probabilityPlots']:
-            createProbabilityPlots(self.setup, self.plot[delta_value], self.N, self.model[delta_value], \
-                                   self.results, self.abstr, self.mc)
-                
-        toc()
-        
+            from .postprocessing.createPlots import createProbabilityPlots #, createTimegroupingPlot
+            
+            if self.setup.plotting['probabilityPlots']:
+                createProbabilityPlots(self.setup, self.plot[delta_value], self.N, self.model[delta_value], \
+                                       self.results, self.abstr, self.mc)
+                    
+        else:
+            
+            printWarning("Omit probability plots, since number of regions is too large to see anything anyways...")
+            
     def monteCarlo(self, iterations='auto', init_states='auto', init_times='auto'):
         '''
         -----------------------------------------------------------------------
@@ -1106,9 +1115,9 @@ class scenarioBasedAbstraction(Abstraction):
                                     # Use Gaussian process noise
                                     x[k+delta] = x_hat + w_array[delta][n0id, i_abs, m, k]
                                 else:
-                                    # Use generated samples
-                                    random_index = np.random.randint(0, self.setup.scenarios['samples_max'])
-                                    disturbance = self.model[delta].noise['samples'][random_index]
+                                    # Use generated samples                                    
+                                    disturbance = random.choice(self.model[delta].noise['samples'])
+                                    
                                     x[k+delta] = x_hat + disturbance
                                     
                                     # print('from x_hat:',x_hat,'with disturbance',disturbance,'to',x[k+delta])

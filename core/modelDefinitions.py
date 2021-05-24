@@ -187,27 +187,7 @@ class UAV(master.LTI_master):
         
     def setTurbulenceNoise(self, N):
         
-        from core.UAV.dryden import DrydenGustModel
-        
-        # V_a = speed in 
-        turb = DrydenGustModel(dt=1, b=5, h=20, V_a = 25, intensity="moderate")
-        
-        iters = N
-        sample_length = 20
-        dim = 3
-        
-        samples = np.zeros((iters,dim))
-        
-        for i in range(iters):
-            
-            if i % 100 == 0:
-                print(' -- Create turbulence noise sample:',i)
-            
-            turb.reset()
-            turb.simulate(sample_length)
-            timeseries = turb.vel_lin
-            
-            samples[i,:] = timeseries[:,-1] / 10
+        samples = np.genfromtxt('input/TurbulenceNoise_N=1000_dim=3.csv', delimiter=',')
             
         self.noise['samples'] = samples
         self.noise['w_mean'] *= 0
@@ -338,27 +318,7 @@ class UAV_v2(master.LTI_master):
    
     def setTurbulenceNoise(self, N):
         
-        from core.UAV.dryden import DrydenGustModel
-        
-        # V_a = speed in 
-        turb = DrydenGustModel(dt=1, b=5, h=20, V_a = 25, intensity="moderate")
-        
-        iters = N
-        sample_length = 20
-        dim = 3
-        
-        samples = np.zeros((iters,dim))
-        
-        for i in range(iters):
-            
-            if i % 100 == 0:
-                print(' -- Create turbulence noise sample:',i)
-            
-            turb.reset()
-            turb.simulate(sample_length)
-            timeseries = turb.vel_lin
-            
-            samples[i,:] = timeseries[:,-1] / 10
+        samples = np.genfromtxt('input/TurbulenceNoise_N=1000_dim=3.csv', delimiter=',')
             
         self.noise['samples'] = samples
         self.noise['w_mean'] *= 0

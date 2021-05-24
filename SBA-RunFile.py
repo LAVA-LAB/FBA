@@ -31,7 +31,7 @@ if latex_path not in os.environ["PATH"]:
 # Main classes and methods used
 from core.scenarioBasedAbstraction import scenarioBasedAbstraction
 from core.preprocessing.user_interface import user_choice, load_PRISM_result_file
-from core.commons import printWarning, createDirectory
+from core.commons import printWarning, createDirectory, toc
 
 from inspect import getmembers, isclass
 from core import modelDefinitions
@@ -42,7 +42,7 @@ from core.masterClasses import settings
 modelClasses = np.array(getmembers(modelDefinitions, isclass))
 application, application_id  = user_choice('application',list(modelClasses[:,0]))
 
-np.random.seed(33)
+np.random.seed(10)
 
 #-----------------------------------------------------------------------------
 # Create model class
@@ -64,17 +64,17 @@ setup = settings(mode='scenario', application=model.name)
 # Manual changes in general settings
 setup.setOptions(category='plotting', exportFormats=['pdf'], partitionPlot=True)
 setup.setOptions(category='mdp', 
-                  # prism_java_memory=32,
-                 # prism_java_memory=7,
+                   # prism_java_memory=32,
+                  prism_java_memory=7,
                  prism_model_writer='explicit', # Is either default or explicit
-                  # prism_folder="/home/tbadings/Documents/SBA/prism-imc/prism/") # Folder where PRISM is located
-                  prism_folder="/Users/thom/Documents/PRISM/prism-imc-v4/prism/")
+                   # prism_folder="/home/tbadings/Documents/SBA/prism-imc/prism/") # Folder where PRISM is located
+                   prism_folder="/Users/thom/Documents/PRISM/prism-imc-v4/prism/")
 # setup.setOptions(category='montecarlo', init_states=[7])
     
-setup.setOptions(category='scenarios', samples=25, samples_max=200)
+setup.setOptions(category='scenarios', samples=25, samples_max=6400)
 
 setup.setOptions(category='main', iterative=True)
-setup.setOptions(category='mdp', mode='estimate')
+setup.setOptions(category='mdp', mode='interval')
 
 print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
 
@@ -257,7 +257,9 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
         MCsims_df.to_excel(writer, sheet_name='Empirical reach.')
     
     # Plot results
-    ScAb.generatePlots( delta_value = ScAb.setup.deltas[0], max_delta = max(ScAb.setup.deltas) )        
+    ScAb.generatePlots( delta_value = ScAb.setup.deltas[0], max_delta = max(ScAb.setup.deltas) )
+                       
+    toc()
     
     # %%
     
@@ -301,7 +303,7 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
                         cut_value[i] = ScAb.basemodel.setup['partition']['width'][d] / 2                
                 
             elif ScAb.basemodel.modelDim == 3:
-                x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-6], b=[-1], c=[6], d=[0], e=[-6], f=[0])
+                x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-6], b=[0], c=[6], d=[0], e=[-6], f=[0])
                 
                 cut_value = np.zeros(3)
                 for i,d in enumerate(range(1, ScAb.basemodel.n, 2)):
