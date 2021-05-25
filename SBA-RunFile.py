@@ -62,7 +62,7 @@ model.setOptions(endTime=64)
 setup = settings(mode='scenario', application=model.name)
 
 # Manual changes in general settings
-setup.setOptions(category='plotting', exportFormats=['pdf'], partitionPlot=True)
+setup.setOptions(category='plotting', exportFormats=['pdf'], partitionPlot=False)
 setup.setOptions(category='mdp', 
                    # prism_java_memory=32,
                   prism_java_memory=7,
@@ -71,7 +71,7 @@ setup.setOptions(category='mdp',
                    prism_folder="/Users/thom/Documents/PRISM/prism-imc-v4/prism/")
 # setup.setOptions(category='montecarlo', init_states=[7])
     
-setup.setOptions(category='scenarios', samples=25, samples_max=6400)
+setup.setOptions(category='scenarios', samples=400, samples_max=6400)
 
 setup.setOptions(category='main', iterative=True)
 setup.setOptions(category='mdp', mode='interval')

@@ -17,7 +17,7 @@ import matplotlib.colors as mcolors
 from ..commons import printWarning, mat_to_vec, cm2inch
 
 
-def createPartitionPlot(j, delta_plot, setup, model, \
+def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
                         abstr, allOriginPointsNested, predecessor_set):
     '''
     Create partition plot for the current filter-based abstraction instance.
@@ -47,116 +47,131 @@ def createPartitionPlot(j, delta_plot, setup, model, \
 
     '''
     
+    i0,i1 = i_tup
+    j0,j1 = j_tup
+    
+    fig = plt.figure(figsize=cm2inch(12, 7))
+    ax = fig.add_subplot(111)
+    
     # If number of dimensions is 2, create 2D plot
-    if model.n <= 2:
-        
-        #### Partition plot v1
-        
-        fig = plt.figure(figsize=cm2inch(12, 7))
-        ax = fig.add_subplot(111)
-        
+    if model.n <= 2:        
         plt.xlabel('$x_1$', labelpad=0)
         plt.ylabel('$x_2$', labelpad=-10)
+    else:
+        plt.xlabel('$x_'+str(i0)+'$', labelpad=0)
+        plt.ylabel('$x_'+str(i1)+'$', labelpad=-10)
         
-        for k,poly in enumerate(allOriginPointsNested):
+    #### Partition plot v1
+    
+    for k,poly in enumerate(allOriginPointsNested):
+
+        if model.n <= 2 or ( \
+            abstr['P'][k]['center'][j0] == model.setup['partition']['origin'][j0] and \
+            abstr['P'][k]['center'][j1] == model.setup['partition']['origin'][j1]):
 
             # Convert poly list to numpy array            
             polyMat = np.array(poly)
             
             # Plot partitions and label
-            ax.text(abstr['P'][k]['center'][0], abstr['P'][k]['center'][1], k, \
+            ax.text(abstr['P'][k]['center'][i0], abstr['P'][k]['center'][i1], k, \
                       verticalalignment='center', horizontalalignment='center' )  
             hull = ConvexHull(polyMat, qhull_options='QJ')
-            ax.plot(polyMat[hull.vertices,0], polyMat[hull.vertices,1], lw=1)
-            ax.plot([polyMat[hull.vertices[0],0], polyMat[hull.vertices[-1],0]], \
-                      [polyMat[hull.vertices[0],1], polyMat[hull.vertices[-1],1]], lw=1)
-            
-        for k,target_point in enumerate(abstr['target']['d']):
-                
+            ax.plot(polyMat[hull.vertices,i0], polyMat[hull.vertices,i1], lw=1)
+            ax.plot([polyMat[hull.vertices[0],i0], polyMat[hull.vertices[-1],i0]], \
+                      [polyMat[hull.vertices[0],i1], polyMat[hull.vertices[-1],i1]], lw=1)
+        
+    for k,target_point in enumerate(abstr['target']['d']):
+          
+        if model.n <= 2 or ( \
+            abstr['P'][k]['center'][j0] == model.setup['partition']['origin'][j0] and \
+            abstr['P'][k]['center'][j1] == model.setup['partition']['origin'][j1]):
+        
             # Plot target point
-            plt.scatter(target_point[0], target_point[1], c='k', s=6)
+            plt.scatter(target_point[i0], target_point[i1], c='k', s=6)
+    
+    if setup.plotting['partitionPlot_plotHull']:
+        # Plot convex hull of the preimage of the target point
+        hull = ConvexHull(predecessor_set, qhull_options='QJ')
+        ax.plot(predecessor_set[hull.vertices,i0], predecessor_set[hull.vertices,i1], 'ro--', lw=1) #2
+        ax.plot([predecessor_set[hull.vertices[0],i0], predecessor_set[hull.vertices[-1],i0]], \
+                  [predecessor_set[hull.vertices[0],i1], predecessor_set[hull.vertices[-1],i1]], 'ro--', lw=1) #2
         
-        if setup.plotting['partitionPlot_plotHull']:
-            # Plot convex hull of the preimage of the target point
-            hull = ConvexHull(predecessor_set, qhull_options='QJ')
-            ax.plot(predecessor_set[hull.vertices,0], predecessor_set[hull.vertices,1], 'ro--', lw=1) #2
-            ax.plot([predecessor_set[hull.vertices[0],0], predecessor_set[hull.vertices[-1],0]], \
-                      [predecessor_set[hull.vertices[0],1], predecessor_set[hull.vertices[-1],1]], 'ro--', lw=1) #2
-            
-        # Set tight layout
-        fig.tight_layout()
-                    
-        # Save figure
-        filename = setup.directories['outputF']+'partitioning_'+str(delta_plot)
-        for form in setup.plotting['exportFormats']:
-            plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
-        
-        
-        ###########################
-        #### Partition plot v2 ####
-        fig, ax = plt.subplots(figsize=cm2inch(6.1, 5))
-        
-        plt.xlabel('$x_1$', labelpad=0)
-        plt.ylabel('$x_2$', labelpad=-10)
-
-        domainMax = np.array(model.setup['partition']['nrPerDim']) * np.array(model.setup['partition']['nrPerDim']) / 2
-        
-        min_xy = model.setup['partition']['origin'] - domainMax
-        max_xy = model.setup['partition']['origin'] + domainMax
-        
-        width = model.setup['partition']['width']
-        
-        major_ticks_x = np.arange(min_xy[0]+1, max_xy[0]+1, 4*width[0])
-        major_ticks_y = np.arange(min_xy[1]+1, max_xy[1]+1, 4*width[1])
-        
-        minor_ticks_x = np.arange(min_xy[0], max_xy[0]+1, width[0])
-        minor_ticks_y = np.arange(min_xy[1], max_xy[1]+1, width[1])
-        
-        ax.set_xticks(major_ticks_x)
-        ax.set_yticks(major_ticks_y)
-        ax.set_xticks(minor_ticks_x, minor=True)
-        ax.set_yticks(minor_ticks_y, minor=True)
-        
-        for axi in (ax.xaxis, ax.yaxis):
-            for tic in axi.get_minor_ticks():
-                tic.tick1On = tic.tick2On = False
-        
-        # plt.grid(which='major', color='#CCCCCC', linewidth=0.3)
-        plt.grid(which='minor', color='#CCCCCC', linewidth=0.3)
-        
-        # Goal x-y limits
-        ax.set_xlim(min_xy[0], max_xy[0])
-        ax.set_ylim(min_xy[1], max_xy[1])
-        
-        # Draw goal states
-        for goal in abstr['goal']:
-            goal_lower = abstr['P'][goal]['low']
-            goalState = Rectangle(goal_lower[0:2], width=width[0], height=width[1], color="green", alpha=0.3, linewidth=None)
-            ax.add_patch(goalState)
-        
-        # Draw critical states
-        for critState in abstr['critical']:
-            critStateLow = abstr['P'][critState]['low']
-            criticalState = Rectangle(critStateLow[0:2], width=width[0], height=width[1], color="red", alpha=0.3, linewidth=None)
-            ax.add_patch(criticalState)
-        
-        with plt.rc_context({"font.size": 5}):        
-            # Draw every X-th label
-            skip = 15
-            for i in range(0, abstr['nr_regions'], skip):
-                ax.text(abstr['P'][i]['center'][0], abstr['P'][i]['center'][1], i, \
-                          verticalalignment='center', horizontalalignment='center' ) 
+    # Set tight layout
+    fig.tight_layout()
                 
-        # Set tight layout
-        fig.tight_layout()
+    # Save figure
+    filename = setup.directories['outputF']+'partitioning_'+str(delta_plot)+'_coords=('+str(i0)+','+str(i1)+')'
+    for form in setup.plotting['exportFormats']:
+        plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
         
-        # Save figure
-        filename = setup.directories['outputF']+'partitioning_v2'
-        for form in setup.plotting['exportFormats']:
-            plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
+        
+    '''
+    ###########################
+    #### Partition plot v2 ####
+    fig, ax = plt.subplots(figsize=cm2inch(6.1, 5))
+    
+    plt.xlabel('$x_1$', labelpad=0)
+    plt.ylabel('$x_2$', labelpad=-10)
+
+    domainMax = np.array(model.setup['partition']['nrPerDim']) * np.array(model.setup['partition']['nrPerDim']) / 2
+    
+    min_xy = model.setup['partition']['origin'] - domainMax
+    max_xy = model.setup['partition']['origin'] + domainMax
+    
+    width = model.setup['partition']['width']
+    
+    major_ticks_x = np.arange(min_xy[0]+1, max_xy[0]+1, 4*width[0])
+    major_ticks_y = np.arange(min_xy[1]+1, max_xy[1]+1, 4*width[1])
+    
+    minor_ticks_x = np.arange(min_xy[0], max_xy[0]+1, width[0])
+    minor_ticks_y = np.arange(min_xy[1], max_xy[1]+1, width[1])
+    
+    ax.set_xticks(major_ticks_x)
+    ax.set_yticks(major_ticks_y)
+    ax.set_xticks(minor_ticks_x, minor=True)
+    ax.set_yticks(minor_ticks_y, minor=True)
+    
+    for axi in (ax.xaxis, ax.yaxis):
+        for tic in axi.get_minor_ticks():
+            tic.tick1On = tic.tick2On = False
+    
+    # plt.grid(which='major', color='#CCCCCC', linewidth=0.3)
+    plt.grid(which='minor', color='#CCCCCC', linewidth=0.3)
+    
+    # Goal x-y limits
+    ax.set_xlim(min_xy[0], max_xy[0])
+    ax.set_ylim(min_xy[1], max_xy[1])
+    
+    # Draw goal states
+    for goal in abstr['goal']:
+        goal_lower = abstr['P'][goal]['low']
+        goalState = Rectangle(goal_lower[0:2], width=width[0], height=width[1], color="green", alpha=0.3, linewidth=None)
+        ax.add_patch(goalState)
+    
+    # Draw critical states
+    for critState in abstr['critical']:
+        critStateLow = abstr['P'][critState]['low']
+        criticalState = Rectangle(critStateLow[0:2], width=width[0], height=width[1], color="red", alpha=0.3, linewidth=None)
+        ax.add_patch(criticalState)
+    
+    with plt.rc_context({"font.size": 5}):        
+        # Draw every X-th label
+        skip = 15
+        for i in range(0, abstr['nr_regions'], skip):
+            ax.text(abstr['P'][i]['center'][0], abstr['P'][i]['center'][1], i, \
+                      verticalalignment='center', horizontalalignment='center' ) 
+            
+    # Set tight layout
+    fig.tight_layout()
+    
+    # Save figure
+    filename = setup.directories['outputF']+'partitioning_v2'
+    for form in setup.plotting['exportFormats']:
+        plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
+    '''
     
     # If number of dimensions is 3, create 3D plot
-    elif model.n == 3:
+    if model.n == 3:
         
         fig = plt.figure(figsize=cm2inch(5.33, 4))
         ax = fig.add_subplot(111, projection="3d")
@@ -842,9 +857,12 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
     from scipy.interpolate import interp1d
     import visvis as vv
     from scipy.spatial import Delaunay
+    import imageio
     
+    fig = vv.figure()
     f = vv.clf()
     a = vv.cla()
+    fig = vv.gcf()
     ax = vv.gca()
     
     ix = 0
@@ -904,8 +922,6 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
         z = trace_array[:, iz]
         points = np.array([x,y,z]).T
         
-        print(points)
-        
         # Plot precise points
         #plt.plot(x, y, z, lw=4, color="black")
         vv.plot(x,y,z, lw=0, mc='b', ms='.')
@@ -945,6 +961,14 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
     ax.axis.zLabel = 'Z'
     
     app = vv.use()
+    f.relativeFontSize = 1.6
+    # ax.position.Correct(dh=-5)
+    vv.axis('tight', axes=ax)
+    fig.position.w = 700
+    fig.position.h = 600
+    im = vv.getframe(vv.gcf())
+    ax.SetView({'zoom':0.042, 'elevation':25, 'azimuth':-35})
+    vv.screenshot('UAV_paths_screenshot.png', sf=3, bg='w', ob=vv.gcf())
     app.Run()
     
     

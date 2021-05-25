@@ -18,13 +18,13 @@ class robot(master.LTI_master):
         master.LTI_master.__init__(self)
         
         # Authority limit for the control u, both positive and negative
-        self.setup['control']['limits']['uMin'] =  [-3]
-        self.setup['control']['limits']['uMax'] =  [3]
+        self.setup['control']['limits']['uMin'] =  [-5]
+        self.setup['control']['limits']['uMax'] =  [8]
         
         # Partition size
-        self.setup['partition']['nrPerDim']  = [7, 4]
-        self.setup['partition']['width']     = [2, 1]
-        self.setup['partition']['origin']    = [0, 0]
+        self.setup['partition']['nrPerDim']  = [21, 21]
+        self.setup['partition']['width']     = [2, 2]
+        self.setup['partition']['origin']    = [-10, 5]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
         self.setup['targets']['nrPerDim']    = 'auto'
@@ -55,7 +55,7 @@ class robot(master.LTI_master):
             self.r          = len(self.C)
         
         # Disturbance matrix
-        self.W  = np.array([[0],[0]])
+        self.W  = np.array([[3.5],[-0.7]])
         
         # Determine system dimensions
         self.n = np.size(self.A,1)
@@ -63,7 +63,6 @@ class robot(master.LTI_master):
         
         self.noise = dict()
         self.noise['w_cov'] = np.eye(np.size(self.A,1))*self.setup['noise']['sigma_w_value']
-        self.noise['w_mean'] = self.W.flatten()
         
 
 class UAV(master.LTI_master):
@@ -183,14 +182,12 @@ class UAV(master.LTI_master):
 
         self.noise = dict()
         self.noise['w_cov'] = np.eye(np.size(self.A,1))*self.setup['noise']['sigma_w_value']
-        self.noise['w_mean'] = self.W.flatten()
         
     def setTurbulenceNoise(self, N):
         
         samples = np.genfromtxt('input/TurbulenceNoise_N=1000_dim=3.csv', delimiter=',')
             
         self.noise['samples'] = samples
-        self.noise['w_mean'] *= 0
 
         
 class UAV_v2(master.LTI_master):
@@ -314,14 +311,12 @@ class UAV_v2(master.LTI_master):
 
         self.noise = dict()
         self.noise['w_cov'] = np.eye(np.size(self.A,1))*self.setup['noise']['sigma_w_value']
-        self.noise['w_mean'] = self.W.flatten()
    
     def setTurbulenceNoise(self, N):
         
         samples = np.genfromtxt('input/TurbulenceNoise_N=1000_dim=3.csv', delimiter=',')
             
         self.noise['samples'] = samples
-        self.noise['w_mean'] *= 0
    
    
 class building_2room(master.LTI_master):
@@ -330,23 +325,32 @@ class building_2room(master.LTI_master):
         # Initialize superclass
         master.LTI_master.__init__(self)
         
+        import core.BAS.parameters as BAS_class
+        
+        self.BAS = BAS_class.parameters()
+        
         # Let the user make a choice for the model dimension
         
+        T_boiler    = self.BAS.Boiler['Tswbss']     
+        
         # Authority limit for the control u, both positive and negative
-        self.setup['control']['limits']['uMin'] = [11, -5] #[15, -5]
-        self.setup['control']['limits']['uMax'] = [31, 5] #[25, 5]
+        self.setup['control']['limits']['uMin'] = [11, T_boiler-20] #[15, -5]
+        self.setup['control']['limits']['uMax'] = [31, T_boiler+20] #[25, 5]
             
         # Partition size
         self.setup['partition']['nrPerDim']  = [21,21,9,9]#[21,     21,     11,     11]
-        self.setup['partition']['width']     = [0.2,   0.2,   1,      1]
-        self.setup['partition']['origin']    = [21,     21,     35,     35]
+        self.setup['partition']['width']     = [0.4, 0.4, 0.05, 0.05]
+        self.setup['partition']['origin']    = [21, 21, 42.3019313 , 62.86740522] #[22.93,  18.53,  37.29, 37.045]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
         self.setup['targets']['nrPerDim']    = 'auto'
         self.setup['targets']['domain']      = 'auto'
         
         # Specification information
-        self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=[21], b=[21], c='all', d='all')
+        self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], 
+                                    a=[self.setup['partition']['origin'][0]], 
+                                    b=[self.setup['partition']['origin'][1]], 
+                                    c='all', d='all') #setStateBlock(self.setup['partition'], a=[21], b=[21], c='all', d='all')
         
         self.setup['specification']['critical'] = [[]]
         
@@ -369,65 +373,71 @@ class building_2room(master.LTI_master):
     
         '''
         
-        import core.BAS.parameters as BAS_class
-        
-        BAS = BAS_class.parameters()
+        BAS = self.BAS
         
         # Steady state values
-        Tswb    = BAS.Boiler['Tswbss']         
-        Twss    = BAS.Zone1['Twss']
-        Trwrss  = BAS.Radiator['Trwrss']
-        Pout1   = BAS.Radiator['Zone1']['Prad']    
-        Pout2   = 2*BAS.Radiator['Zone2']['Prad']    
+        Twss        = BAS.Zone1['Twss']
+        Pout1       = BAS.Radiator['Zone1']['Prad'] * 5
+        Pout2       = BAS.Radiator['Zone2']['Prad'] * 2  
         
-        w       = BAS.Radiator['w_r']
+        w1          = BAS.Radiator['w_r'] * 2
+        w2          = BAS.Radiator['w_r'] * 2
         
         BAS.Zone1['Cz'] = BAS.Zone1['Cz'] / 5
+        BAS.Zone1['Rn'] = BAS.Zone1['Rn'] / 5
         
-        m1      = BAS.Zone1['m'] * 2
-        m2      = BAS.Zone2['m']
+        BAS.Zone2['Cz'] = BAS.Zone2['Cz']
+        BAS.Zone2['Rn'] = BAS.Zone2['Rn']
         
-        k1_a    = 3*BAS.Radiator['k1']
-        k1_b    = BAS.Radiator['k1']
+        m1          = BAS.Zone1['m'] * 2
+        m2          = BAS.Zone2['m'] * 2
         
-        k0_a    = 3*BAS.Radiator['k0']
-        k0_b    = BAS.Radiator['k0']
+        Rad_k1_z1   = BAS.Radiator['k1'] * 5
+        Rad_k1_z2   = BAS.Radiator['k1']
+        
+        Rad_k0_z1   = BAS.Radiator['k0']
+        Rad_k0_z2   = BAS.Radiator['k0']
+        
+        alpha1_z1   = BAS.Radiator['alpha1']
+        alpha1_z2   = BAS.Radiator['alpha1']
+        
+        alpha2_z1   = BAS.Radiator['alpha1'] * 3
+        alpha2_z2   = BAS.Radiator['alpha1'] * 3
         
         # Defining Deterministic Model corresponding matrices
         A_cont      = np.zeros((4,4));
-        A_cont[0,0] = -(1/(BAS.Zone1['Rn']*BAS.Zone1['Cz']))-((Pout1*BAS.Radiator['alpha2'] )/(BAS.Zone1['Cz'])) - ((m1*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz']))
-        A_cont[0,2] = (Pout1*BAS.Radiator['alpha2'] )/(BAS.Zone1['Cz'])
-        A_cont[1,1] = -(1/(BAS.Zone2['Rn']*BAS.Zone2['Cz']))-(Pout2*BAS.Radiator['alpha2'] )/(BAS.Zone2['Cz']) - (m2*BAS.Materials['air']['Cpa'])/(BAS.Zone2['Cz'])
-        A_cont[1,3] = (Pout2*BAS.Radiator['alpha2'] )/(BAS.Zone2['Cz'])
-        A_cont[2,0] = (k1_a)
-        A_cont[2,2] = -(k0_a*w) - k1_a
-        A_cont[3,1] = (k1_b)
-        A_cont[3,3] = -(k0_b*w) - k1_b
         
-        # B_cont      = np.zeros((4,2))
-        # B_cont[0,0] = (m*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz'])
-        # B_cont[1,1] = (m*BAS.Materials['air']['Cpa'])/(BAS.Zone2['Cz'])
-        # B_cont[2,0] = 0
-        # B_cont[3,1] =0
+        # Room 1
+        A_cont[0,0] = ( -(1/(BAS.Zone1['Rn']*BAS.Zone1['Cz']))-((Pout1*alpha2_z1 )/(BAS.Zone1['Cz'])) - ((m1*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz'])) - (1/(BAS.Zone1['Rn']*BAS.Zone1['Cz'])) )
+        A_cont[0,2] = (Pout1*alpha2_z1 )/(BAS.Zone1['Cz'])
+        
+        # Room 2
+        A_cont[1,1] = ( -(1/(BAS.Zone2['Rn']*BAS.Zone2['Cz']))-((Pout2*alpha2_z2 )/(BAS.Zone2['Cz'])) - ((m2*BAS.Materials['air']['Cpa'])/(BAS.Zone2['Cz'])) - (1/(BAS.Zone2['Rn']*BAS.Zone2['Cz'])) )
+        A_cont[1,3] = (Pout2*alpha2_z2 )/(BAS.Zone2['Cz'])
+        
+        # Heat transfer room 1 <-> room 2
+        A_cont[0,1] = ( (1/(BAS.Zone1['Rn']*BAS.Zone1['Cz'])) )
+        A_cont[1,0] = ( (1/(BAS.Zone2['Rn']*BAS.Zone2['Cz'])) )
+        
+        # Radiator 1
+        A_cont[2,0] = (Rad_k1_z1)
+        A_cont[2,2] = ( -(Rad_k0_z1*w1) - Rad_k1_z1 )
+        
+        # Radiator 2
+        A_cont[3,1] = (Rad_k1_z2)
+        A_cont[3,3] = ( -(Rad_k0_z2*w2) - Rad_k1_z2 )
 
         B_cont      = np.zeros((4,2))
         B_cont[0,0] = (m1*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz'])
         B_cont[1,0] = (m2*BAS.Materials['air']['Cpa'])/(BAS.Zone2['Cz'])
-        B_cont[2,1] = (k0_a*w*Tswb) # < Allows to change the boiler temperature
-        B_cont[3,1] = (k0_b*w*Tswb) # < Allows to change the boiler temperature
+        B_cont[2,1] = (Rad_k0_z1*w1) # < Allows to change the boiler temperature
+        B_cont[3,1] = (Rad_k0_z2*w2) # < Allows to change the boiler temperature
 
-        # B_cont = np.array([
-        #         [ (m*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz']) ],
-        #         [ (m*BAS.Materials['air']['Cpa'])/(BAS.Zone2['Cz']) ],
-        #         [ 0 ],
-        #         [ 0 ]
-        #         ])
-        
         W_cont  = np.array([
-                [ (Twss/(BAS.Zone1['Rn']*BAS.Zone1['Cz']))+ (BAS.Radiator['alpha1'])/(BAS.Zone1['Cz']) ],
-                [ ((Twss-1)/(BAS.Zone2['Rn']*BAS.Zone2['Cz']))+ (BAS.Radiator['alpha1'])/(BAS.Zone1['Cz']) ],
-                [ (k0_a*w*Tswb) ],
-                [ (k0_b*w*Tswb) ]
+                [ 0.6 + (Twss/(BAS.Zone1['Rn']*BAS.Zone1['Cz'])) + (alpha1_z1)/(BAS.Zone1['Cz']) ],
+                [ 0.07 + ((Twss-1)/(BAS.Zone2['Rn']*BAS.Zone2['Cz'])) + (alpha1_z2)/(BAS.Zone1['Cz']) ],
+                [ 0 ],
+                [ 0 ]
                 ])
         
         # Discretize model with respect to time
@@ -444,8 +454,9 @@ class building_2room(master.LTI_master):
         self.noise = dict()
         self.noise['w_cov'] = 0.2*np.diag([ BAS.Zone1['Tz']['sigma'], BAS.Zone2['Tz']['sigma'], BAS.Radiator['rw']['sigma'], BAS.Radiator['rw']['sigma'] ])
         
-        self.noise['w_mean'] = self.W.flatten()
-        
+        self.A_cont = A_cont
+        self.B_cont = B_cont
+        self.W_cont = W_cont
         
 class building_1room(master.LTI_master):
     
@@ -456,13 +467,13 @@ class building_1room(master.LTI_master):
         # Let the user make a choice for the model dimension
         
         # Authority limit for the control u, both positive and negative
-        self.setup['control']['limits']['uMin'] = [15, -5]
-        self.setup['control']['limits']['uMax'] = [25, 5]
+        self.setup['control']['limits']['uMin'] = [11, -15]
+        self.setup['control']['limits']['uMax'] = [31, 15]
             
         # Partition size
-        self.setup['partition']['nrPerDim']  = [21, 11]
-        self.setup['partition']['width']     = [0.25, 1]
-        self.setup['partition']['origin']    = [21, 32]
+        self.setup['partition']['nrPerDim']  = [21, 9]
+        self.setup['partition']['width']     = [0.25, 0.5]
+        self.setup['partition']['origin']    = [21.55, 58.19] #[21, 45]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
         self.setup['targets']['nrPerDim']    = 'auto'
@@ -497,30 +508,34 @@ class building_1room(master.LTI_master):
         BAS = BAS_class.parameters()
         
         # Steady state values
-        Tswb    = BAS.Boiler['Tswbss']
-        Tsp     = BAS.Zone1['Tsp']             
+        Tswb    = BAS.Boiler['Tswbss']  
         Twss    = BAS.Zone1['Twss']
-        Trwrss  = BAS.Radiator['Trwrss']
-        Pout1   = BAS.Radiator['Zone1']['Prad']    
-        Pout2   = BAS.Radiator['Zone2']['Prad']    
-        m       = 1.5*BAS.Zone1['m']
+        Pout1   = BAS.Radiator['Zone1']['Prad']      
+        
         w       = BAS.Radiator['w_r']
+        
+        BAS.Zone1['Cz'] = BAS.Zone1['Cz']
+        
+        m1      = BAS.Zone1['m'] * 2 # Proportional factor for the air conditioning
+        
+        k1_a    = BAS.Radiator['k1']
+        k0_a    = BAS.Radiator['k0'] * 3 #Proportional factor for the boiler temp. on radiator temp.
         
         # Defining Deterministic Model corresponding matrices
         A_cont      = np.zeros((2,2));
-        A_cont[0,0] = -(1/(BAS.Zone1['Rn']*BAS.Zone1['Cz']))-((Pout1*BAS.Radiator['alpha2'] )/(BAS.Zone1['Cz'])) - ((m*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz']))
+        A_cont[0,0] = -(1/(BAS.Zone1['Rn']*BAS.Zone1['Cz']))-((Pout1*BAS.Radiator['alpha2'] )/(BAS.Zone1['Cz'])) - ((m1*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz']))
         A_cont[0,1] = (Pout1*BAS.Radiator['alpha2'] )/(BAS.Zone1['Cz'])
-        A_cont[1,0] = (BAS.Radiator['k1'])
-        A_cont[1,1] = -(BAS.Radiator['k0']*w) - BAS.Radiator['k1']
+        A_cont[1,0] = (k1_a)
+        A_cont[1,1] = -(k0_a*w) - k1_a
         
         B_cont      = np.zeros((2,2))
-        B_cont[0,0] = (m*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz'])
-        B_cont[1,1] = (BAS.Radiator['k0']*w*Tswb) # < Allows to change the boiler temperature
+        B_cont[0,0] = (m1*BAS.Materials['air']['Cpa'])/(BAS.Zone1['Cz'])
+        B_cont[1,1] = (k0_a*w) # < Allows to change the boiler temperature
 
         
         W_cont  = np.array([
                 [ (Twss/(BAS.Zone1['Rn']*BAS.Zone1['Cz']))+ (BAS.Radiator['alpha1'])/(BAS.Zone1['Cz']) ],
-                [ (BAS.Radiator['k0']*w*Tswb) ],
+                [ (k0_a*w*Tswb) ],
                 ])
         
         # Discretize model with respect to time
@@ -535,9 +550,7 @@ class building_1room(master.LTI_master):
         self.p = np.size(self.B,1)
 
         self.noise = dict()
-        self.noise['w_cov'] = 0.5*np.diag([ BAS.Zone1['Tz']['sigma'], BAS.Radiator['rw']['sigma'] ])
-        
-        self.noise['w_mean'] = self.W.flatten()
+        self.noise['w_cov'] = 0.2*np.diag([ BAS.Zone1['Tz']['sigma'], BAS.Radiator['rw']['sigma'] ])
         
 #####################################
 # BELOW ARE VARIOUS (OUTDATED) MODELS
@@ -617,8 +630,6 @@ class aircraft_altitude(master.LTI_master):
 
         self.noise = dict()
         self.noise['w_cov'] = np.eye(np.size(self.A,1))*self.setup['noise']['sigma_w_value']
-        self.noise['w_mean'] = self.W.flatten()
-
 
 class anaesthesia_delivery(master.LTI_master):
     
@@ -698,7 +709,6 @@ class anaesthesia_delivery(master.LTI_master):
 
         self.noise = dict()
         self.noise['w_cov'] = np.eye(np.size(self.A,1))*self.setup['noise']['sigma_w_value']
-        self.noise['w_mean'] = self.W.flatten()
         
         
 class cold_store(master.LTI_master):
@@ -871,7 +881,6 @@ class cold_store(master.LTI_master):
 
         self.noise = dict()
         self.noise['w_cov'] = np.eye(np.size(self.A,1))*self.setup['noise']['sigma_w_value']
-        self.noise['w_mean'] = self.W.flatten()
         
 
         

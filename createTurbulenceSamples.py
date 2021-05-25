@@ -43,7 +43,7 @@ samples = createTurbulenceSamples(N=N, length=length, dim=dim)
 
 # Store samples
 store_folder = "input/"
-store_file   = "TurbulenceNoise_N="+str(N)+"_dim="+str(dim)
+store_file   = "TurbulenceNoise_N="+str(N)+"_dim="+str(dim)+".csv"
 
 # Save file
 np.savetxt(store_folder+store_file, samples, delimiter=",")

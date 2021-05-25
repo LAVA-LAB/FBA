@@ -33,7 +33,7 @@ class parameters(object):
         # Gas Boiler, AMBI simulator
         self.Boiler['taub']     = 60*5                  # Time constant of boiler [s]
         self.Boiler['kb']       = 348.15 - 273.15       # Steady-state temperature of the boiler (75degC) [K]
-        self.Boiler['Tswbss']   = 65
+        self.Boiler['Tswbss']   = 75
         self.Boiler['sigma']    = 0.5
         
         self.Splitter = {'uv': 0}                       # Water flow Splitter [-]

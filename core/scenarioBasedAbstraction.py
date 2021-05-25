@@ -88,6 +88,12 @@ class Abstraction(object):
                                                 2*model.noise['samples'][:,2],
                                                   model.noise['samples'][:,2])).T
         
+        uAvg = (model.uMin + model.uMax) / 2
+        
+        if np.linalg.matrix_rank(np.eye(model.n) - model.A) == model.n:
+            model.equilibrium = np.linalg.inv(np.eye(model.n) - model.A) @ \
+                (model.B @ uAvg + model.W_flat)
+        
         return model
     
     def _defPartition(self):
@@ -204,7 +210,10 @@ class Abstraction(object):
     
     def _defInvArea(self, delta):
         
-        ### Define inverse control area (note: not a hull yet)
+        # Compute the predecessor set (without the shift due to the target
+        # point). This acccounts to computing, for all u_k, the set
+        # A^-1 (B u_k - q_k)
+        
         # Determine the set of extremal control inputs
         u = [[self.model[delta].uMin[i], self.model[delta].uMax[i]] for i in range(self.model[delta].p)]
         
@@ -214,19 +223,25 @@ class Abstraction(object):
             list_elem = list(elem)
             
             # Calculate inverse image of the current extreme control input
-            x_inv_area[i,:] = - self.model[delta].A_inv @ \
-                (self.model[delta].B @ np.array(list_elem).T)  
+            x_inv_area[i,:] = self.model[delta].A_inv @ \
+                (self.model[delta].B @ np.array(list_elem).T + self.model[delta].W_flat)  
     
         return x_inv_area
     
     def _defInvHull(self, x_inv_area):
         
-        ### Define control hull
+        # Define the convex hull object of the predecessor set
+        
         x_inv_hull = Delaunay(x_inv_area, qhull_options='QJ')
         
         return x_inv_hull
     
-    def _defInvVec(self, delta):
+    def _defBasisVectors(self, delta):
+
+        # Compute the basis vectors of the predecessor set, computed from the
+        # average control inputs to the maximum in every dimension of the
+        # control space.
+        # Note that the drift does not play a role here.        
 
         u_avg = np.array(self.model[delta].uMax + self.model[delta].uMin)/2    
 
@@ -234,24 +249,32 @@ class Abstraction(object):
         u = np.tile(u_avg, (self.basemodel.n,1)) + \
             np.diag(self.model[delta].uMax - u_avg)
         
-        print(u)
-        
-        origin = - self.model[delta].A_inv @ \
+        origin = self.model[delta].A_inv @ \
                 (self.model[delta].B @ np.array(u_avg).T)   
                 
         basis_vectors = np.zeros((self.basemodel.n, self.basemodel.n))
         
         for i,elem in enumerate(u):
+            
             # Calculate inverse image of the current extreme control input
-            point = - self.model[delta].A_inv @ \
+            point = self.model[delta].A_inv @ \
                 (self.model[delta].B @ elem.T)    
             
             basis_vectors[i,:] = point - origin
         
+            print(' ---- Length of basis',i,':',np.linalg.norm(basis_vectors[i,:]))
+        
         return basis_vectors
     
     def _defEnabledActions(self, delta):
-            
+           
+        from .commons import angle_between
+        
+        def f7(seq):
+            seen = set()
+            seen_add = seen.add
+            return [x for x in seq if not (x in seen or seen_add(x))]
+        
         # Define dictionaries to sture points in the preimage of a state, and the
         # corresponding polytope points
         
@@ -261,14 +284,13 @@ class Abstraction(object):
         total_actions_enabled = 0
         
         enabled_polypoints = dict()
-        mu_inv_hull = dict()
         
         enabled_in_states = [[] for i in range(self.abstr['nr_actions'])]
         enabled_actions   = [[] for i in range(self.abstr['nr_regions'])]
         
         nr_corners = 2**self.basemodel.n
         
-        printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
+        printEvery = 1#min(100, max(1, int(self.abstr['nr_actions']/10)))
         
         # Check if dimension of control area equals that if the state vector
         dimEqual = self.model[delta].p == self.basemodel.n
@@ -278,23 +300,27 @@ class Abstraction(object):
             print(' -- Computing inverse basis vectors...')
             # Use preferred method: map back the skewed image to squares
             
-            basis_vectors = self._defInvVec(delta)   
-            print('Basis vectors:',basis_vectors)
+            basis_vectors = self._defBasisVectors(delta)   
             
-            basis_vectors_inv = np.linalg.inv( basis_vectors )
-            print('Transformation:',basis_vectors_inv)
+            for i,v1 in enumerate(basis_vectors):
+                for j,v2 in enumerate(basis_vectors):
+                    if i != j:
+                        print(' ---- Angle between control',i,'and',j,':',angle_between(v1,v2) / np.pi * 180)
+            
+            parralelo2cube = np.linalg.inv( basis_vectors )
+            print('Transformation:',parralelo2cube)
             
             print('Normal inverse area:',x_inv_area)
             
-            x_inv_area_normalized = x_inv_area @ basis_vectors_inv
+            x_inv_area_normalized = x_inv_area @ parralelo2cube
             print('Normalized hypercube:',x_inv_area_normalized)
             
-            x_inv_area_offOrigin = np.average(x_inv_area_normalized, axis=0)
-            print('Off origin:',x_inv_area_offOrigin)
+            predSet_originShift = -np.average(x_inv_area_normalized, axis=0)
+            print('Off origin:',predSet_originShift)
             
-            print('Shifted normalized hypercube:',x_inv_area @ basis_vectors_inv - x_inv_area_offOrigin)
+            print('Shifted normalized hypercube:',x_inv_area @ parralelo2cube + predSet_originShift)
             
-            allCornersTransformed = self.abstr['allCornersFlat'] @ basis_vectors_inv - x_inv_area_offOrigin
+            allRegionVertices = self.abstr['allCornersFlat'] @ parralelo2cube - predSet_originShift
             
         else:
             
@@ -305,34 +331,50 @@ class Abstraction(object):
             
             print('Normal inverse area:',x_inv_area)
         
-            allCornersTransformed = self.abstr['allCornersFlat'] 
+            allRegionVertices = self.abstr['allCornersFlat'] 
         
         import sys
         np.set_printoptions(threshold=sys.maxsize)
         
+        action_range = f7(np.concatenate(( self.abstr['goal'],
+                           np.arange(self.abstr['nr_actions']) )))
+        
         # For every action
-        for action_id in range(self.abstr['nr_actions']):
+        for action_id in action_range:
             
             targetPoint = self.abstr['target']['d'][action_id]
-            
-            drift = self.model[delta].noise['w_mean']
             
             if dimEqual:
             
                 # Shift the origin points (instead of the target point)
-                originShift = self.model[delta].A_inv @ (np.array(targetPoint) - drift)
+                A_inv_d = self.model[delta].A_inv @ np.array(targetPoint)
                 
                 # Python implementation
-                originPointsShifted = allCornersTransformed - (originShift @ basis_vectors_inv)
+                allVerticesNormalized = (A_inv_d @ parralelo2cube) - allRegionVertices
                 
                 '''
                 # Numba implementation
-                originPointsShifted = f(allCornersTransformed, originShift)
+                originPointsShifted = f(allRegionVertices, originShift)
                 '''
                                 
                 # Reshape the whole matrix that we obtain
-                poly_reshape = np.reshape( originPointsShifted,
+                poly_reshape = np.reshape( allVerticesNormalized,
                                 (self.abstr['nr_regions'], nr_corners*self.basemodel.n))
+                
+                # poly_reshape2 = np.zeros((self.abstr['nr_regions'], nr_corners))
+                poly_reshape3 = np.zeros((self.abstr['nr_regions'], self.basemodel.n))
+                # for v in range(nr_corners):
+                #     start = v*self.basemodel.n
+                #     stop  = start + self.basemodel.n
+                #     # np.abs(poly_reshape[:,start:stop])
+                #     poly_reshape2[:,v] = np.max(np.abs(poly_reshape[:,start:stop]), axis=1)
+                for v in range(self.basemodel.n):
+                    poly_reshape3[:,v] = np.max(np.abs(poly_reshape[:,v::self.basemodel.n]), axis=1)
+                                
+                # pointsWithin2 = poly_reshape2 <= 1.0
+                pointsWithin3 = poly_reshape3 <= 1.0
+                # print(np.sum(pointsWithin2, axis=1))
+                print('Points in pred.set. per dimension:',np.sum(pointsWithin3, axis=0))
                 
                 # Somehow, the line below is slower than the newer one below it.
                 # enabled_in = np.max( abs(poly_reshape), axis=1 ) <= 1.0
@@ -352,13 +394,13 @@ class Abstraction(object):
             else:
                 
                 # Shift the origin points (instead of the target point)
-                originShift = self.model[delta].A_inv @ (np.array(targetPoint) - drift)
+                A_inv_d = self.model[delta].A_inv @ np.array(targetPoint)
             
                 # Subtract the shift from all corner points
-                originPointsShifted = allCornersTransformed - originShift
+                allVertices = A_inv_d - allRegionVertices
             
                 # Check which points are in the convex hull
-                polypoints_vec = in_hull(originPointsShifted, x_inv_hull)
+                polypoints_vec = in_hull(allVertices, x_inv_hull)
             
                 # Map the enabled corner points of the partitions to actual partitions
                 enabled_polypoints[action_id] = np.reshape(  polypoints_vec, 
@@ -372,10 +414,40 @@ class Abstraction(object):
             if self.setup.plotting['partitionPlot'] and action_id == int(self.abstr['nr_regions']/2):
 
                 print('x_inv_area:',x_inv_area)
-                print('origin shift:',originShift)       
-                print('targetPoint:',targetPoint,' - drift:',drift)
-
-                predecessor_set = x_inv_area + np.tile(originShift, (nr_corners, 1))
+                print('origin shift:',A_inv_d)       
+                print('targetPoint:',targetPoint,' - drift:',self.model[2].W_flat)
+                
+                predecessor_set = A_inv_d - x_inv_area #np.tile(A_inv_d, (nr_corners, 1)) - x_inv_area
+                
+                # Generate partition plot for the goal state, also showing the pre-image
+                print('Create partition plot...')
+                
+                if self.basemodel.name == 'building_2room':
+                
+                    createPartitionPlot((0,1), (2,3), self.abstr['goal'], delta, self.setup, \
+                                self.model[delta], self.abstr, self.abstr['allCorners'],
+                                predecessor_set)
+                    createPartitionPlot((0,2), (1,3), self.abstr['goal'], delta, self.setup, \
+                                self.model[delta], self.abstr, self.abstr['allCorners'],
+                                predecessor_set)
+                    createPartitionPlot((0,3), (1,2), self.abstr['goal'], delta, self.setup, \
+                                self.model[delta], self.abstr, self.abstr['allCorners'],
+                                predecessor_set)
+                    createPartitionPlot((1,2), (0,3), self.abstr['goal'], delta, self.setup, \
+                                self.model[delta], self.abstr, self.abstr['allCorners'],
+                                predecessor_set)
+                    createPartitionPlot((1,3), (0,2), self.abstr['goal'], delta, self.setup, \
+                                self.model[delta], self.abstr, self.abstr['allCorners'],
+                                predecessor_set)
+                    createPartitionPlot((2,3), (0,1), self.abstr['goal'], delta, self.setup, \
+                                self.model[delta], self.abstr, self.abstr['allCorners'],
+                                predecessor_set)
+                        
+                else:
+                    
+                    createPartitionPlot((0,1), (None,None), self.abstr['goal'], delta, self.setup, \
+                                self.model[delta], self.abstr, self.abstr['allCorners'],
+                                predecessor_set)
             
             # Retreive the ID's of all states in which the action is enabled
             enabled_in_states[action_id] = np.nonzero(enabled_in)[0]
@@ -385,8 +457,15 @@ class Abstraction(object):
                 enabled_in_states[action_id], self.abstr['critical'])
             
             if action_id % printEvery == 0:
-                print(' -- Action',str(action_id),'enabled in',
-                      str(len(enabled_in_states[action_id])),'states')
+                if action_id in self.abstr['goal']:
+                    print(' -- GOAL action',str(action_id),'enabled in',
+                          str(len(enabled_in_states[action_id])),'states - target point:',
+                          str(targetPoint))
+                    
+                else:
+                    print(' -- Action',str(action_id),'enabled in',
+                          str(len(enabled_in_states[action_id])),'states - target point:',
+                          str(targetPoint))
             
             if len(enabled_in_states[action_id]) > 0:
                 total_actions_enabled += 1
@@ -396,15 +475,6 @@ class Abstraction(object):
                 
         enabledActions_inv = [enabled_in_states[i] 
                               for i in range(self.abstr['nr_actions'])]
-        
-        # Generate partition plot for the goal state, also showing the pre-image
-        if self.setup.plotting['partitionPlot']:
-            
-            print('Create partition plot...')
-            
-            createPartitionPlot(self.abstr['goal'], delta, self.setup, \
-                        self.model[delta], self.abstr, self.abstr['allCorners'],
-                        predecessor_set)
         
         return total_actions_enabled, enabled_actions, enabledActions_inv
                 
@@ -459,8 +529,7 @@ class Abstraction(object):
 
         self.time['1_partition'] = tocDiff(False)
         print('Discretized states defined - time:',self.time['1_partition'])
-
-    def defineActions(self):
+        
         ''' 
         -----------------------------------------------------------------------
         CREATE TARGET POINTS
@@ -489,6 +558,8 @@ class Abstraction(object):
         print(' -- Creating hull for the full state space...')
         
         self.abstr['stateSpaceHull'] = self._defRegionHull(outerCorners)
+
+    def defineActions(self):
         
         ''' 
         -----------------------------------------------------------------------
@@ -583,11 +654,9 @@ class scenarioBasedAbstraction(Abstraction):
                     
                 else:
                     # Determine non-Gaussian noise samples (relative from target point)
-                    # samples = mu + np.array(random.choices(self.model[delta].noise['samples'], k=self.setup.scenarios['samples']))
-                    
+                    samples = mu + np.array(random.choices(self.model[delta].noise['samples'], k=self.setup.scenarios['samples']))
                               
-                    samples = mu + self.model[delta].noise['samples'][0:self.setup.scenarios['samples'], :]
-                    print('samples:',samples)
+                    # samples = mu + self.model[delta].noise['samples'][0:self.setup.scenarios['samples'], :]
                     
                 self.trans['memory'], prob[a] = \
                     computeScenarioBounds_sparse(self.setup, 
@@ -926,7 +995,7 @@ class scenarioBasedAbstraction(Abstraction):
         if self.setup.scenarios['gaussian'] is True:
             w_array = dict()
             for delta in self.setup.deltas:
-                w_array[delta] = np.random.multivariate_normal(self.model[delta].noise['w_mean'], self.model[delta].noise['w_cov'],
+                w_array[delta] = np.random.multivariate_normal(0, self.model[delta].noise['w_cov'],
                    ( len(n_list), len(init_state_idxs), self.setup.montecarlo['iterations'], self.N ))
         
         # For each starting time step in the list
@@ -1106,10 +1175,10 @@ class scenarioBasedAbstraction(Abstraction):
         
                                 # Reconstruct the control input required to achieve this target point
                                 # Note that we do not constrain the control input; we already know that a suitable control exists!
-                                u[k] = np.array(self.model[delta].B_pinv @ ( x_goal[k+delta] - self.model[delta].A @ x[k] - self.model[delta].noise['w_mean'] ))
+                                u[k] = np.array(self.model[delta].B_pinv @ ( x_goal[k+delta] - self.model[delta].A @ x[k] - self.model ))
                                 
                                 # Implement the control into the physical (unobservable) system
-                                x_hat = self.model[delta].A @ x[k] + self.model[delta].B @ u[k]
+                                x_hat = self.model[delta].A @ x[k] + self.model[delta].B @ u[k] + self.model[delta].W_flat
                                 
                                 if self.setup.scenarios['gaussian'] is True:
                                     # Use Gaussian process noise
@@ -1120,8 +1189,6 @@ class scenarioBasedAbstraction(Abstraction):
                                     
                                     x[k+delta] = x_hat + disturbance
                                     
-                                    # print('from x_hat:',x_hat,'with disturbance',disturbance,'to',x[k+delta])
-                            
                                 # Add current state to trace
                                 self.mc['traces'][n0][i][m] += [x[k+delta]]
                             
