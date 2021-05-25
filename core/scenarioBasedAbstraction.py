@@ -361,6 +361,7 @@ class Abstraction(object):
                 poly_reshape = np.reshape( allVerticesNormalized,
                                 (self.abstr['nr_regions'], nr_corners*self.basemodel.n))
                 
+                '''
                 # poly_reshape2 = np.zeros((self.abstr['nr_regions'], nr_corners))
                 poly_reshape3 = np.zeros((self.abstr['nr_regions'], self.basemodel.n))
                 # for v in range(nr_corners):
@@ -375,6 +376,7 @@ class Abstraction(object):
                 pointsWithin3 = poly_reshape3 <= 1.0
                 # print(np.sum(pointsWithin2, axis=1))
                 print('Points in pred.set. per dimension:',np.sum(pointsWithin3, axis=0))
+                '''
                 
                 # Somehow, the line below is slower than the newer one below it.
                 # enabled_in = np.max( abs(poly_reshape), axis=1 ) <= 1.0

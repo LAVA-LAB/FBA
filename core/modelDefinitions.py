@@ -339,8 +339,8 @@ class building_2room(master.LTI_master):
             
         # Partition size
         self.setup['partition']['nrPerDim']  = [21,21,9,9]#[21,     21,     11,     11]
-        self.setup['partition']['width']     = [0.4, 0.4, 0.05, 0.05]
-        self.setup['partition']['origin']    = [21, 21, 42.3019313 , 62.86740522] #[22.93,  18.53,  37.29, 37.045]
+        self.setup['partition']['width']     = [0.4, 0.4, 0.15, 0.15]
+        self.setup['partition']['origin']    = [21, 21, 51.34869734, 62.78421196] #[22.93,  18.53,  37.29, 37.045]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
         self.setup['targets']['nrPerDim']    = 'auto'
@@ -395,7 +395,7 @@ class building_2room(master.LTI_master):
         Rad_k1_z1   = BAS.Radiator['k1'] * 5
         Rad_k1_z2   = BAS.Radiator['k1']
         
-        Rad_k0_z1   = BAS.Radiator['k0']
+        Rad_k0_z1   = BAS.Radiator['k0'] * 2
         Rad_k0_z2   = BAS.Radiator['k0']
         
         alpha1_z1   = BAS.Radiator['alpha1']
