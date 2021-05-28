@@ -64,11 +64,11 @@ setup = settings(mode='scenario', application=model.name)
 # Manual changes in general settings
 setup.setOptions(category='plotting', exportFormats=['pdf'], partitionPlot=False)
 setup.setOptions(category='mdp', 
-                    prism_java_memory=32,
-                  # prism_java_memory=7,
+                    # prism_java_memory=32,
+                   prism_java_memory=7,
                  prism_model_writer='explicit', # Is either default or explicit
-                    prism_folder="/home/tbadings/Documents/SBA/prism-imc/prism/") # Folder where PRISM is located
-                   # prism_folder="/Users/thom/Documents/PRISM/prism-imc-v4/prism/")
+                    # prism_folder="/home/tbadings/Documents/SBA/prism-imc/prism/") # Folder where PRISM is located
+                    prism_folder="/Users/thom/Documents/PRISM/prism-imc-v4/prism/")
 # setup.setOptions(category='montecarlo', init_states=[7])
     
 setup.setOptions(category='scenarios', samples=25, samples_max=6400)
