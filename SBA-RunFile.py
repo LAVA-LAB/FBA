@@ -74,7 +74,7 @@ setup.setOptions(category='mdp',
 setup.setOptions(category='scenarios', samples=25, samples_max=6400)
 
 setup.setOptions(category='main', iterative=True)
-setup.setOptions(category='mdp', mode='estimate')
+setup.setOptions(category='mdp', mode='interval')
 
 print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
 

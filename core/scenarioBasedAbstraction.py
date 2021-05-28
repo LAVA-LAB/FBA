@@ -33,25 +33,25 @@ Main filter-based abstraction object definition
 ------------------------------------------------------------------------------
 '''
 
-from numba import njit
+# from numba import njit
 
-@njit
-def f(mat, vec):
-    return mat - vec
+# @njit
+# def f(mat, vec):
+#     return mat - vec
+
+# # @njit
+# # def f2(mat, threshold):
+# #     return np.maximum(np.max(mat, axis=1), -np.min(mat, axis=1)) <= threshold
 
 # @njit
 # def f2(mat, threshold):
-#     return np.maximum(np.max(mat, axis=1), -np.min(mat, axis=1)) <= threshold
-
-@njit
-def f2(mat, threshold):
     
-    outVec = np.zeros(len(mat))
-    for i,row in enumerate(mat):
-        if max(np.abs(row)) <= threshold:
-            outVec[i] = True
+#     outVec = np.zeros(len(mat))
+#     for i,row in enumerate(mat):
+#         if max(np.abs(row)) <= threshold:
+#             outVec[i] = True
             
-    return outVec
+#     return outVec
 
 class Abstraction(object):
     '''
