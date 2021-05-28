@@ -7,6 +7,7 @@ Created on Wed May  5 10:03:21 2021
 
 import os                       # Import OS to allow creationg of folders
 import matplotlib.pyplot as plt # Import to generate plos using Pyplot
+import seaborn as sns
 
 from datetime import datetime   # Import Datetime to retreive current date/time
 from core.commons import createDirectory
@@ -27,6 +28,8 @@ class settings(object):
         setattr(self, category, category_upd)
     
     def __init__(self, mode, application):
+        
+        sns.set_style("ticks")
         
         # Default pyplot style (font size, template, etc.)
         plt.close('all')

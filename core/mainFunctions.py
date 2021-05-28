@@ -441,6 +441,10 @@ def definePartitions(dim, nrPerDim, regionWidth, origin, onlyCenter=False):
                                               for i in range(dim)]
     
     if onlyCenter:        
+        print(widthArrays)
+        
+        print(origin)
+        
         partitions = np.array(list(itertools.product(*widthArrays))) + origin
         
     else:

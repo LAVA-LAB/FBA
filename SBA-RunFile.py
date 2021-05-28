@@ -42,7 +42,7 @@ from core.masterClasses import settings
 modelClasses = np.array(getmembers(modelDefinitions, isclass))
 application, application_id  = user_choice('application',list(modelClasses[:,0]))
 
-np.random.seed(10)
+#np.random.seed(10)
 
 #-----------------------------------------------------------------------------
 # Create model class
@@ -52,7 +52,7 @@ np.random.seed(10)
 model = modelClasses[application_id, 1]()
 
 # Manual changes in model settings
-model.setOptions(endTime=64)
+model.setOptions(endTime=8*4) #(endTime=64)
 
 #-----------------------------------------------------------------------------
 # Create settings object + change manual settings
@@ -64,17 +64,17 @@ setup = settings(mode='scenario', application=model.name)
 # Manual changes in general settings
 setup.setOptions(category='plotting', exportFormats=['pdf'], partitionPlot=False)
 setup.setOptions(category='mdp', 
-                   # prism_java_memory=32,
-                  prism_java_memory=7,
+                    prism_java_memory=32,
+                  # prism_java_memory=7,
                  prism_model_writer='explicit', # Is either default or explicit
-                   # prism_folder="/home/tbadings/Documents/SBA/prism-imc/prism/") # Folder where PRISM is located
-                   prism_folder="/Users/thom/Documents/PRISM/prism-imc-v4/prism/")
+                    prism_folder="/home/tbadings/Documents/SBA/prism-imc/prism/") # Folder where PRISM is located
+                   # prism_folder="/Users/thom/Documents/PRISM/prism-imc-v4/prism/")
 # setup.setOptions(category='montecarlo', init_states=[7])
     
-setup.setOptions(category='scenarios', samples=400, samples_max=6400)
+setup.setOptions(category='scenarios', samples=25, samples_max=6400)
 
 setup.setOptions(category='main', iterative=True)
-setup.setOptions(category='mdp', mode='interval')
+setup.setOptions(category='mdp', mode='estimate')
 
 print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
 
@@ -111,6 +111,10 @@ if setup.mdp['solver'] == 'Python' and setup.mdp['horizon'] == 'infinite':
     printWarning("Cannot solve infinite horizon MDP internally; switch to PRISM only")
     setup.mdp['solver'] = 'PRISM'
 
+####### TO DO ##########################
+### SELECT DELTA VALUE AUTOMATICALLY ###
+########################################
+
 # Set case-specific parameters
 setup.deltas = [2]
 
@@ -125,7 +129,7 @@ setup.main['newRun'] = not choice
 
 if setup.main['newRun'] is True:
     # Create noise samples
-    if model.name in ['UAV','UAV_v2'] and model.modelDim == 3:
+    if model.name in ['UAV'] and model.modelDim == 3:
         setup.setOptions(category='scenarios', gaussian=False)
         model.setTurbulenceNoise(setup.scenarios['samples_max'])
 
@@ -162,6 +166,8 @@ iterative_results['general'] = pd.DataFrame()
 iterative_results['run_times'] = pd.DataFrame()
 iterative_results['performance'] = pd.DataFrame()
 iterative_results['model_size'] = pd.DataFrame()
+
+# %%
 
 while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or \
     ScAb.setup.main['iterative'] is False:
@@ -263,35 +269,14 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
     
     # %%
     
-    if ScAb.basemodel.name == 'UAV' or ScAb.basemodel.name == 'UAV_v2':
+    if ScAb.basemodel.name in ['UAV']:
     
-        from core.postprocessing.createPlots import UAVplot2D, UAVplot3D, UAVplot3d_visvis
+        from core.postprocessing.createPlots import UAVplot2D
         from core.mainFunctions import computeRegionCenters
         from core.commons import setStateBlock
         
         # Determine desired state IDs
         if ScAb.basemodel.name == 'UAV':
-            if ScAb.basemodel.modelDim == 2:
-                x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-8], b=[1.5], c=[-8], d=[0])
-                
-                cut_value = np.zeros(2)
-                for i,d in enumerate(range(1, ScAb.basemodel.n, 2)):
-                    if ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 != round( ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 ):
-                        cut_value[i] = 0
-                    else:
-                        cut_value[i] = ScAb.basemodel.setup['partition']['width'][d] / 2                
-                
-            elif ScAb.basemodel.modelDim == 3:
-                x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-3], b=[0], c=[-3], d=[0], e=[-3], f=[0])
-                
-                cut_value = np.zeros(3)
-                for i,d in enumerate(range(1, ScAb.basemodel.n, 2)):
-                    if ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 != round( ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 ):
-                        cut_value[i] = 0
-                    else:
-                        cut_value[i] = ScAb.basemodel.setup['partition']['width'][d] / 2             
-        
-        elif ScAb.basemodel.name == 'UAV_v2':
             if ScAb.basemodel.modelDim == 2:
                 x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-6], b=[0], c=[-6], d=[0])
                 
@@ -352,25 +337,37 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
         elif ScAb.basemodel.modelDim == 3:
             if ScAb.setup.main['iterative'] is False:
             
+                from core.postprocessing.createPlots import UAVplot3d_visvis    
+            
                 # Only plot trajectory plot in non-iterative mode (because it pauses the script)
                 UAVplot3d_visvis( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value ) 
         
         if ScAb.setup.main['iterative'] is True:
             iterative_results['performance'] = pd.concat([iterative_results['performance'], performance_df], axis=0)
-        
+    
     # %%
     
-    if ScAb.basemodel.name == 'building_2room' or (ScAb.basemodel.name == 'UAV' and ScAb.basemodel.modelDim == 2):
+    if ScAb.basemodel.name in ['building_1room','building_2room'] or \
+        (ScAb.basemodel.name == 'UAV' and ScAb.basemodel.modelDim == 2):
         
         import seaborn as sns
         from core.mainFunctions import definePartitions
-        
+
         if ScAb.basemodel.name == 'building_2room':
         
             x_nr = ScAb.basemodel.setup['partition']['nrPerDim'][0]
             y_nr = ScAb.basemodel.setup['partition']['nrPerDim'][1]
             
             cut_centers = definePartitions(ScAb.basemodel.n, [x_nr, y_nr, 1, 1], 
+                   ScAb.basemodel.setup['partition']['width'], 
+                   ScAb.basemodel.setup['partition']['origin'], onlyCenter=True)
+            
+        elif ScAb.basemodel.name == 'building_1room':
+        
+            x_nr = ScAb.basemodel.setup['partition']['nrPerDim'][0]
+            y_nr = ScAb.basemodel.setup['partition']['nrPerDim'][1]
+            
+            cut_centers = definePartitions(ScAb.basemodel.n, [x_nr, y_nr], 
                    ScAb.basemodel.setup['partition']['width'], 
                    ScAb.basemodel.setup['partition']['origin'], onlyCenter=True)
             
@@ -400,12 +397,30 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] or 
         cut_df = pd.DataFrame( cut_values, index=cut_coords[:,0,0], columns=cut_coords[0,:,1] )
         
         fig = plt.figure()
-        ax = sns.heatmap(cut_df.T, cmap="YlGnBu")
+        ax = sns.heatmap(cut_df.T, cmap="YlGnBu",
+                 vmin=0, vmax=1)
+        ax.figure.axes[-1].yaxis.label.set_size(20)
         ax.invert_yaxis()
-        ax.set_xlabel('Temp. zone 1')
-        ax.set_ylabel('Temp. zone 2')
-        plt.show()
         
+        xticks = [round(t) if i % 5 == 0 else '' for i,t in enumerate(cut_df.index.values.round(0))]
+        yticks = [round(t) if i % 5 == 0 else '' for i,t in enumerate(cut_df.columns.values.round(0))]
+        
+        ax.set_xticklabels(xticks, size = 13)
+        ax.set_yticklabels(yticks, size = 13)
+        ax.set_xlabel('Temp. zone 1', fontsize=15)
+        ax.set_ylabel('Temp. zone 2', fontsize=15)
+        ax.set_title("N = "+str(ScAb.setup.scenarios['samples']),fontsize=20)
+        
+        # Set tight layout
+        fig.tight_layout()
+    
+        # Save figure
+        filename = ScAb.setup.directories['outputFcase']+'safeset_N='+str(ScAb.setup.scenarios['samples'])
+        for form in ScAb.setup.plotting['exportFormats']:
+            plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
+            
+        plt.show()
+    
     # %%
     
     # Store run times of current iterations        

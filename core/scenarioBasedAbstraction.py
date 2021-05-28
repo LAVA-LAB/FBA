@@ -290,7 +290,7 @@ class Abstraction(object):
         
         nr_corners = 2**self.basemodel.n
         
-        printEvery = 1#min(100, max(1, int(self.abstr['nr_actions']/10)))
+        printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
         
         # Check if dimension of control area equals that if the state vector
         dimEqual = self.model[delta].p == self.basemodel.n
@@ -361,22 +361,21 @@ class Abstraction(object):
                 poly_reshape = np.reshape( allVerticesNormalized,
                                 (self.abstr['nr_regions'], nr_corners*self.basemodel.n))
                 
-                '''
-                # poly_reshape2 = np.zeros((self.abstr['nr_regions'], nr_corners))
-                poly_reshape3 = np.zeros((self.abstr['nr_regions'], self.basemodel.n))
-                # for v in range(nr_corners):
-                #     start = v*self.basemodel.n
-                #     stop  = start + self.basemodel.n
-                #     # np.abs(poly_reshape[:,start:stop])
-                #     poly_reshape2[:,v] = np.max(np.abs(poly_reshape[:,start:stop]), axis=1)
-                for v in range(self.basemodel.n):
-                    poly_reshape3[:,v] = np.max(np.abs(poly_reshape[:,v::self.basemodel.n]), axis=1)
-                                
-                # pointsWithin2 = poly_reshape2 <= 1.0
-                pointsWithin3 = poly_reshape3 <= 1.0
-                # print(np.sum(pointsWithin2, axis=1))
-                print('Points in pred.set. per dimension:',np.sum(pointsWithin3, axis=0))
-                '''
+                if action_id % printEvery == 0:
+                    # poly_reshape2 = np.zeros((self.abstr['nr_regions'], nr_corners))
+                    poly_reshape3 = np.zeros((self.abstr['nr_regions'], self.basemodel.n))
+                    # for v in range(nr_corners):
+                    #     start = v*self.basemodel.n
+                    #     stop  = start + self.basemodel.n
+                    #     # np.abs(poly_reshape[:,start:stop])
+                    #     poly_reshape2[:,v] = np.max(np.abs(poly_reshape[:,start:stop]), axis=1)
+                    for v in range(self.basemodel.n):
+                        poly_reshape3[:,v] = np.max(np.abs(poly_reshape[:,v::self.basemodel.n]), axis=1)
+                                    
+                    # pointsWithin2 = poly_reshape2 <= 1.0
+                    pointsWithin3 = poly_reshape3 <= 1.0
+                    # print(np.sum(pointsWithin2, axis=1))
+                    print('Points in pred.set. per dimension:',np.sum(pointsWithin3, axis=0))
                 
                 # Somehow, the line below is slower than the newer one below it.
                 # enabled_in = np.max( abs(poly_reshape), axis=1 ) <= 1.0
@@ -417,14 +416,14 @@ class Abstraction(object):
 
                 print('x_inv_area:',x_inv_area)
                 print('origin shift:',A_inv_d)       
-                print('targetPoint:',targetPoint,' - drift:',self.model[2].W_flat)
+                print('targetPoint:',targetPoint,' - drift:',self.model[delta].W_flat)
                 
                 predecessor_set = A_inv_d - x_inv_area #np.tile(A_inv_d, (nr_corners, 1)) - x_inv_area
                 
                 # Generate partition plot for the goal state, also showing the pre-image
                 print('Create partition plot...')
                 
-                if self.basemodel.name == 'building_2room':
+                if self.basemodel.name in ['building_2room']:
                 
                     createPartitionPlot((0,1), (2,3), self.abstr['goal'], delta, self.setup, \
                                 self.model[delta], self.abstr, self.abstr['allCorners'],
@@ -670,7 +669,8 @@ class scenarioBasedAbstraction(Abstraction):
                     # prob_lb = np.round(max(prob[a]['lb']), 5)
                     # prob_ub = np.round(max(prob[a]['ub']), 5)
                     # tab.print_row([delta, k, a, 'sampling-based primary bounds: ['+str(prob_lb)+', '+str(prob_ub)+']'])
-                    tab.print_row([delta, k, a, 'Probabilities computed'])
+                    nr_transitions = len(prob[a]['interval_idxs'])
+                    tab.print_row([delta, k, a, 'Probabilities computed (transitions: '+str(nr_transitions)+')'])
                 
         return prob
     
@@ -997,7 +997,8 @@ class scenarioBasedAbstraction(Abstraction):
         if self.setup.scenarios['gaussian'] is True:
             w_array = dict()
             for delta in self.setup.deltas:
-                w_array[delta] = np.random.multivariate_normal(0, self.model[delta].noise['w_cov'],
+                w_array[delta] = np.random.multivariate_normal(
+                    np.zeros(self.model[delta].n), self.model[delta].noise['w_cov'],
                    ( len(n_list), len(init_state_idxs), self.setup.montecarlo['iterations'], self.N ))
         
         # For each starting time step in the list
@@ -1177,7 +1178,7 @@ class scenarioBasedAbstraction(Abstraction):
         
                                 # Reconstruct the control input required to achieve this target point
                                 # Note that we do not constrain the control input; we already know that a suitable control exists!
-                                u[k] = np.array(self.model[delta].B_pinv @ ( x_goal[k+delta] - self.model[delta].A @ x[k] - self.model ))
+                                u[k] = np.array(self.model[delta].B_pinv @ ( x_goal[k+delta] - self.model[delta].A @ x[k] - self.model[delta].W_flat ))
                                 
                                 # Implement the control into the physical (unobservable) system
                                 x_hat = self.model[delta].A @ x[k] + self.model[delta].B @ u[k] + self.model[delta].W_flat
