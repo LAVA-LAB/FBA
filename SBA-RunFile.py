@@ -116,7 +116,7 @@ if setup.mdp['solver'] == 'Python' and setup.mdp['horizon'] == 'infinite':
 ########################################
 
 # Set case-specific parameters
-setup.deltas = [2]
+setup.deltas = [1]
 
 # Set LTI model in main object
 model.setModel(observer=False)
