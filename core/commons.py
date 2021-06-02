@@ -2,16 +2,27 @@
 # -*- coding: utf-8 -*-
 
 """
+ ______________________________________
+|                                      |
+|  SCENARIO-BASED ABSTRACTION PROGRAM  |
+|______________________________________|
+
+Implementation of the method proposed in the paper:
+ "Sampling-Based Robust Control of Autonomous Systems with Non-Gaussian Noise"
+
+Originally coded by:        <anonymized>
+Contact e-mail address:     <anonymized>
+______________________________________________________________________________
+
 Module containing smaller ancillary functions called repeatedly by other 
 functions
 """
 
-import time
-import numpy as np
-from scipy.spatial import ConvexHull
-import math
-import sys
-import itertools
+import numpy as np              # Import Numpy for computations
+import math                     # Import Math for mathematical operations
+import time                     # Import to create tic/toc functions
+import sys                      # Allows to terminate the code at some point
+import itertools                # Import to crate iterators
 import os                       # Import OS to allow creationg of folders
 
 class table(object):
@@ -70,7 +81,19 @@ class table(object):
             print('-'*sum(self.col_width))
 
 def createDirectory(folder):
-    
+    '''
+    Helpeer function to create a directory if it not exists yet
+
+    Parameters
+    ----------
+    folder : str
+        Folder to create.
+
+    Returns
+    -------
+    None.
+
+    '''
     if not os.path.exists(folder):
         os.makedirs(folder)
 
@@ -278,43 +301,6 @@ def point_in_poly(x,y,poly):
 
     return inside
 
-def nearest_point_in_hull(points, goal):   
-    '''
-    Compute the nearest point in the given hull, to a point outside of the hull
-    '''
-
-    # Convert points to numpy array
-    points = np.array(points)
-
-    # Original points, hull and test points
-    hull = ConvexHull(points)
-    
-    #Check point is within polygon
-    inside = point_in_poly(goal[0],goal[1],points[hull.vertices])
-    if (inside == True):
-        # If inside the polytope, take the original point itself    
-        nearest_point = goal
-        
-    else:
-        # If not in the polytope, determine the closest point in the hull
-        dist_list = []
-        nearest_list = []
-        
-        for v_idx in range(len(hull.vertices)):
-            v1 = hull.vertices[v_idx - 1]
-            v2 = hull.vertices[v_idx]
-            start = points[v1]
-            end = points[v2]
-            
-            dist, nearest = pnt2line(goal, start, end)
-            dist_list.append(dist)
-            nearest_list.append(nearest)
-        
-        closest_vertice_id = np.argmin(dist_list)
-        nearest_point = list( nearest_list[ closest_vertice_id ] )
-    
-    return nearest_point
-
 def cm2inch(*tupl):
     '''
     Convert centimeters to inches
@@ -356,6 +342,25 @@ def writeFile(file, operation="w", content=[""]):
     filehandle.close()
     
 def setStateBlock(partition, **kwargs):
+    '''
+    Create a block of discrete regions for the given partition (can be used
+    for the goal / critical regions)
+
+    Parameters
+    ----------
+    partition : dict
+        Dictionary of the partition of the abstraction.
+    **kwargs : (multiple) lists
+        Multiple arguments that give the lists of (center) coordinates to 
+        include in the block in every dimension.
+
+    Returns
+    -------
+    2D Numpy array
+        Array with every row being the center coordinates of a region in the 
+        block.
+
+    '''
     
     nrArgs = len(kwargs)
     stateDim = len(partition['nrPerDim'])

@@ -1,6 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+ ______________________________________
+|                                      |
+|  SCENARIO-BASED ABSTRACTION PROGRAM  |
+|______________________________________|
+
+Implementation of the method proposed in the paper:
+ "Sampling-Based Robust Control of Autonomous Systems with Non-Gaussian Noise"
+
+Originally coded by:        <anonymized>
+Contact e-mail address:     <anonymized>
+______________________________________________________________________________
+"""
+
 import glob
 import os
 
@@ -19,6 +33,8 @@ def user_choice(title, items):
     -------
     choice : str
         String of the chosen item.
+    choice_id : int
+        Integer index of the chosen item.
 
     '''
     
@@ -61,6 +77,28 @@ def user_choice(title, items):
     return choice, choice_id
 
 def load_PRISM_result_file(output_folder, model_name, N):
+    '''
+    Lets the user load results from a set of existing PRISM files
+
+    Parameters
+    ----------
+    output_folder : str
+        Location of the output folder.
+    model_name : str
+        Name of the model to load results from.
+    N : TYPE
+        Number of samples used in the model to load results from.
+
+    Returns
+    -------
+    folder_to_load : str
+        Folder where the files to load are located.
+    policy_file : str
+        Filename of the optimal policy results file.
+    vector_file : str
+        Filename of the optimal reward results file.
+
+    '''
 
     suitable_folders = []
 

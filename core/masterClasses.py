@@ -1,20 +1,45 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Wed May  5 10:03:21 2021
 
-@author: Thom Badings
+"""
+ ______________________________________
+|                                      |
+|  SCENARIO-BASED ABSTRACTION PROGRAM  |
+|______________________________________|
+
+Implementation of the method proposed in the paper:
+ "Sampling-Based Robust Control of Autonomous Systems with Non-Gaussian Noise"
+
+Originally coded by:        <anonymized>
+Contact e-mail address:     <anonymized>
+______________________________________________________________________________
 """
 
 import os                       # Import OS to allow creationg of folders
 import matplotlib.pyplot as plt # Import to generate plos using Pyplot
-import seaborn as sns
-
+import seaborn as sns           # Import Seaborn to plot heat maps
 from datetime import datetime   # Import Datetime to retreive current date/time
-from core.commons import createDirectory
 
 class settings(object):
     
     def setOptions(self, category=None, **kwargs):
+        '''
+        Change options in the main 'options' object
+
+        Parameters
+        ----------
+        category : str, optional
+            Category (i.e. dictionary entry) for which to make changes. 
+            The default is None.
+        **kwargs : <multiple arguments>
+            Multiple arguments for which to make changes in the settings.
+
+        Returns
+        -------
+        None.
+
+        '''
+        
         # Function to set values in the setup dictionary
             
         category_upd = getattr(self, category)
@@ -27,7 +52,20 @@ class settings(object):
             
         setattr(self, category, category_upd)
     
-    def __init__(self, mode, application):
+    def __init__(self, application):
+        '''
+        Initialize 'options' object
+
+        Parameters
+        ----------
+        application : str
+            Name of the application / benchmark to initialize for.
+
+        Returns
+        -------
+        None.
+
+        '''
         
         sns.set_style("ticks")
         
@@ -61,34 +99,16 @@ class settings(object):
         sa = dict()
         gaussian = dict()
         
-        # Mode is either 'scenario' or 'gaussian'
-        if mode == 'scenario':
-            sa['switch'] = True        
-            sa['samples'] = 25 # Sample complexity used in scenario approach
-            sa['gamma'] = 2 # Factor by which N is multiplied in every iteration
-            sa['samples_max'] = 6400 # Maximum number of samples in iterative scheme
-            sa['confidence']   = 1e-1 # Confidence level (beta)
-            sa['gaussian'] = True
-            
-        else:
-            sa['switch'] = False
-            
-            # The interval margin determines the width (from mean approximation) for the
-            # induces intervals on the transition probabilities (for the iMDP)
-            gaussian['margin'] = 0.01
-            
-            # If TRUE, the distance between the center of regions is linked to the 
-            # probability integrals. Note, this requires symmetric regions, with the
-            # target point being the center.
-            gaussian['efficientIntegral'] = True
-
+        sa['samples'] = 25 # Sample complexity used in scenario approach
+        sa['gamma'] = 2 # Factor by which N is multiplied in every iteration
+        sa['samples_max'] = 6400 # Maximum number of samples in iterative scheme
+        sa['confidence']   = 1e-1 # Confidence level (beta)
+        sa['gaussian'] = True
         
         # Default MDP and prism settings
         mdp = dict()
         mdp['filename'] = 'Abstraction'
         mdp['mode'] = ['estimate','interval'][1]
-        mdp['horizon'] = ['infinite','finite'][0]
-        mdp['solver'] = ['PRISM', 'Python'][0]
         mdp['prism_java_memory'] = 1 # PRISM java memory allocation in GB
         mdp['prism_model_writer'] = ['default','explicit'][1]
         mdp['prism_folder'] = "/Users/..."
@@ -112,7 +132,6 @@ class settings(object):
         plot['partitionPlot']           = False
         plot['partitionPlot_plotHull']  = True
         plot['probabilityPlots']        = True
-        plot['MCtrajectoryPlot']        = False
         plot['exportFormats']           = ['pdf','png']
         
         # Default Monte Carelo settings
@@ -138,6 +157,23 @@ class settings(object):
 class LTI_master(object):
     
     def setOptions(self, category=None, **kwargs):
+        '''
+        Change options in the model-specific 'options' object
+
+        Parameters
+        ----------
+        category : str, optional
+            Category (i.e. dictionary entry) for which to make changes. 
+            The default is None.
+        **kwargs : <multiple arguments>
+            Multiple arguments for which to make changes in the settings.
+
+        Returns
+        -------
+        None.
+
+        '''
+        
         # Function to set values in the setup dictionary
 
         # If category is none, settings are set in main dictionary
@@ -155,16 +191,18 @@ class LTI_master(object):
                 print(' >> Changed "'+str(key)+'" in "'+str(category)+'" to "'+str(value)+'"')
     
     def __init__(self):
+        '''
+        Initialize the model object
+
+        Returns
+        -------
+        None.
+
+        '''
         
         partition = dict()
         specification = dict()
-        
         targets = dict()
-       
-        # If TRUE, the target point of each action is determined as the point in the
-        # hull nearest to the actual goal point (typically the center state)
-        targets['dynamic'] = False
-        
         noise = dict()
         control = dict()
         control['limits'] = dict()
@@ -175,7 +213,6 @@ class LTI_master(object):
                 'targets' :         targets,
                 'noise' :           noise,
                 'control' :         control,
-                #
                 'endTime' :         32
             }
         

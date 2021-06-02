@@ -1,29 +1,45 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import numpy as np
+"""
+ ______________________________________
+|                                      |
+|  SCENARIO-BASED ABSTRACTION PROGRAM  |
+|______________________________________|
 
-import matplotlib as mpl
-# mpl.use("pgf")
-import matplotlib.pyplot as plt
+Implementation of the method proposed in the paper:
+ "Sampling-Based Robust Control of Autonomous Systems with Non-Gaussian Noise"
 
+Originally coded by:        <anonymized>
+Contact e-mail address:     <anonymized>
+______________________________________________________________________________
+"""
+
+import numpy as np              # Import Numpy for computations
+import pandas as pd             # Import Pandas to store data in frames
+import matplotlib.pyplot as plt # Import Pyplot to generate plots
+
+# Load main classes and methods
 from matplotlib import cm
 from scipy.spatial import ConvexHull
-import scipy.interpolate
 from matplotlib.patches import Rectangle
-from matplotlib.colors import to_rgba
-import matplotlib.colors as mcolors
 
 from ..commons import printWarning, mat_to_vec, cm2inch
 
 
 def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
                         abstr, allOriginPointsNested, predecessor_set):
+    
     '''
-    Create partition plot for the current filter-based abstraction instance.
+    
+    Create partition plot for the current abstraction instance.
 
     Parameters
     ----------
+    i_tup : tuple
+        Tuple of indices to plot against
+    j_tup : tuple
+        Tuple of indices to create a cross-section for (i.e. are fixed)
     j : int
         Index of the center region of the state space partition.
     delta_plot : int
@@ -36,16 +52,14 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
         Dictionay containing all information of the finite-state abstraction.
     allOriginPointsNested : list
         Nested lists containing all origin points of all regions.
-    mu_inv_hulls : list
-        List containing all inverse reachability hulls.
-    enabledPolypoints : list
-        List of which states are contained in the inv. reachability hull.
+    predecessor_set : array
+        Vertices of the predecessor set
 
     Returns
     -------
     None.
-
     '''
+
     
     i0,i1 = i_tup
     j0,j1 = j_tup
@@ -103,72 +117,6 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
     filename = setup.directories['outputF']+'partitioning_'+str(delta_plot)+'_coords=('+str(i0)+','+str(i1)+')'
     for form in setup.plotting['exportFormats']:
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
-        
-        
-    '''
-    ###########################
-    #### Partition plot v2 ####
-    fig, ax = plt.subplots(figsize=cm2inch(6.1, 5))
-    
-    plt.xlabel('$x_1$', labelpad=0)
-    plt.ylabel('$x_2$', labelpad=-10)
-
-    domainMax = np.array(model.setup['partition']['nrPerDim']) * np.array(model.setup['partition']['nrPerDim']) / 2
-    
-    min_xy = model.setup['partition']['origin'] - domainMax
-    max_xy = model.setup['partition']['origin'] + domainMax
-    
-    width = model.setup['partition']['width']
-    
-    major_ticks_x = np.arange(min_xy[0]+1, max_xy[0]+1, 4*width[0])
-    major_ticks_y = np.arange(min_xy[1]+1, max_xy[1]+1, 4*width[1])
-    
-    minor_ticks_x = np.arange(min_xy[0], max_xy[0]+1, width[0])
-    minor_ticks_y = np.arange(min_xy[1], max_xy[1]+1, width[1])
-    
-    ax.set_xticks(major_ticks_x)
-    ax.set_yticks(major_ticks_y)
-    ax.set_xticks(minor_ticks_x, minor=True)
-    ax.set_yticks(minor_ticks_y, minor=True)
-    
-    for axi in (ax.xaxis, ax.yaxis):
-        for tic in axi.get_minor_ticks():
-            tic.tick1On = tic.tick2On = False
-    
-    # plt.grid(which='major', color='#CCCCCC', linewidth=0.3)
-    plt.grid(which='minor', color='#CCCCCC', linewidth=0.3)
-    
-    # Goal x-y limits
-    ax.set_xlim(min_xy[0], max_xy[0])
-    ax.set_ylim(min_xy[1], max_xy[1])
-    
-    # Draw goal states
-    for goal in abstr['goal']:
-        goal_lower = abstr['P'][goal]['low']
-        goalState = Rectangle(goal_lower[0:2], width=width[0], height=width[1], color="green", alpha=0.3, linewidth=None)
-        ax.add_patch(goalState)
-    
-    # Draw critical states
-    for critState in abstr['critical']:
-        critStateLow = abstr['P'][critState]['low']
-        criticalState = Rectangle(critStateLow[0:2], width=width[0], height=width[1], color="red", alpha=0.3, linewidth=None)
-        ax.add_patch(criticalState)
-    
-    with plt.rc_context({"font.size": 5}):        
-        # Draw every X-th label
-        skip = 15
-        for i in range(0, abstr['nr_regions'], skip):
-            ax.text(abstr['P'][i]['center'][0], abstr['P'][i]['center'][1], i, \
-                      verticalalignment='center', horizontalalignment='center' ) 
-            
-    # Set tight layout
-    fig.tight_layout()
-    
-    # Save figure
-    filename = setup.directories['outputF']+'partitioning_v2'
-    for form in setup.plotting['exportFormats']:
-        plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
-    '''
     
     # If number of dimensions is 3, create 3D plot
     if model.n == 3:
@@ -212,12 +160,14 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
         print('Number of dimensions is larger than 3, so partition plot omitted')
 
 def set_axes_equal(ax: plt.Axes):
-    """Set 3D plot axes to equal scale.
+    """
+    Set 3D plot axes to equal scale.
 
     Make axes of 3D plot have equal scale so that spheres appear as
     spheres and cubes as cubes.  Required since `ax.axis('equal')`
     and `ax.set_aspect('equal')` don't work on 3D.
     """
+    
     limits = np.array([
         ax.get_xlim3d(),
         ax.get_ylim3d(),
@@ -235,7 +185,7 @@ def _set_axes_radius(ax, origin, radius):
 
 def createProbabilityPlots(setup, plot, N, model, results, abstr, mc):
     '''
-    Create the result plots for the filter-based abstraction instance.
+    Create the result plots for the abstraction instance.
 
     Parameters
     ----------
@@ -444,16 +394,14 @@ def createProbabilityPlots(setup, plot, N, model, results, abstr, mc):
     for form in setup.plotting['exportFormats']:
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
     
-def createTimegroupingPlot(setup, plot, model, results, abstr, max_delta):
+def policyPlot(setup, model, results, abstr):
     '''
-    Create plot that shows both the actions and the associated delta values.
+    Create the policy plot for the current abstraction instance
 
     Parameters
     ----------
     setup : dict
         Setup dictionary.
-    plot : dict
-        Dictionary containing info about plot settings
     model : dict
         Main dictionary of the LTI system model.
     results : dict
@@ -467,178 +415,197 @@ def createTimegroupingPlot(setup, plot, model, results, abstr, max_delta):
 
     '''
     
-    ### NOTE: THIS FUNCTION IS OUTDATED (DOESNT WORK ANYMORE.)
+    ix = 0
+    iy = 1
     
-    colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
+    fig, ax = plt.subplots(figsize=cm2inch(6.1, 5))
     
-    # If number of dimensions is 2, create 2D plot
-    if model.n <= 2:
-        
-        #### Retreive results
-        
-        # Retreive grid size
-        m = setup['PartitionsFromCenter']*2+1
-        
-        #get discrete colormap
-        data_all = results['optimal_delta']
-        cmap = plt.get_cmap('Greys', max_delta+4-np.min(data_all)+1)
-        
-        # Retreive highest delta value of any action used
-        highest_delta = np.max(data_all)
-        
-        
-        #### Single plot for time k=0
-        
-        fig, ax = plt.subplots(figsize=cm2inch(6.1, 5))
-        
-        plt.xlabel('$x_1$', labelpad=0)
-        plt.ylabel('$x_2$', labelpad=-10)
+    plt.xlabel('Zone temp.', labelpad=0)
+    plt.ylabel('Radiator temp.', labelpad=0)
+
+    width = np.array(model.setup['partition']['width'])
+    domainMax = width * np.array(model.setup['partition']['nrPerDim']) / 2
     
-        k = 2
+    min_xy = model.setup['partition']['origin'] - domainMax
+    max_xy = model.setup['partition']['origin'] + domainMax
     
-        # Shortcut to data (flipped to make values correspond to axes)
-        data = results['optimal_delta'][k,:]                      
-        data_reshape = np.flip(np.reshape(data, (m,m)), axis=0)
-        
-        # set limits .5 outside true range
-        mat = ax.imshow(data_reshape,cmap=cmap,vmin = np.min(data_all)-.5, vmax = max_delta+4+.5)
-        
-        # Retreive sizes of regions
-        origin_x = setup['stateSpaceOrigin'][0]
-        origin_y = setup['stateSpaceOrigin'][1]
-        min_x = origin_x - setup['stateSpaceDomainMax']
-        max_x = origin_x + setup['stateSpaceDomainMax']
-        min_y = origin_y - setup['stateSpaceDomainMax']
-        max_y = origin_y + setup['stateSpaceDomainMax']
-        
-        width = setup['stateSpaceDomainMax'] / (setup['PartitionsFromCenter']+0.5)
-        
-        major_ticks_x = np.arange(min_x+1, max_x+1, int(4*width))
-        major_ticks_y = np.arange(min_y+1, max_y+1, int(4*width))[::-1]
-        
-        # Set ticks
-        plt.xticks(np.arange(0,m,4), major_ticks_x)
-        plt.yticks(np.arange(0,m,4), major_ticks_y)
-        
-        # Plot individual actions as arrows
-        for i in range(highest_delta,0,-1):
-            # Create boolean list for actions associated with current delta
-            actionBool = [j == i for j in data]
-            
-            # Retreive relative actions corresponding to this delta
-            action_data = results['optimal_policy'][k,actionBool]
-            origin_state = np.arange(0,len(abstr['P']))[actionBool]
-            
-            arrow_frequency = 5
-            
-            # Plot these actions as arrows
-            for l,act in enumerate(action_data):
-                
-                if origin_state[l] % arrow_frequency != 0:
-                    continue
-                
-                # Calculate state ID for arrow to draw
-                x = origin_state[l] % m
-                y = m-1 - origin_state[l] // m
-                dx = act % m - x
-                dy = m-1 - act // m - y
-                
-                alpha = 1 #max(0.2, min(0.5, (0.7*results['optimal_reward'][0,origin_state[l]])))
-                edgecol = colors['maroon'] #to_rgba('red', 0.5) #(0.7,0,0)
-                facecol = colors['forestgreen'] #to_rgba('cyan', 1) #'c'
-                
-                # Draw arrow
-                ax.arrow(x,y,dx,dy, lw=0.05, head_width=0.5, head_length=0.7, 
-                    length_includes_head=True, edgecolor=edgecol, facecolor=facecol, alpha=alpha)
-        
-        # Set tight layout
-        fig.tight_layout()
-        
-        fig.subplots_adjust(right=1.15)
-        cbar_ax = fig.add_axes([0.93, 0.25, 0.05, 0.6])
-        
-        #tell the colorbar to tick at integers
-        fig.colorbar(mat, cax=cbar_ax, ticks=np.arange(np.min(data_all),np.max(data_all)+1))
-        
-        # Save figure
-        filename = setup.directories['outputFcase']+'policy_action_delta_time0'
-        for form in setup.plotting['exportFormats']:
-            plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
-        
-        #### Combined plot for multiple points in time
-        
-        fig_comb    = plt.figure(figsize=cm2inch(16,5.33))
-        fig_ind     = 0
-        ax_comb     = dict()
-        
-        time_list = [ [plot['N'][key], plot['T'][key]] for key in plot['N'].keys() ]
-        
-        # For each of the time slots, create a subplot
-        for [k,t] in time_list:
-            
-            # Increase combo figure index
-            fig_ind += 1
-                
-            # Create combo subplot
-            ax_comb[fig_ind]  = fig_comb.add_subplot(1,4,fig_ind)
-        
-            # Shortcut to data (flipped to make values correspond to axes)
-            data = results['optimal_delta'][k,:]                      
-            data_reshape = np.flip(np.reshape(data, (m,m)), axis=0)
-            
-            # set limits .5 outside true range
-            mat = ax_comb[fig_ind].imshow(data_reshape,cmap=cmap,vmin = np.min(data_all)-.5, vmax = np.max(data_all)+.5)
-            
-            # Format subplot
-            ax_comb[fig_ind].set_title('Time k='+str(t))
-            ax_comb[fig_ind].set_xlabel('$x_1$', labelpad=-2)
-            ax_comb[fig_ind].set_ylabel('$x_2$', labelpad=-4)
-            
-            xlabels = np.arange(-20,21,8)
-            ylabels = np.arange(20,-21,-8)
-            
-            plt.xticks(np.arange(0,m,4), xlabels)
-            plt.yticks(np.arange(0,m,4), ylabels)
-            
-            # Plot individual actions as arrows
-            for i in range(highest_delta,0,-1):
-                # Create boolean list for actions associated with current delta
-                actionBool = [j == i for j in data]
-                
-                # Retreive relative actions corresponding to this delta
-                action_data = results['optimal_policy'][k,actionBool]
-                origin_state = np.arange(0,len(abstr['P']))[actionBool]
-                
-                # Plot these actions as arrows
-                for l,act in enumerate(action_data):
-                    # Calculate state ID for arrow to draw
-                    x = origin_state[l] % m
-                    y = m-1 - origin_state[l] // m
-                    dx = act % m - x
-                    dy = m-1 - act // m - y
-                    
-                    # Draw arrow
-                    ax_comb[fig_ind].arrow(x,y,dx,dy, lw=0.05, head_width=0.3, head_length=0.2, \
-                        length_includes_head=True, color='r', alpha=(0.1+0.3*results['optimal_reward'][k,origin_state[l]]))
+    major_ticks_x = np.arange(min_xy[ix]+1, max_xy[ix]+1, 4*width[ix])
+    major_ticks_y = np.arange(min_xy[iy]+1, max_xy[iy]+1, 4*width[iy])
     
-        # Set tight layout
-        fig_comb.tight_layout()
+    minor_ticks_x = np.arange(min_xy[ix], max_xy[ix]+1, width[ix])
+    minor_ticks_y = np.arange(min_xy[iy], max_xy[iy]+1, width[iy])
+    
+    ax.set_xticks(major_ticks_x)
+    ax.set_yticks(major_ticks_y)
+    ax.set_xticks(minor_ticks_x, minor=True)
+    ax.set_yticks(minor_ticks_y, minor=True)
+    
+    for axi in (ax.xaxis, ax.yaxis):
+        for tic in axi.get_minor_ticks():
+            tic.tick1On = tic.tick2On = False
+    
+    # plt.grid(which='major', color='#CCCCCC', linewidth=0.3)
+    plt.grid(which='minor', color='#CCCCCC', linewidth=0.3)
+    
+    # Goal x-y limits
+    ax.set_xlim(min_xy[ix], max_xy[ix])
+    ax.set_ylim(min_xy[iy], max_xy[iy])
+    
+    # Draw goal states
+    for goal in abstr['goal']:
         
-        fig_comb.subplots_adjust(right=1.15)
-        cbar_ax = fig_comb.add_axes([0.9, 0.2, 0.05, 0.6])
+        goalState = abstr['P'][goal]
         
-        #tell the colorbar to tick at integers
-        fig_comb.colorbar(mat, cax=cbar_ax, ticks=np.arange(np.min(data_all),np.max(data_all)+1))
-                    
-        # Save figure
-        filename = setup.directories['outputFcase']+'policy_action_delta_over_time'
-        for form in setup.plotting['exportFormats']:
-            plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
+        goal_lower = [goalState['low'][ix], goalState['low'][iy]]
+        goalState = Rectangle(goal_lower, width=width[ix], height=width[iy], color="green", alpha=0.3, linewidth=None)
+        ax.add_patch(goalState)
+    
+    # Draw critical states
+    for crit in abstr['critical']:
         
-    else:
-        print('Number of dimensions is larger than 2, so partition plots omitted')
+        critState = abstr['P'][crit]
         
+        critStateLow = [critState['low'][ix], critState['low'][iy]]
+        criticalState = Rectangle(critStateLow, width=width[ix], height=width[iy], color="red", alpha=0.3, linewidth=None)
+        ax.add_patch(criticalState)
+    
+    frequency = 1
+    
+    for state_from, action in enumerate(results['optimal_policy'][0,:]):
+        if state_from % frequency == 0 and action != -1:
+            
+            center_from = abstr['P'][state_from]['center']
+            center_to   = abstr['target']['d'][int(action)]
+            
+            dxy = center_to - center_from
+            
+            # Draw arrow
+            ax.arrow(center_from[0],center_from[1],dxy[0],dxy[1], 
+                    lw=0.1, head_width=0.1, head_length=0.1, 
+                    length_includes_head=True, edgecolor='r') #, edgecolor=edgecol, facecolor=facecol, alpha=alpha)
+    
+    # Set tight layout
+    fig.tight_layout()
+    
+    # Save figure
+    filename = setup.directories['outputFcase']+'policy'
+    for form in setup.plotting['exportFormats']:
+        plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
+        
+    plt.show()
+        
+def UAVplots(ScAb, case_id, writer):
+    '''
+    Create the trajectory plots for the UAV benchmarks
+
+    Parameters
+    ----------
+    ScAb : abstraction instance
+        Full object of the abstraction being plotted for
+    case_id : int
+        Index for the current abstraction iteration
+    writer : XlsxWriter
+        Writer object to write results to Excel
+
+    Returns
+    -------
+    performance_df : Pandas DataFrame
+        DataFrame containing the empirical performance results
+
+    '''
+    
+    from core.mainFunctions import computeRegionCenters
+    from core.commons import setStateBlock
+    
+    # Determine desired state IDs
+    if ScAb.basemodel.name == 'UAV':
+        if ScAb.basemodel.modelDim == 2:
+            x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-6], b=[0], c=[-6], d=[0])
+            
+            cut_value = np.zeros(2)
+            for i,d in enumerate(range(1, ScAb.basemodel.n, 2)):
+                if ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 != round( ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 ):
+                    cut_value[i] = 0
+                else:
+                    cut_value[i] = ScAb.basemodel.setup['partition']['width'][d] / 2                
+            
+        elif ScAb.basemodel.modelDim == 3:
+            x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-6], b=[0], c=[6], d=[0], e=[-6], f=[0])
+            
+            cut_value = np.zeros(3)
+            for i,d in enumerate(range(1, ScAb.basemodel.n, 2)):
+                if ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 != round( ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 ):
+                    cut_value[i] = 0
+                else:
+                    cut_value[i] = ScAb.basemodel.setup['partition']['width'][d] / 2          
+            
+    # Compute all centers of regions associated with points
+    x_init_centers = computeRegionCenters(np.array(x_init), ScAb.basemodel.setup['partition'])
+    
+    # Filter to only keep unique centers
+    x_init_unique = np.unique(x_init_centers, axis=0)
+    
+    state_idxs = [ScAb.abstr['allCenters'][tuple(c)] for c in x_init_unique 
+                                   if tuple(c) in ScAb.abstr['allCenters']]
+    
+    print(' -- Perform simulations for initial states:',state_idxs)
+    
+    ScAb.setup.montecarlo['init_states'] = state_idxs
+    ScAb.setup.montecarlo['iterations'] = 10000
+    ScAb.monteCarlo()
+    
+    PRISM_reach = ScAb.results['optimal_reward'][0,state_idxs]
+    empirical_reach = ScAb.mc['results']['reachability_probability'][state_idxs]
+    
+    print('Probabilistic reachability (PRISM): ',PRISM_reach)
+    print('Empirical reachability (Monte Carlo):',empirical_reach)
+    
+    performance_df = pd.DataFrame( {'PRISM reachability': PRISM_reach.flatten(),
+                                    'Empirical reachability': empirical_reach.flatten() }, index=[case_id] )
+    performance_df.to_excel(writer, sheet_name='Performance')
+    
+    itersToShow = 10
+    
+    traces = []
+    for i in state_idxs:
+        for j in range(itersToShow):
+            traces += [ScAb.mc['traces'][0][i][j]]
+    
+    min_delta = int(min(ScAb.setup.deltas))
+    
+    if ScAb.basemodel.modelDim == 2:
+        UAVplot2D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value )
+    
+    elif ScAb.basemodel.modelDim == 3:
+        if ScAb.setup.main['iterative'] is False:
+        
+            # Only plot trajectory plot in non-iterative mode (because it pauses the script)
+            UAVplot3d_visvis( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value ) 
+    
+    return performance_df
+    
 def UAVplot2D(setup, model, abstr, traces, cut_value):
+    '''
+    Create 2D trajectory plots for the 2D UAV benchmark
+
+    Parameters
+    ----------
+    setup : dict
+        Setup dictionary.
+    model : dict
+        Main dictionary of the LTI system model.
+    abstr : dict
+        Dictionay containing all information of the finite-state abstraction.
+    traces : list
+        Nested list containing the trajectories (traces) to plot for
+    cut_value : array
+        Values to create the cross-section for
+
+    Returns
+    -------
+    None.
+
+    '''
     
     from scipy.interpolate import interp1d
     
@@ -751,113 +718,31 @@ def UAVplot2D(setup, model, abstr, traces, cut_value):
         
     plt.show()
     
-      
-def UAVplot3D(setup, model, abstr, traces, cut_value):
-    
-    import numpy as np
-    
-    from scipy.interpolate import interp1d
-    
-    ix = 0
-    iy = 2
-    iz = 4
-    
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    
-    regionWidth_xyz = np.array([model.setup['partition']['width'][0], 
-                                model.setup['partition']['width'][2], 
-                                model.setup['partition']['width'][4]])    
-    
-    # Draw goal states
-    for goal in abstr['goal']:
-        
-        goalState = abstr['P'][goal]
-        if goalState['center'][1] == cut_value[0] and goalState['center'][3] == cut_value[1] and goalState['center'][5] == cut_value[2]:
-        
-            center_xyz = np.array([goalState['center'][0], 
-                                   goalState['center'][2], 
-                                   goalState['center'][4]])
-            
-            plotCube(ax, center_xyz, regionWidth_xyz, 0.1, 'g')
-            
-    # Draw critical states
-    for crit in abstr['critical']:
-        
-        critState = abstr['P'][crit]
-        if critState['center'][1] == cut_value[0] and critState['center'][3] == cut_value[1] and critState['center'][5] == cut_value[2]:
-        
-            center_xyz = np.array([critState['center'][0], 
-                                   critState['center'][2], 
-                                   critState['center'][4]])    
-        
-            plotCube(ax, center_xyz, regionWidth_xyz, 0.2, 'r')   
-        
-    # Add traces
-    for i,trace in enumerate(traces):
-        
-        if len(trace) < 3:
-            printWarning('Warning: trace '+str(i)+' has length of '+str(len(trace)))
-            continue
-        
-        # Convert nested list to 2D array
-        trace_array = np.array(trace)
-        
-        # Extract x,y coordinates of trace
-        x = trace_array[:, ix]
-        y = trace_array[:, iy]
-        z = trace_array[:, iz]
-        points = np.array([x,y,z]).T
-        
-        print(points)
-        
-        # Plot precise points
-        plt.plot(*points.T, 'o', markersize=4, color="black");
-        
-        # Linear length along the line:
-        distance = np.cumsum( np.sqrt(np.sum( np.diff(points, axis=0)**2, axis=1 )) )
-        distance = np.insert(distance, 0, 0)/distance[-1]
-        
-        # Interpolation for different methods:
-        alpha = np.linspace(0, 1, 75)
-        
-        interpolator =  interp1d(distance, points, kind='quadratic', axis=0)
-        interpolated_points = interpolator(alpha)
-        
-        # Plot trace
-        plt.plot(*interpolated_points.T, '-', color="blue", linewidth=1);
-        # plt.plot(x_values, y_values, color="blue")
-        
-    # Set axis labels
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-           
-    width = np.array(model.setup['partition']['width'])
-    domainMax = width * np.array(model.setup['partition']['nrPerDim']) / 2
-    min_xyz = model.setup['partition']['origin'] - domainMax
-    max_xyz = model.setup['partition']['origin'] + domainMax
-    
-    ax.set_xlim(min_xyz[ix], max_xyz[ix])
-    ax.set_ylim(min_xyz[iy], max_xyz[iy])
-    ax.set_zlim(min_xyz[iz], max_xyz[iz])
-    
-    # Set tight layout
-    fig.tight_layout()
-    
-    # Save figure
-    filename = setup.directories['outputFcase']+'drone_trajectory'
-    for form in setup.plotting['exportFormats']:
-        plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
-        
-    plt.show()
-    
 def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
+    '''
+    Create 3D trajectory plots for the 3D UAV benchmark
+
+    Parameters
+    ----------
+    setup : dict
+        Setup dictionary.
+    model : dict
+        Main dictionary of the LTI system model.
+    abstr : dict
+        Dictionay containing all information of the finite-state abstraction.
+    traces : list
+        Nested list containing the trajectories (traces) to plot for
+    cut_value : array
+        Values to create the cross-section for
+
+    Returns
+    -------
+    None.
+
+    '''
     
     from scipy.interpolate import interp1d
     import visvis as vv
-    from scipy.spatial import Delaunay
-    import imageio
     
     fig = vv.figure()
     f = vv.clf()
@@ -898,13 +783,6 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
         
             critical = vv.solidBox(tuple(center_xyz), scaling=tuple(regionWidth_xyz))
             critical.faceColor = (1,0,0,0.5)
-            
-            # allCorners = abstr['allCorners'][crit][:,0::2]
-            # hull = Delaunay(allCorners)
-            # meshIndx = hull.convex_hull
-    
-            # critical2 = vv.Mesh(ax, allCorners, faces=meshIndx, normals=allCorners)
-            # critical2.faceColor = (1,0,0,0.5)
     
     # Add traces
     for i,trace in enumerate(traces):
@@ -923,7 +801,6 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
         points = np.array([x,y,z]).T
         
         # Plot precise points
-        #plt.plot(x, y, z, lw=4, color="black")
         vv.plot(x,y,z, lw=0, mc='b', ms='.')
         
         # Linear length along the line:
@@ -942,19 +819,6 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
         
         # Plot trace
         vv.plot(xp,yp,zp, lw=1, lc='b')
-        # plt.plot(x_values, y_values, color="blue")
-    
-    # angle = np.linspace(0, 6*np.pi, 1000)
-    # x = np.sin(angle)
-    # y = np.cos(angle)
-    # z = angle / 6.0
-    # vv.plot(x, y, z, lw=10)
-    
-    # angle += np.pi*2/3.0
-    # x = np.sin(angle)
-    # y = np.cos(angle)
-    # z = angle / 6.0 - 0.5
-    # vv.plot(x, y, z, lc ="r", lw=10)
     
     ax.axis.xLabel = 'X'
     ax.axis.yLabel = 'Y'
@@ -971,42 +835,88 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
     vv.screenshot('UAV_paths_screenshot.png', sf=3, bg='w', ob=vv.gcf())
     app.Run()
     
-    
-def plotCube(ax, center, width, alpha, color):
-    
-    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-    
-    alpha = float(alpha)
-    color = str(color)
-    
-    points = np.array([ [-1, -1, -1],
-                        [1, -1, -1 ],
-                        [1, 1, -1],
-                        [-1, 1, -1],
-                        [-1, -1, 1],
-                        [1, -1, 1 ],
-                        [1, 1, 1],
-                        [-1, 1, 1] ])
-    
-    Z = center + points * 0.5 * width
+def reachabilityHeatMap(ScAb):
+    '''
+    Create heat map for the BAS benchmarks
 
-    r = [-1,1]
+    Parameters
+    ----------
+    ScAb : abstraction instance
+        Full object of the abstraction being plotted for
+
+    Returns
+    -------
+    None.
+
+    '''
     
-    X, Y = np.meshgrid(r, r)
+    import seaborn as sns
+    from ..mainFunctions import definePartitions
+
+    if ScAb.basemodel.name == 'building_2room':
     
-    # plot vertices
-    # ax.scatter3D(Z[:, 0], Z[:, 1], Z[:, 2])
+        x_nr = ScAb.basemodel.setup['partition']['nrPerDim'][0]
+        y_nr = ScAb.basemodel.setup['partition']['nrPerDim'][1]
+        
+        cut_centers = definePartitions(ScAb.basemodel.n, [x_nr, y_nr, 1, 1], 
+               ScAb.basemodel.setup['partition']['width'], 
+               ScAb.basemodel.setup['partition']['origin'], onlyCenter=True)
+        
+    elif ScAb.basemodel.name == 'building_1room':
     
-    # list of sides' polygons of figure
-    verts = [[Z[0],Z[1],Z[2],Z[3]],
-     [Z[4],Z[5],Z[6],Z[7]], 
-     [Z[0],Z[1],Z[5],Z[4]], 
-     [Z[2],Z[3],Z[7],Z[6]], 
-     [Z[1],Z[2],Z[6],Z[5]],
-     [Z[4],Z[7],Z[3],Z[0]]]
+        x_nr = ScAb.basemodel.setup['partition']['nrPerDim'][0]
+        y_nr = ScAb.basemodel.setup['partition']['nrPerDim'][1]
+        
+        cut_centers = definePartitions(ScAb.basemodel.n, [x_nr, y_nr], 
+               ScAb.basemodel.setup['partition']['width'], 
+               ScAb.basemodel.setup['partition']['origin'], onlyCenter=True)
+        
+    elif ScAb.basemodel.name == 'UAV':
+        
+        x_nr = ScAb.basemodel.setup['partition']['nrPerDim'][0]
+        y_nr = ScAb.basemodel.setup['partition']['nrPerDim'][2]
+        
+        cut_centers = definePartitions(ScAb.basemodel.n, [x_nr, 1, y_nr, 1], 
+               ScAb.basemodel.setup['partition']['width'], 
+               ScAb.basemodel.setup['partition']['origin'], onlyCenter=True)
+                          
+    cut_values = np.zeros((x_nr, y_nr))
+    cut_coords = np.zeros((x_nr, y_nr, ScAb.basemodel.n))
     
-    cube = Poly3DCollection(verts, 
-     facecolors=color, linewidths=1, edgecolors=color, alpha=alpha)
+    cut_idxs = [ScAb.abstr['allCenters'][tuple(c)] for c in cut_centers 
+                                   if tuple(c) in ScAb.abstr['allCenters']]              
     
-    # plot sides
-    ax.add_collection3d(cube)
+    for i,(idx,center) in enumerate(zip(cut_idxs, cut_centers)):
+        
+        j = i % y_nr
+        k = i // y_nr
+        
+        cut_values[k,j] = ScAb.results['optimal_reward'][0,idx]
+        cut_coords[k,j,:] = center
+    
+    cut_df = pd.DataFrame( cut_values, index=cut_coords[:,0,0], columns=cut_coords[0,:,1] )
+    
+    fig = plt.figure(figsize=cm2inch(9, 8))
+    ax = sns.heatmap(cut_df.T, cmap="jet", #YlGnBu
+             vmin=0, vmax=1)
+    ax.figure.axes[-1].yaxis.label.set_size(20)
+    ax.invert_yaxis()
+    
+    # xticks = [t if i % 5 == 0 else '' for i,t in enumerate(cut_df.index.values.round(1))]
+    # yticks = [t if i % 5 == 0 else '' for i,t in enumerate(cut_df.columns.values.round(1))]
+    
+    # ax.set_xticklabels(xticks, size = 13)
+    # ax.set_yticklabels(yticks, size = 13)
+    ax.set_xlabel('Temp. zone 1', fontsize=15)
+    ax.set_ylabel('Temp. zone 2', fontsize=15)
+    ax.set_title("N = "+str(ScAb.setup.scenarios['samples']),fontsize=20)
+    
+    # Set tight layout
+    fig.tight_layout()
+
+    # Save figure
+    filename = ScAb.setup.directories['outputFcase']+'safeset_N='+str(ScAb.setup.scenarios['samples'])
+    for form in ScAb.setup.plotting['exportFormats']:
+        plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
+        
+    plt.show()

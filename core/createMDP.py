@@ -1,14 +1,21 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 """
-Created on Fri Apr 30 13:47:22 2021
+ ______________________________________
+|                                      |
+|  SCENARIO-BASED ABSTRACTION PROGRAM  |
+|______________________________________|
 
-@author: Thom Badings
+Implementation of the method proposed in the paper:
+ "Sampling-Based Robust Control of Autonomous Systems with Non-Gaussian Noise"
+
+Originally coded by:        <anonymized>
+Contact e-mail address:     <anonymized>
+______________________________________________________________________________
 """
 
-import numpy as np
-
-from .commons import floor_decimal, writeFile, \
-                     printWarning, printSuccess
+from .commons import writeFile, printSuccess
 
 class mdp(object):
     def __init__(self, setup, N, abstr):
@@ -21,10 +28,8 @@ class mdp(object):
             Setup dictionary.
         N : int
             Finite time horizon.
-        kalman : dict
-            Dictionary containing the Kalman filter dynamics.
         abstr : dict
-            Dictionay containing all information of the finite-state abstraction.
+            Abstraction dictionary
     
         Returns
         -------
@@ -38,121 +43,25 @@ class mdp(object):
         
         self.nr_regions = abstr['nr_regions']
         self.nr_actions = abstr['nr_actions']
+        self.nr_states  = self.nr_regions
         
-        if self.setup.mdp['horizon'] == 'finite':
+        # Specify goal state set
+        self.goodStates = abstr['goal']
         
-            self.nr_states  = self.nr_regions * self.N
-            
-            # Specify goal state set
-            self.goodStates = [g + x*self.nr_regions for x in range(N) for g in abstr['goal']]
-            
-            # Specify sets that can never reach target set
-            self.badStates  = [c + x*self.nr_regions for x in range(N) for c in abstr['critical']]
-            
-        else:
-            
-            self.nr_states = self.nr_regions
-            
-            # Specify goal state set
-            self.goodStates = abstr['goal']
-            
-            # Specify sets that can never reach target set
-            self.badStates  = abstr['critical']
-            
-            
-    def createPython(self, abstr, trans, kalman=False):
-        
-        # Create MDP internally in Python
-        
-        # self.nr_actions = 0
-        
-        self.transitions = dict()
-        self.transitions['prob'] = dict()
-        self.transitions['succ'] = dict()
-        
-        min_delta = min(self.setup.deltas)
+        # Specify sets that can never reach target set
+        self.badStates  = abstr['critical']
 
-        if self.setup.scenarios['switch']:
-            printWarning('Warning: probabilities based on average between bounds; results may be unrealistic')
-    
-        # For every time step in the horizon
-        for k in range(self.N):
-            self.transitions['prob'][k] = dict()
-            self.transitions['succ'][k] = dict()
-    
-            # For every origin state
-            for s_rel in range(self.nr_regions):
-                
-                s = s_rel + k * self.nr_regions
-                
-                self.transitions['prob'][k][s] = dict()
-                self.transitions['succ'][k][s] = dict()
-                
-                # For every delta value in the list
-                for delta in self.setup.deltas:
-                    
-                    # Only proceed if we stay below the time horizon
-                    if k + delta < self.N:
-                    
-                        # For every enaled action in state s, via delta
-                        actions         = abstr['actions'][delta][s_rel]
-                        
-                        # For every enabled action
-                        for action in actions:
-                            
-                            to_probs_all    = trans['prob'][delta][k][action]['approx']
-                            
-                            to_probs = to_probs_all #[ to_probs_all.nonzero() ]
-                            to_states = np.arange(self.nr_regions) #[ to_probs_all.nonzero() ]
-                            
-                            if kalman is not False:
-                                # Retreive required waiting time
-                                gamma = kalman[delta]['waiting_time'][k]
-                            else:
-                                gamma = 0
-                                LIC = False
-                            
-                            if LIC and gamma > 0:
-                                # If LIC is active, take the waiting time into account
-                                
-                                # If waiting time is above zero, take into account
-                                # Only proceed if waiting is indeed enabled
-                                if abstr['waitEnabled'][min_delta][action]:
-                                    
-                                    # Compute index shift to include waiting time
-                                    idx_shift = (k + delta) * self.nr_regions + \
-                                        gamma * self.nr_regions * min_delta
-                                    
-                                    # Only add if the resulting successor is still
-                                    # within the finite horizon                                    
-                                    if k + delta + gamma*min_delta < self.N:                                
-                                    
-                                        self.transitions['prob'][k][s][(delta,action)] = to_probs
-                                        self.transitions['succ'][k][s][(delta,action)] = to_states + idx_shift
-                                        
-                                        # Increment the number of actions
-                                        # self.nr_actions += 1
-        
-                            else:
-                                # If LIC is not active, directly add the transition
-                                
-                                # Compute index shift for pointing forward in time
-                                idx_shift = (k + delta) * self.nr_regions
-                                
-                                 # Only add if the resulting successor is still
-                                # within the finite horizon                                
-                                self.transitions['prob'][k][s][(delta,action)] = to_probs
-                                self.transitions['succ'][k][s][(delta,action)] = to_states + idx_shift
-                                
-                                # Increment the number of actions
-                                # self.nr_actions += 1
-
-    def writePRISM_scenario(self, abstr, trans, mode='estimate', horizon='infinite'):
+    def writePRISM_scenario(self, abstr, trans, mode='estimate', 
+                            horizon='infinite'):
         '''
-        Converts the model to the PRISM language, and write the model to a file.
+        Converts the model to the PRISM language, and write the model to file.
     
         Parameters
         ----------
+        abstr : dict
+            Abstraction dictionary
+        trans : dict
+            Dictionary of transition probabilities        
         mode : str, optional
             Is either 'estimate' or 'interval'.
         horizon : str, optional
@@ -270,9 +179,7 @@ class mdp(object):
                                 # Compute successor state time step
                                 kprime = "&(k'=k+"+str(int(delta/min_delta))+")"
                             
-                            
-                            
-                            if self.setup.scenarios['switch'] and mode == 'interval':
+                            if mode == 'interval':
                                 
                                 # Retreive probability intervals (and corresponding state ID's)
                                 interval_idxs    = trans['prob'][delta][k][a]['interval_idxs']
@@ -288,38 +195,18 @@ class mdp(object):
                                 succPieces += [deadlock_string+" : (x'=-1)"+kprime]
                                 
                             else:
+                                # Write resulting states with their probabilities
+                                succProbStrings = trans['prob'][delta][k][a]['approx_strings']
+                                succProbIdxs    = trans['prob'][delta][k][a]['approx_idxs']
                                 
-                                if mode == 'estimate':
-                                    # Write resulting states with their probabilities
-                                    succProbStrings = trans['prob'][delta][k][a]['approx_strings']
-                                    succProbIdxs    = trans['prob'][delta][k][a]['approx_idxs']
-                                    
-                                    # If mode is default, use concrete probabilities
-                                    succPieces = [str(p)+":(x'="+str(i)+")"+kprime
-                                                  for (i,p) in zip(succProbIdxs,succProbStrings)]
-                                    
-                                    # Use absorbing state to make sure that probs sum to one
-                                    deadlockProb = trans['prob'][delta][k][a]['deadlock_approx']
-                                    if float(deadlockProb) > 0:
-                                        succPieces += [str(deadlockProb)+":(x'=-1)"+kprime]
-                                    
-                                else:
-                                    # Write resulting states with their probabilities
-                                    succProbs = trans['prob'][delta][k][a]['approx']
-                                    
-                                    # If mode is interval, use intervals on probs.
-                                    succPieces = ["["+
-                                                  str(floor_decimal(max(1e-4, p - self.setup.gaussian['margin']),5))+","+
-                                                  str(floor_decimal(min(1, p + self.setup.gaussian['margin']),5))+"] : (x'="+
-                                                  str(i)+")"+kprime 
-                                                  for i,p in enumerate(succProbs) if p > 0]
-                            
-                                    # Use absorbing state to make sure that probs sum to one
-                                    deadlock_lb = np.round(1-sum(succProbs),6) - self.setup.gaussian['margin']
-                                    deadlock_ub = np.round(1-sum(succProbs),6) + self.setup.gaussian['margin']
-                                    succPieces += ["["+
-                                        str(floor_decimal(max(1e-4, deadlock_lb),5))+","+
-                                        str(floor_decimal(min(1,    deadlock_ub),5))+"] : (x'=-1)"+kprime]
+                                # If mode is default, use concrete probabilities
+                                succPieces = [str(p)+":(x'="+str(i)+")"+kprime
+                                              for (i,p) in zip(succProbIdxs,succProbStrings)]
+                                
+                                # Use absorbing state to make sure that probs sum to one
+                                deadlockProb = trans['prob'][delta][k][a]['deadlock_approx']
+                                if float(deadlockProb) > 0:
+                                    succPieces += [str(deadlockProb)+":(x'=-1)"+kprime]                                
                                 
                             # Join  individual pieces
                             sep = " + "
@@ -363,15 +250,6 @@ class mdp(object):
         #########
         specfile, specification = self.writePRISM_specification(mode, horizon)
         
-        # # Define terminal command (may be user-dependent)
-        # commandfile = self.setup.directories['outputFcase']+ \
-        #     self.setup.mdp['filename']+"_"+mode+"_command.txt"
-            
-        # # Write command file
-        # command = "bin/prism models/m2/Abstraction_interval.prism -pf 'Pmaxmin=?[F<="+\
-        #     str(horizonLen)+" \"reached\"]' -exportadv strat.csv -exportstates states.csv -exportvector vector.csv"
-        # writeFile(commandfile, 'w', command)
-        
         if mode == 'estimate':
             printSuccess('MDP ('+horizon+' horizon) exported as PRISM file')
         else:
@@ -380,6 +258,24 @@ class mdp(object):
         return PRISM_file, specfile, specification
     
     def writePRISM_specification(self, mode, horizon):
+        '''
+        Write the PRISM specificatoin / property to a file
+
+        Parameters
+        ----------
+        mode : str
+            Is either 'estimate' or 'interval'.
+        horizon : str
+            Is either 'finite' or 'infinite'.
+
+        Returns
+        -------
+        specfile : str
+            The name of the file in which the specification is stored.
+        specification : str
+            The specification itself given as a string.
+
+        '''
         
         if horizon == 'infinite':
             # Infer number of time steps in horizon (at minimum delta value)
@@ -412,6 +308,25 @@ class mdp(object):
         return specfile, specification
     
     def writePRISM_explicit(self, abstr, trans, mode='estimate'):
+        '''
+        Converts the model to the PRISM language, and write the model in
+        explicit form to files (meaning that every transition is already
+        enumerated explicitly).
+    
+        Parameters
+        ----------
+        abstr : dict
+            Abstraction dictionary
+        trans : dict
+            Dictionary of transition probabilities        
+        mode : str, optional
+            Is either 'estimate' or 'interval'.
+    
+        Returns
+        -------
+        None.
+    
+        '''
         
         # Define PRISM filename
         PRISM_allfiles = self.setup.directories['outputFcase']+ \
@@ -498,7 +413,7 @@ class mdp(object):
                         
                         substring_start = str(s+1) +' '+ str(choice)
                         
-                        if self.setup.scenarios['switch'] and mode == 'interval':
+                        if mode == 'interval':
                         
                             # Add probability to end in absorbing state
                             deadlock_string = trans['prob'][delta][0][a]['deadlock_interval_string']
@@ -540,14 +455,12 @@ class mdp(object):
                         nr_transitions_absolute += len(subsubstring_a) + len(subsubstring_b)
                         
                         subsubstring[a_idx] = '\n'.join(subsubstring_a + subsubstring_b)
-                        
-                    # subsubstring = '\n'.join(subsubstring)
                     
                 else:
                     
                     # No actions enabled, so only add self-loop
                     if selfloop is False:
-                        if self.setup.scenarios['switch'] and mode == 'interval':
+                        if mode == 'interval':
                             selfloop_prob = '[1.0,1.0]'
                         else:
                             selfloop_prob = '1.0'
@@ -566,7 +479,6 @@ class mdp(object):
                         
                 substring[delta_idx] = subsubstring
                 
-            # transition_file_list[s] = '\n'.join(substring)
             transition_file_list[s] = substring
             
         # transition_file_list = '\n'.join(transition_file_list)
@@ -584,7 +496,7 @@ class mdp(object):
                       'Transitions':size_transitions}
         header = str(size_states)+' '+str(size_choices)+' '+str(size_transitions)+'\n'
         
-        if self.setup.scenarios['switch'] and mode == 'interval':
+        if mode == 'interval':
             firstrow = '0 0 0 [1.0,1.0]\n'
         else:
             firstrow = '0 0 0 1.0\n'

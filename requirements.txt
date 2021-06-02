@@ -1,0 +1,23 @@
+# List of used packages
+matplotlib==3.2.2
+numpy==1.18.5
+pandas==1.0.5
+scipy==1.5.0
+seaborn==0.10.1
+xlrd==1.2.0
+xlsxwriter==1.2.9
+csv==1.0
+visvis==1.12.4
+
+# Besides the above, the script imports the following packages:
+# copy
+# csv
+# datetime
+# glob
+# inspect
+# itertools
+# math
+# os
+# random
+# subprocess
+# sys

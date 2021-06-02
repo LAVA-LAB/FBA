@@ -1,28 +1,33 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Apr 30 16:18:50 2021
-
-@author: Thom Badings
-"""
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import numpy as np
-import itertools
-import copy
-import csv
-import sys
-import os
-import random
+"""
+ ______________________________________
+|                                      |
+|  SCENARIO-BASED ABSTRACTION PROGRAM  |
+|______________________________________|
 
-from scipy.spatial import Delaunay
+Implementation of the method proposed in the paper:
+ "Sampling-Based Robust Control of Autonomous Systems with Non-Gaussian Noise"
 
-from .mainFunctions import definePartitions, defineDistances, \
-    in_hull, makeModelFullyActuated, computeScenarioBounds, computeScenarioBounds_sparse, \
+Originally coded by:        <anonymized>
+Contact e-mail address:     <anonymized>
+______________________________________________________________________________
+"""
+
+import numpy as np              # Import Numpy for computations
+import itertools                # Import to crate iterators
+import copy                     # Import to copy variables in Python
+import csv                      # Import to create/load CSV files
+import sys                      # Allows to terminate the code at some point
+import os                       # Import OS to allow creationg of folders
+import random                   # Import to use random variables
+from scipy.spatial import Delaunay # Import to create convex hulls
+
+from .mainFunctions import definePartitions, \
+    in_hull, makeModelFullyActuated, computeScenarioBounds_sparse, \
     computeRegionCenters
-from .commons import tic, toc, ticDiff, tocDiff, \
-    nearest_point_in_hull, table, printWarning
+from .commons import tic, ticDiff, tocDiff, table, printWarning
 from .postprocessing.createPlots import createPartitionPlot
 
 from .createMDP import mdp
@@ -33,37 +38,33 @@ Main filter-based abstraction object definition
 ------------------------------------------------------------------------------
 '''
 
-# from numba import njit
-
-# @njit
-# def f(mat, vec):
-#     return mat - vec
-
-# # @njit
-# # def f2(mat, threshold):
-# #     return np.maximum(np.max(mat, axis=1), -np.min(mat, axis=1)) <= threshold
-
-# @njit
-# def f2(mat, threshold):
-    
-#     outVec = np.zeros(len(mat))
-#     for i,row in enumerate(mat):
-#         if max(np.abs(row)) <= threshold:
-#             outVec[i] = True
-            
-#     return outVec
-
 class Abstraction(object):
     '''
     Main abstraction object    
     '''
     
     def _defModel(self, delta):
+        '''
+        Define model within abstraction object for given value of delta
+
+        Parameters
+        ----------
+        delta : int
+            Value of delta to create model for.
+
+        Returns
+        -------
+        model : TYPE
+            DESCRIPTION.
+
+        '''
         
         if delta == 0:
-            model = makeModelFullyActuated(copy.deepcopy(self.basemodel), manualDimension = 'auto', observer=False)
+            model = makeModelFullyActuated(copy.deepcopy(self.basemodel), 
+                       manualDimension = 'auto', observer=False)
         else:
-            model = makeModelFullyActuated(copy.deepcopy(self.basemodel), manualDimension = delta, observer=False)
+            model = makeModelFullyActuated(copy.deepcopy(self.basemodel), 
+                       manualDimension = delta, observer=False)
             
         # Determine inverse A matrix
         model.A_inv  = np.linalg.inv(model.A)
@@ -75,18 +76,21 @@ class Abstraction(object):
         model.p      = np.size(model.B,1)   # Nr of inputs
     
         # Control limitations
-        model.uMin   = np.array( model.setup['control']['limits']['uMin'] * int(model.p/self.basemodel.p) )
-        model.uMax   = np.array( model.setup['control']['limits']['uMax'] * int(model.p/self.basemodel.p) )
+        model.uMin   = np.array( model.setup['control']['limits']['uMin'] * \
+                                int(model.p/self.basemodel.p) )
+        model.uMax   = np.array( model.setup['control']['limits']['uMax'] * \
+                                int(model.p/self.basemodel.p) )
         
         # If noise samples are used, recompute them
         if self.setup.scenarios['gaussian'] is False:
             
-            model.noise['samples'] = np.vstack((2*model.noise['samples'][:,0],
-                                                  model.noise['samples'][:,0],
-                                                2*model.noise['samples'][:,1],
-                                                  model.noise['samples'][:,1],
-                                                2*model.noise['samples'][:,2],
-                                                  model.noise['samples'][:,2])).T
+            model.noise['samples'] = np.vstack(
+                (2*model.noise['samples'][:,0],
+                 model.noise['samples'][:,0],
+                 2*model.noise['samples'][:,1],
+                 model.noise['samples'][:,1],
+                 2*model.noise['samples'][:,2],
+                 model.noise['samples'][:,2])).T
         
         uAvg = (model.uMin + model.uMax) / 2
         
@@ -102,28 +106,50 @@ class Abstraction(object):
         abstr = dict()
         
         abstr['P'] = definePartitions(self.basemodel.n,
-                                     self.basemodel.setup['partition']['nrPerDim'],
-                                     self.basemodel.setup['partition']['width'],
-                                     self.basemodel.setup['partition']['origin'],
-                                     onlyCenter = False)
+                            self.basemodel.setup['partition']['nrPerDim'],
+                            self.basemodel.setup['partition']['width'],
+                            self.basemodel.setup['partition']['origin'],
+                            onlyCenter = False)
         
         abstr['nr_regions'] = len(abstr['P'])
         
-        centerTuples = [tuple(abstr['P'][i]['center']) for i in range(abstr['nr_regions'])] 
+        centerTuples = [tuple(abstr['P'][i]['center']) for i in 
+                        range(abstr['nr_regions'])] 
         
-        abstr['allCenters'] = dict(zip(centerTuples, range(abstr['nr_regions'])))
+        abstr['allCenters'] = dict(zip(centerTuples, 
+                                       range(abstr['nr_regions'])))
         
         # Determine goal regions
         abstr['goal'] = self._defStateLabelSet(abstr['allCenters'], 
-            self.basemodel.setup['partition'], self.basemodel.setup['specification']['goal'])
+            self.basemodel.setup['partition'], 
+            self.basemodel.setup['specification']['goal'])
         
         # Determine critical regions
         abstr['critical'] = self._defStateLabelSet(abstr['allCenters'], 
-            self.basemodel.setup['partition'], self.basemodel.setup['specification']['critical'])
+            self.basemodel.setup['partition'], 
+            self.basemodel.setup['specification']['critical'])
         
         return abstr
     
     def _defStateLabelSet(self, allCenters, partition, subset):
+        '''
+        Return the indices of regions associated with the unique centers.
+
+        Parameters
+        ----------
+        allCenters : List
+            List of the center coordinates for all regions.
+        partition : Dict
+            Partition dictionary.
+        subset : List
+            List of points to return the unique centers for.
+
+        Returns
+        -------
+        list
+            List of unique center points.
+
+        '''
         
         if np.shape(subset)[1] == 0:
             return []
@@ -144,8 +170,18 @@ class Abstraction(object):
                                if tuple(c) in allCenters]
     
     def _defAllCorners(self):
+        '''
+        Returns the vertices of every region in the partition (as nested list)
+
+        Returns
+        -------
+        list
+            Nested list of all vertices of all regions.
+
+        '''
             
-        # Create all combinations of n bits, to reflect combinations of all lower/upper bounds of partitions
+        # Create all combinations of n bits, to reflect combinations of all 
+        # lower/upper bounds of partitions
         bitCombinations = list(itertools.product([0, 1], repeat=self.basemodel.n))
         bitRelation     = ['low','upp']
         
@@ -163,10 +199,38 @@ class Abstraction(object):
         return np.array(allOriginPointsNested)
     
     def _defRegionHull(self, points):
+        '''
+        Compute the convex hull for the given points
+
+        Parameters
+        ----------
+        points : 2D Numpy array
+            Numpy array, with every row being a point to include in the hull.
+
+        Returns
+        -------
+        Convex hull
+            Convex hull object.
+
+        '''
         
         return Delaunay(points, qhull_options='QJ')
     
     def _createTargetPoints(self, cornerPoints):
+        '''
+        Create target points, based on the vertices given
+
+        Parameters
+        ----------
+        cornerPoints : list
+            Vertices to compute target points for.
+
+        Returns
+        -------
+        target : dict
+            Dictionary with all data about the target points.
+
+        '''
         
         target = dict()
         
@@ -188,20 +252,9 @@ class Abstraction(object):
         
         else:
         
-            # Create target points of actions
-            if len(self.abstr['goal']) == 1 and self.basemodel.setup['targets']['dynamic']:
-            
-                # Define the (unique) continuous goal state
-                goal = self.abstr['P'][ self.abstr['goal'][0] ]['center'][0]
-                    
-                # Define dynamic target points
-                target['d'] = [nearest_point_in_hull(cornerPoints[j], goal) for
-                                                   j in range(self.abstr['nr_regions'])]
-                    
-            else:
-                
-                # Set default target points to the center of every region
-                target['d'] = [self.abstr['P'][j]['center'] for j in range(self.abstr['nr_regions'])]
+            # Set default target points to the center of every region
+            target['d'] = [self.abstr['P'][j]['center'] for j in 
+                           range(self.abstr['nr_regions'])]
         
         targetPointTuples = [tuple(point) for point in target['d']]        
         target['inv'] = dict(zip(targetPointTuples, range(len(target['d']))))
@@ -209,40 +262,78 @@ class Abstraction(object):
         return target
     
     def _defInvArea(self, delta):
-        
-        # Compute the predecessor set (without the shift due to the target
-        # point). This acccounts to computing, for all u_k, the set
-        # A^-1 (B u_k - q_k)
+        '''
+        Compute the predecessor set (without the shift due to the target
+        point). This acccounts to computing, for all u_k, the set
+        A^-1 (B u_k - q_k)
+
+        Parameters
+        ----------
+        delta : int
+            Delta value of the model which is used.
+
+        Returns
+        -------
+        x_inv_area : 2D Numpy array
+            Predecessor set (every row is a vertex).
+
+        '''
         
         # Determine the set of extremal control inputs
-        u = [[self.model[delta].uMin[i], self.model[delta].uMax[i]] for i in range(self.model[delta].p)]
+        u = [[self.model[delta].uMin[i], self.model[delta].uMax[i]] for i in 
+              range(self.model[delta].p)]
         
-        # Determine the inverse image of the extreme control inputs from target point
+        # Determine the inverse image of the extreme control inputs
         x_inv_area = np.zeros((2**self.model[delta].p, self.model[delta].n))
         for i,elem in enumerate(itertools.product(*u)):
             list_elem = list(elem)
             
             # Calculate inverse image of the current extreme control input
             x_inv_area[i,:] = self.model[delta].A_inv @ \
-                (self.model[delta].B @ np.array(list_elem).T + self.model[delta].W_flat)  
+                (self.model[delta].B @ np.array(list_elem).T + 
+                 self.model[delta].W_flat)  
     
         return x_inv_area
     
     def _defInvHull(self, x_inv_area):
-        
-        # Define the convex hull object of the predecessor set
+        '''
+        Define the convex hull object of the predecessor set        
+
+        Parameters
+        ----------
+        x_inv_area : 2D Numpy array
+            Predecessor set (every row is a vertex).
+
+        Returns
+        -------
+        x_inv_hull : hull
+            Convex hull object.
+
+        '''
         
         x_inv_hull = Delaunay(x_inv_area, qhull_options='QJ')
         
         return x_inv_hull
     
     def _defBasisVectors(self, delta):
+        '''
+        Compute the basis vectors of the predecessor set, computed from the
+        average control inputs to the maximum in every dimension of the
+        control space.
+        Note that the drift does not play a role here.  
 
-        # Compute the basis vectors of the predecessor set, computed from the
-        # average control inputs to the maximum in every dimension of the
-        # control space.
-        # Note that the drift does not play a role here.        
+        Parameters
+        ----------
+        delta : int
+            Delta value of the model which is used.
 
+        Returns
+        -------
+        basis_vectors : 2D Numpy array
+            Numpy array of basis vectors (every row is a vector).
+
+        '''
+        
         u_avg = np.array(self.model[delta].uMax + self.model[delta].uMin)/2    
 
         # Compute basis vectors (with average of all controls as origin)
@@ -262,21 +353,38 @@ class Abstraction(object):
             
             basis_vectors[i,:] = point - origin
         
-            print(' ---- Length of basis',i,':',np.linalg.norm(basis_vectors[i,:]))
+            print(' ---- Length of basis',i,':',
+                  np.linalg.norm(basis_vectors[i,:]))
         
         return basis_vectors
     
     def _defEnabledActions(self, delta):
-           
+        '''
+        Define dictionaries to sture points in the preimage of a state, and
+        the corresponding polytope points.
+
+        Parameters
+        ----------
+        delta : int
+            Delta value of the model which is used.
+
+        Returns
+        -------
+        total_actions_enabled : int
+            Total number of enabled actions.
+        enabled_actions : list
+            Nested list of actions enabled in every region.
+        enabledActions_inv : list
+            Nested list of inverse actions enabled in every region.
+            
+        '''
+        
         from .commons import angle_between
         
         def f7(seq):
             seen = set()
             seen_add = seen.add
             return [x for x in seq if not (x in seen or seen_add(x))]
-        
-        # Define dictionaries to sture points in the preimage of a state, and the
-        # corresponding polytope points
         
         # Compute inverse reachability area
         x_inv_area = self._defInvArea(delta)
@@ -305,7 +413,8 @@ class Abstraction(object):
             for i,v1 in enumerate(basis_vectors):
                 for j,v2 in enumerate(basis_vectors):
                     if i != j:
-                        print(' ---- Angle between control',i,'and',j,':',angle_between(v1,v2) / np.pi * 180)
+                        print(' ---- Angle between control',i,'and',j,':',
+                              angle_between(v1,v2) / np.pi * 180)
             
             parralelo2cube = np.linalg.inv( basis_vectors )
             print('Transformation:',parralelo2cube)
@@ -318,9 +427,11 @@ class Abstraction(object):
             predSet_originShift = -np.average(x_inv_area_normalized, axis=0)
             print('Off origin:',predSet_originShift)
             
-            print('Shifted normalized hypercube:',x_inv_area @ parralelo2cube + predSet_originShift)
+            print('Shifted normalized hypercube:',x_inv_area @ parralelo2cube
+                    + predSet_originShift)
             
-            allRegionVertices = self.abstr['allCornersFlat'] @ parralelo2cube - predSet_originShift
+            allRegionVertices = self.abstr['allCornersFlat'] @ parralelo2cube \
+                    - predSet_originShift
             
         else:
             
@@ -350,47 +461,18 @@ class Abstraction(object):
                 A_inv_d = self.model[delta].A_inv @ np.array(targetPoint)
                 
                 # Python implementation
-                allVerticesNormalized = (A_inv_d @ parralelo2cube) - allRegionVertices
-                
-                '''
-                # Numba implementation
-                originPointsShifted = f(allRegionVertices, originShift)
-                '''
+                allVerticesNormalized = (A_inv_d @ parralelo2cube) - \
+                                         allRegionVertices
                                 
                 # Reshape the whole matrix that we obtain
                 poly_reshape = np.reshape( allVerticesNormalized,
-                                (self.abstr['nr_regions'], nr_corners*self.basemodel.n))
-                
-                if action_id % printEvery == 0:
-                    # poly_reshape2 = np.zeros((self.abstr['nr_regions'], nr_corners))
-                    poly_reshape3 = np.zeros((self.abstr['nr_regions'], self.basemodel.n))
-                    # for v in range(nr_corners):
-                    #     start = v*self.basemodel.n
-                    #     stop  = start + self.basemodel.n
-                    #     # np.abs(poly_reshape[:,start:stop])
-                    #     poly_reshape2[:,v] = np.max(np.abs(poly_reshape[:,start:stop]), axis=1)
-                    for v in range(self.basemodel.n):
-                        poly_reshape3[:,v] = np.max(np.abs(poly_reshape[:,v::self.basemodel.n]), axis=1)
-                                    
-                    # pointsWithin2 = poly_reshape2 <= 1.0
-                    pointsWithin3 = poly_reshape3 <= 1.0
-                    # print(np.sum(pointsWithin2, axis=1))
-                    print('Points in pred.set. per dimension:',np.sum(pointsWithin3, axis=0))
-                
-                # Somehow, the line below is slower than the newer one below it.
-                # enabled_in = np.max( abs(poly_reshape), axis=1 ) <= 1.0
+                                (self.abstr['nr_regions'], 
+                                 nr_corners*self.basemodel.n))
                 
                 # Enabled actions are ones that have all corner points within
                 # the origin-centered hypercube with unit length
-                enabled_in = np.maximum(np.max(poly_reshape, axis=1), -np.min(poly_reshape, axis=1)) <= 1.0
-                
-                # enabled_any = sum( np.minimum(np.max(poly_reshape, axis=1), -np.min(poly_reshape, axis=1)) <= 1.0 )
-                # print('Any point included in nr states:',enabled_any)
-                
-                '''
-                # Numba implementation
-                enabled_in = f2(poly_reshape, 1.0)
-                '''
+                enabled_in = np.maximum(np.max(poly_reshape, axis=1), 
+                                        -np.min(poly_reshape, axis=1)) <= 1.0
                 
             else:
                 
@@ -403,52 +485,33 @@ class Abstraction(object):
                 # Check which points are in the convex hull
                 polypoints_vec = in_hull(allVertices, x_inv_hull)
             
-                # Map the enabled corner points of the partitions to actual partitions
+                # Map enabled vertices of the partitions to actual partitions
                 enabled_polypoints[action_id] = np.reshape(  polypoints_vec, 
                               (self.abstr['nr_regions'], nr_corners))
             
-                # Polypoints contains the True/False results for all corner points of every partition
-                # An action is enabled in a state if it is enabled in all its corner points
-                enabled_in = np.all(enabled_polypoints[action_id] == True, axis = 1)
+                # Polypoints contains the True/False results for all vertices
+                # of every partition. An action is enabled in a state if it 
+                # is enabled in all its vertices
+                enabled_in = np.all(enabled_polypoints[action_id] == True, 
+                                    axis = 1)
             
             # Shift the inverse hull to account for the specific target point
-            if self.setup.plotting['partitionPlot'] and action_id == int(self.abstr['nr_regions']/2):
+            if self.setup.plotting['partitionPlot'] and \
+                action_id == int(self.abstr['nr_regions']/2):
 
                 print('x_inv_area:',x_inv_area)
                 print('origin shift:',A_inv_d)       
-                print('targetPoint:',targetPoint,' - drift:',self.model[delta].W_flat)
+                print('targetPoint:',targetPoint,' - drift:',
+                      self.model[delta].W_flat)
                 
-                predecessor_set = A_inv_d - x_inv_area #np.tile(A_inv_d, (nr_corners, 1)) - x_inv_area
+                predecessor_set = A_inv_d - x_inv_area
                 
-                # Generate partition plot for the goal state, also showing the pre-image
+                # Partition plot for the goal state, also showing pre-image
                 print('Create partition plot...')
-                
-                if self.basemodel.name in ['building_2room']:
-                
-                    createPartitionPlot((0,1), (2,3), self.abstr['goal'], delta, self.setup, \
-                                self.model[delta], self.abstr, self.abstr['allCorners'],
-                                predecessor_set)
-                    createPartitionPlot((0,2), (1,3), self.abstr['goal'], delta, self.setup, \
-                                self.model[delta], self.abstr, self.abstr['allCorners'],
-                                predecessor_set)
-                    createPartitionPlot((0,3), (1,2), self.abstr['goal'], delta, self.setup, \
-                                self.model[delta], self.abstr, self.abstr['allCorners'],
-                                predecessor_set)
-                    createPartitionPlot((1,2), (0,3), self.abstr['goal'], delta, self.setup, \
-                                self.model[delta], self.abstr, self.abstr['allCorners'],
-                                predecessor_set)
-                    createPartitionPlot((1,3), (0,2), self.abstr['goal'], delta, self.setup, \
-                                self.model[delta], self.abstr, self.abstr['allCorners'],
-                                predecessor_set)
-                    createPartitionPlot((2,3), (0,1), self.abstr['goal'], delta, self.setup, \
-                                self.model[delta], self.abstr, self.abstr['allCorners'],
-                                predecessor_set)
-                        
-                else:
                     
-                    createPartitionPlot((0,1), (None,None), self.abstr['goal'], delta, self.setup, \
-                                self.model[delta], self.abstr, self.abstr['allCorners'],
-                                predecessor_set)
+                createPartitionPlot((0,1), (None,None), self.abstr['goal'], 
+                    delta, self.setup, self.model[delta], self.abstr, 
+                    self.abstr['allCorners'], predecessor_set)
             
             # Retreive the ID's of all states in which the action is enabled
             enabled_in_states[action_id] = np.nonzero(enabled_in)[0]
@@ -460,12 +523,14 @@ class Abstraction(object):
             if action_id % printEvery == 0:
                 if action_id in self.abstr['goal']:
                     print(' -- GOAL action',str(action_id),'enabled in',
-                          str(len(enabled_in_states[action_id])),'states - target point:',
+                          str(len(enabled_in_states[action_id])),
+                          'states - target point:',
                           str(targetPoint))
                     
                 else:
                     print(' -- Action',str(action_id),'enabled in',
-                          str(len(enabled_in_states[action_id])),'states - target point:',
+                          str(len(enabled_in_states[action_id])),
+                          'states - target point:',
                           str(targetPoint))
             
             if len(enabled_in_states[action_id]) > 0:
@@ -482,11 +547,6 @@ class Abstraction(object):
     def __init__(self):
         '''
         Initialize the scenario-based abstraction object.
-
-        Parameters
-        ----------
-        setup : dict
-        Setup dictionary.
 
         Returns
         -------
@@ -515,11 +575,14 @@ class Abstraction(object):
         
     def definePartition(self):
         ''' 
-        -----------------------------------------------------------------------
-        DEFINE THE DISCRETE STATE PARTITION
-        -----------------------------------------------------------------------
+        Define the discrete state space partition and target points
+        
+        Returns
+        -------
+        None.
         '''
         
+        # Create partition
         print('Computing partition of the state space...')
         
         self.abstr = self._defPartition()
@@ -531,16 +594,11 @@ class Abstraction(object):
         self.time['1_partition'] = tocDiff(False)
         print('Discretized states defined - time:',self.time['1_partition'])
         
-        ''' 
-        -----------------------------------------------------------------------
-        CREATE TARGET POINTS
-        -----------------------------------------------------------------------
-        '''
-        
+        # Create target points
         print('Creating actions (target points)...')
         
         self.abstr['allCorners']     = self._defAllCorners()
-        self.abstr['allCornersFlat'] = np.concatenate( self.abstr['allCorners'] )
+        self.abstr['allCornersFlat'] = np.concatenate(self.abstr['allCorners'])
         
         # Create the target point for every action (= every state)
         self.abstr['target'] = self._createTargetPoints(self.abstr['allCorners'])
@@ -561,11 +619,12 @@ class Abstraction(object):
         self.abstr['stateSpaceHull'] = self._defRegionHull(outerCorners)
 
     def defineActions(self):
-        
         ''' 
-        -----------------------------------------------------------------------
-        DETERMINE WHICH ACTIONS ARE ACTUALLY ENABLED
-        -----------------------------------------------------------------------
+        Determine which actions are actually enabled.
+        
+        Returns
+        -------
+        None.
         '''
         
         print('Computing set of enabled actions...')
@@ -576,8 +635,8 @@ class Abstraction(object):
         # For every time step grouping value in the list
         for delta_idx,delta in enumerate(self.setup.deltas):
             
-            nr_A, self.abstr['actions'][delta], self.abstr['actions_inv'][delta] = \
-                self._defEnabledActions(delta)
+            nr_A, self.abstr['actions'][delta], \
+             self.abstr['actions_inv'][delta] = self._defEnabledActions(delta)
                         
             print(nr_A,'actions enabled')
             if nr_A == 0:
@@ -591,12 +650,27 @@ class Abstraction(object):
 
 class scenarioBasedAbstraction(Abstraction):
     def __init__(self, setup, basemodel):
+        '''
+        Initialize scenario-based abstraction (ScAb) object
+
+        Parameters
+        ----------
+        setup : dict
+            Setup dictionary.
+        basemodel : dict
+            Base model for which to create the abstraction.
+
+        Returns
+        -------
+        None.
+
+        '''
         
         # Copy setup to internal variable
         self.setup = setup
         self.basemodel = basemodel
         
-        # Define empty dictionary for monte carlo simulations (even if not used)
+        # Define empty dictionary for monte carlo sims. (even if not used)
         self.mc = dict()   
         
         # Start timer
@@ -609,14 +683,27 @@ class scenarioBasedAbstraction(Abstraction):
         Abstraction.definePartition(self)
         
     def _loadScenarioTable(self, tableFile):
+        '''
+        Load tabulated bounds on the transition probabilities (computed using
+        the scenario approach).
+
+        Parameters
+        ----------
+        tableFile : str
+            File from which to load the table.
+
+        Returns
+        -------
+        memory : dict
+            Dictionary containing all loaded probability bounds / intervals.
+
+        '''
         
-        # Create memory for scenario probabilities (6 variables/columns, max N+1 rows)
-        # Used to ensure that equal probabilities are only calculated once
-        # If a file is specified, use it; otherwise define empty matrix
         memory = dict()
         
         if not os.path.isfile(tableFile):
-            sys.exit('ERROR: the following table file does not exist:'+str(tableFile))
+            sys.exit('ERROR: the following table file does not exist:'+
+                     str(tableFile))
         
         with open(tableFile, newline='') as csvfile:
             reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
@@ -624,7 +711,8 @@ class scenarioBasedAbstraction(Abstraction):
                 
                 strSplit = row[0].split(',')
                 
-                key = tuple( [int(float(i)) for i in strSplit[0:2]] + [float(strSplit[2])] )
+                key = tuple( [int(float(i)) for i in strSplit[0:2]] + 
+                             [float(strSplit[2])] )
                 
                 value = [float(i) for i in strSplit[-2:]]
                 memory[key] = value
@@ -632,6 +720,24 @@ class scenarioBasedAbstraction(Abstraction):
         return memory
         
     def _computeProbabilityBounds(self, tab, k, delta):
+        '''
+        Compute transition probability intervals (bounds)
+
+        Parameters
+        ----------
+        tab : dict
+            Table dictionary.
+        k : int
+            Discrete time step.
+        delta : int
+            Value of delta to use the model for.
+
+        Returns
+        -------
+        prob : dict
+            Dictionary containing the computed transition probabilities.
+
+        '''
         
         prob = dict()
 
@@ -651,38 +757,50 @@ class scenarioBasedAbstraction(Abstraction):
                 if self.setup.scenarios['gaussian'] is True:
                     # Compute Gaussian noise samples
                     samples = np.random.multivariate_normal(mu, Sigma, 
-                                            size=self.setup.scenarios['samples'])
+                                    size=self.setup.scenarios['samples'])
                     
                 else:
-                    # Determine non-Gaussian noise samples (relative from target point)
-                    samples = mu + np.array(random.choices(self.model[delta].noise['samples'], k=self.setup.scenarios['samples']))
-                              
-                    # samples = mu + self.model[delta].noise['samples'][0:self.setup.scenarios['samples'], :]
+                    # Determine non-Gaussian noise samples (relative from 
+                    # target point)
+                    samples = mu + np.array(
+                        random.choices(self.model[delta].noise['samples'], 
+                        k=self.setup.scenarios['samples']) )
                     
-                self.trans['memory'], prob[a] = \
-                    computeScenarioBounds_sparse(self.setup, 
+                prob[a] = computeScenarioBounds_sparse(self.setup, 
                       self.basemodel.setup['partition'], 
                       self.abstr, self.trans, samples)
                 
                 # Print normal row in table
                 if a % printEvery == 0:
-                    # prob_lb = np.round(max(prob[a]['lb']), 5)
-                    # prob_ub = np.round(max(prob[a]['ub']), 5)
-                    # tab.print_row([delta, k, a, 'sampling-based primary bounds: ['+str(prob_lb)+', '+str(prob_ub)+']'])
                     nr_transitions = len(prob[a]['interval_idxs'])
-                    tab.print_row([delta, k, a, 'Probabilities computed (transitions: '+str(nr_transitions)+')'])
+                    tab.print_row([delta, k, a, 
+                       'Probabilities computed (transitions: '+
+                       str(nr_transitions)+')'])
                 
         return prob
     
     def defActions(self):
+        '''
+        Define the actions of the finite-state abstraction (performed once,
+        outside the iterative scheme).
+
+        Returns
+        -------
+        None.
+
+        '''
+        
         Abstraction.defineActions(self)
     
     def defTransitions(self):
-        
         '''
-        -----------------------------------------------------------------------
-        CALCULATE TRANSITION PROBABILITIES
-        -----------------------------------------------------------------------
+        Define the transition probabilities of the finite-state abstraction 
+        (perform for every iteration of the iterative scheme).
+
+        Returns
+        -------
+        None.
+
         '''
            
         # Column widths for tabular prints
@@ -701,10 +819,7 @@ class scenarioBasedAbstraction(Abstraction):
         self.trans['memory'] = self._loadScenarioTable(tableFile = tableFile)
         
         # Retreive type of horizon
-        if self.setup.mdp['horizon'] == 'finite':
-            k_range = range(self.N)
-        else:
-            k_range = [0]
+        k_range = [0]
         
         print('Computing transition probabilities...')
         
@@ -719,47 +834,48 @@ class scenarioBasedAbstraction(Abstraction):
                 if self.setup.main['verbose']:
                     tab.print_row(['DELTA','K','ACTION','STATUS'], head=True)    
                 else:
-                    print(' -- Calculate transitions for delta',delta,'at time',k)
+                    print(' -- Calculate transitions for delta',
+                          delta,'at time',k)
                 
-                self.trans['prob'][delta][k] = self._computeProbabilityBounds(tab, k, delta)
+                self.trans['prob'][delta][k] = \
+                    self._computeProbabilityBounds(tab, k, delta)
                 
             # Delete iterable variables
             del k
         del delta
         
         self.time['3_probabilities'] = tocDiff(False)
-        print('Transition probabilities calculated - time:',self.time['3_probabilities'])
+        print('Transition probabilities calculated - time:',
+              self.time['3_probabilities'])
 
     def buildMDP(self):
         '''
-        -----------------------------------------------------------------------
-        CONSTRUCT MDP
-        -----------------------------------------------------------------------
+        Build the (i)MDP and create all respective PRISM files.
+
+        Returns
+        -------
+        model_size : dict
+            Dictionary describing the number of states, choices, and 
+            transitions.
+
         '''
         
         # Initialize MDP object
         self.mdp = mdp(self.setup, self.N, self.abstr)
         
-        if self.setup.mdp['solver'] == 'Python':
-            self.mdp.createPython(self.abstr, self.trans)
+        if self.setup.mdp['prism_model_writer'] == 'explicit':
             
+            # Create PRISM file (explicit way)
+            model_size, self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
+                self.mdp.writePRISM_explicit(self.abstr, self.trans, self.setup.mdp['mode'])   
+        
+        else:
+        
+            # Create PRISM file (default way)
+            self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
+                self.mdp.writePRISM_scenario(self.abstr, self.trans, self.setup.mdp['mode'])  
+              
             model_size = {'States':None,'Choices':None,'Transitions':None}
-            
-        elif self.setup.mdp['solver'] == 'PRISM':
-            
-            if self.setup.mdp['prism_model_writer'] == 'explicit' and self.setup.mdp['horizon'] != 'finite':
-                
-                # Create PRISM file (explicit way)
-                model_size, self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
-                    self.mdp.writePRISM_explicit(self.abstr, self.trans, self.setup.mdp['mode'])   
-            
-            else:
-            
-                # Create PRISM file (default way)
-                self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
-                    self.mdp.writePRISM_scenario(self.abstr, self.trans, self.setup.mdp['mode'], self.setup.mdp['horizon'])  
-                  
-                model_size = {'States':None,'Choices':None,'Transitions':None}
 
         self.time['4_MDPcreated'] = tocDiff(False)
         print('MDP created - time:',self.time['4_MDPcreated'])
@@ -767,28 +883,33 @@ class scenarioBasedAbstraction(Abstraction):
         return model_size
             
     def solveMDP(self):
+        '''
+        Solve the (i)MDP usign PRISM
+
+        Returns
+        -------
+        None.
+
+        '''
+            
+        # Solve the MDP in PRISM (which is called via the terminal)
+        policy_file, vector_file = self._solveMDPviaPRISM()
         
-        # Solve MDP, either internally or via PRISM
-        if self.setup.mdp['solver'] == 'Python':
-        
-            # Solve the MDP using the internal solver
-            self._solveMDPviaPython()
-            
-        elif self.setup.mdp['solver'] == 'PRISM':
-            
-            # Solve the MDP in PRISM (which is called via the terminal)
-            policy_file, vector_file = self._solveMDPviaPRISM()
-            
-            # Load PRISM results back into Python
-            self.loadPRISMresults(policy_file, vector_file)
+        # Load PRISM results back into Python
+        self.loadPRISMresults(policy_file, vector_file)
             
         self.time['5_MDPsolved'] = tocDiff(False)
         print('MDP solved in',self.time['5_MDPsolved'])
-            
-        import time
-        time.sleep(3)
         
     def preparePlots(self):
+        '''
+        Initializing function to prepare for plotting
+
+        Returns
+        -------
+        None.
+
+        '''
         
         # Process results
         self.plot           = dict()
@@ -801,38 +922,21 @@ class scenarioBasedAbstraction(Abstraction):
             self.plot[delta]['N']['start'] = 0
             
             # Convert index to absolute time (note: index 0 is time tau)
-            self.plot[delta]['T']['start'] = int(self.plot[delta]['N']['start'] * self.basemodel.tau)
-            
-            if self.setup.mdp['solver'] == 'Python':
-                self.plot[delta]['N']['half']  = int(np.floor(self.N/2))-1
-                self.plot[delta]['N']['final'] = (self.N-1)- self.model[delta].tau
-                
-                # Convert index to absolute time (note: index 0 is time tau)
-                self.plot[delta]['T']['half']  = int(self.plot[delta]['N']['half'] * self.basemodel.tau)
-                self.plot[delta]['T']['final'] = int(self.plot[delta]['N']['final'] * self.basemodel.tau)
-           
-        
-        
-    def _solveMDPviaPython(self):
-        '''
-        -----------------------------------------------------------------------
-        CONSTRUCT MDP
-        -----------------------------------------------------------------------
-        '''
-        
-        from .mainFunctions import valueIteration
-
-        # Solve MDP via value iteration        
-        solution = valueIteration(self.setup, self.mdp)
-        
-        # Convert result vectors to matrices
-        self.results = dict()
-        
-        self.results['optimal_policy'] = np.reshape(solution['optimal_policy'], (self.N, self.mdp.nr_regions))
-        self.results['optimal_delta'] = np.reshape(solution['optimal_delta'], (self.N, self.mdp.nr_regions))
-        self.results['optimal_reward'] = np.reshape(solution['optimal_reward'], (self.N, self.mdp.nr_regions))
+            self.plot[delta]['T']['start'] = \
+                int(self.plot[delta]['N']['start'] * self.basemodel.tau)
         
     def _solveMDPviaPRISM(self):
+        '''
+        Call PRISM to solve (i)MDP while executing the Python codes.
+
+        Returns
+        -------
+        policy_file : str
+            Name of the file in which the optimal policy is stored.
+        vector_file : str
+            Name of the file in which the optimal rewards are stored.
+
+        '''
         
         import subprocess
 
@@ -846,22 +950,22 @@ class scenarioBasedAbstraction(Abstraction):
         mode = self.setup.mdp['mode']
         java_memory = self.setup.mdp['prism_java_memory']
         
-        print(' -- Running PRISM with specification for mode',mode.upper()+'...')
+        print(' -- Running PRISM with specification for mode',
+              mode.upper()+'...')
     
-        file_prefix     = self.setup.directories['outputFcase'] + "PRISM_" + mode
-        policy_file     = file_prefix + '_policy.csv'
-        vector_file     = file_prefix + '_vector.csv'
+        file_prefix = self.setup.directories['outputFcase'] + "PRISM_" + mode
+        policy_file = file_prefix + '_policy.csv'
+        vector_file = file_prefix + '_vector.csv'
     
         options = ' -ex -exportadv "'+policy_file+'"'+ \
                   ' -exportvector "'+vector_file+'"'
     
         # Switch between PRISM command for explicit model vs. default model
-        if self.setup.mdp['prism_model_writer'] == 'explicit' and self.setup.mdp['horizon'] != 'finite':
+        if self.setup.mdp['prism_model_writer'] == 'explicit':
     
             print(' --- Execute PRISM command for EXPLICIT model description')        
     
-            model_file      = '"'+self.mdp.prism_file+'"'        
-            spec_file       = '"'+self.mdp.spec_file+'"'        
+            model_file      = '"'+self.mdp.prism_file+'"'             
         
             # Explicit model
             command = prism_folder+"bin/prism -javamaxmem "+str(java_memory)+"g "+ \
@@ -881,6 +985,21 @@ class scenarioBasedAbstraction(Abstraction):
         return policy_file, vector_file
         
     def loadPRISMresults(self, policy_file, vector_file):
+        '''
+        Load results from existing PRISM output files.
+
+        Parameters
+        ----------
+        policy_file : str
+            Name of the file to load the optimal policy from.
+        vector_file : str
+            Name of the file to load the optimal policy from.
+
+        Returns
+        -------
+        None.
+
+        '''
         
         import pandas as pd
         
@@ -916,30 +1035,53 @@ class scenarioBasedAbstraction(Abstraction):
         
     def generatePlots(self, delta_value, max_delta):
         '''
-        -----------------------------------------------------------------------
-        GENERATE PLOTS
-        -----------------------------------------------------------------------
+        Generate (optimal reachability probability) plots
+
+        Parameters
+        ----------
+        delta_value : int
+            Value of delta for the model to plot for.
+        max_delta : int
+            Maximum value of delta used for any model.
+
+        Returns
+        -------
+        None.
         '''
         
         print('\nGenerate plots')
         
         if self.abstr['nr_regions'] <= 1000:
         
-            from .postprocessing.createPlots import createProbabilityPlots #, createTimegroupingPlot
+            from .postprocessing.createPlots import createProbabilityPlots
             
             if self.setup.plotting['probabilityPlots']:
-                createProbabilityPlots(self.setup, self.plot[delta_value], self.N, self.model[delta_value], \
+                createProbabilityPlots(self.setup, self.plot[delta_value], 
+                                       self.N, self.model[delta_value],
                                        self.results, self.abstr, self.mc)
                     
         else:
             
-            printWarning("Omit probability plots, since number of regions is too large to see anything anyways...")
+            printWarning("Omit probability plots (nr. of regions too large)")
             
-    def monteCarlo(self, iterations='auto', init_states='auto', init_times='auto'):
+    def monteCarlo(self, iterations='auto', init_states='auto', 
+                   init_times='auto'):
         '''
-        -----------------------------------------------------------------------
-        MONTE CARLO SIMULATION TO VALIDATE THE OBTAINED RESULTS
-        -----------------------------------------------------------------------
+        Perform Monte Carlo simulations to validate the obtained results
+
+        Parameters
+        ----------
+        iterations : str or int, optional
+            Number of Monte Carlo iterations. The default is 'auto'.
+        init_states : str or list, optional
+            Initial states to start simulations from. The default is 'auto'.
+        init_times : str or list, optional
+            Initial time steps to start sims. from. The default is 'auto'.
+
+        Returns
+        -------
+        None.
+
         '''
         
         tocDiff(False)
@@ -960,22 +1102,8 @@ class scenarioBasedAbstraction(Abstraction):
             min_delta = min(self.setup.deltas)
             
             self.setup.montecarlo['init_timesteps'] = [ n for n in self.plot[min_delta]['N'].values() ]
-        
-        # Check if we should limit the set of initial states for the MC sims.        
-        # if self.setup.montecarlo['init_states'] is not False:
-        #     # Determine the index set of the initial states
-        #     self.mc['initS'] = [ i for i,region in self.abstr['P'].items()
-        #         if region['center'][0:(self.basemodel.n-1)] == \
-        #             self.setup.montecarlo['init_states'] ]
             
         n_list = self.setup.montecarlo['init_timesteps']
-        
-        # print(' -- Creating hulls for all regions...')
-        
-        # Create hull for every region in the partition
-        # if 'hull' not in self.abstr['P'][0]:
-        #     for i in self.abstr['P']:
-        #         self.abstr['P'][i]['hull'] = self._defRegionHull(self.abstr['allCorners'][i])
         
         self.mc['results']['reachability_probability'] = \
             np.zeros((self.abstr['nr_regions'],len(n_list)))
@@ -1079,44 +1207,6 @@ class scenarioBasedAbstraction(Abstraction):
                             if self.setup.main['verbose']:
                                 tab.print_row([n0, i, m, k, 'New time step'])
                             
-                            # if k == n0 or self.setup.mdp['solver'] != 'Python':
-                            #     region_likelihood_list = np.arange(self.mdp.nr_regions)
-                            # else:
-                            #     # Determine the likehood of being in a state,
-                            #     # based on previous action taken
-                            #     prev_k = k - delta
-                            #     prev_s = x_region[prev_k] + prev_k * self.mdp.nr_regions
-                                
-                            #     prev_probs = self.mdp.transitions['prob'][prev_k] \
-                            #        [prev_s][(delta, actionToTake[prev_k])]
-                            
-                            #     region_likelihood_list = np.array(prev_probs).argsort()[::-1]
-                            
-                            # Determine to what region the MDP state belongs   
-                            # Default value is -1 (absorbing state)
-                            
-                            # x_region[k] = -1
-                            
-                            # for ii in region_likelihood_list:
-                            #     # If the current true state is in the set of polypoints..                                
-                            #     if in_hull( x[k], self.abstr['P'][ii]['hull'] ):
-                            #         # Save that state is currently in region ii
-                            #         x_region[k] = ii
-                                    
-                            #         # Retreive the action from the policy
-                            #         actionToTake[k] = self.results['optimal_policy'][k, x_region[k]]
-                                        
-                            #         # Print current state of the belief
-                            #         if self.setup.main['verbose']:
-                            #             tab.print_row([n0, i, m, k, 'True state is in region '+str(x_region[k])])
-                                        
-                            #         break
-                                
-                            ### Method below doesn't use convex hulls (= faster)
-                            
-                            # Determine to what region the MDP state belongs   
-                            # Default value is -1 (absorbing state)
-                            
                             # Compute all centers of regions associated with points
                             center_coord = computeRegionCenters(x[k], self.basemodel.setup['partition']).flatten()
                             
@@ -1128,8 +1218,6 @@ class scenarioBasedAbstraction(Abstraction):
                                 actionToTake[k] = self.results['optimal_policy'][k, x_region[k]]
                             else:
                                 x_region[k] = -1
-                            
-                            ###
                             
                             # If current region is the goal state ... 
                             if x_region[k] in self.abstr['goal']:

@@ -1,3 +1,16 @@
+"""
+Implementation of Dryden gust model, used to model turbulence in the UAV case.
+
+This implementation is adapted from the version proposed in PyFly:
+    https://github.com/eivindeb/pyfly
+    
+Citation to original paper:
+    E. Bøhn, E. M. Coates, S. Moe, and T. A. Johansen. Deep reinforcement 
+    learning attitude control of fixed-wing uavs using proximal policy 
+    optimization. In 2019 International Conference on Unmanned Aircraft 
+    Systems (ICUAS), pages 523–533. IEEE, 2019.
+"""
+
 import numpy as np
 from scipy.signal import lti
 import math

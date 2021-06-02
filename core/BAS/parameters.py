@@ -1,18 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed May 12 14:10:11 2021
-
-@author: thom
+Parameters for the Building Automation System (BAS) case. There parameters
+were obtained from the following reference:
+    
+    N. Cauchi and A. Abate.  Benchmarks for cyber-physical systems: A modular 
+    model libraryfor building automation systems. In ADHS, volume 51 of 
+    IFAC-PapersOnLine, pages 49–54. Elsevier, 2018.
+    
+The GitLab repository of these benchmarks can be accessed via the URL below:
+    https://github.com/natchi92/BASBenchmarks
 """
 
 class parameters(object):
     
     def __init__(self):
         
-        # Adopted from the BAC Benchmarks by Cauchi and Abate (2018).
-        # For the original GitHub repository, see:
-        # https://github.com/natchi92/BASBenchmarks
+        """
+        Adopted from the BAC Benchmarks by
+            N. Cauchi and A. Abate.  Benchmarks for cyber-physical systems: A 
+            modular model libraryfor building automation systems. In ADHS, 
+            volume 51 of IFAC-PapersOnLine, pages 49–54. Elsevier, 2018.    
+        
+        For the original GitHub repository, see:
+            https://github.com/natchi92/BASBenchmarks
+        """
         
         #--------- Material properties   -------
         
