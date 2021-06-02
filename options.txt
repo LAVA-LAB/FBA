@@ -1,0 +1,9 @@
+# User options for the scenario-based abstractions Python program
+scenarios.samples = 25
+scenarios.samples_max = 6400
+scenarios.confidence = 0.1
+mdp.prism_folder = /Users/thom/Documents/PRISM/prism-imc-v4/prism/
+mdp.mode = interval
+mdp.prism_model_writer = explicit
+mdp.prism_java_memory = 7
+main.iterative = True

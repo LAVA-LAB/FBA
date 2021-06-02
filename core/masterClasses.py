@@ -15,10 +15,67 @@ Contact e-mail address:     <anonymized>
 ______________________________________________________________________________
 """
 
-import os                       # Import OS to allow creationg of folders
+import os                       # Import OS to allow creation of folders
 import matplotlib.pyplot as plt # Import to generate plos using Pyplot
 import seaborn as sns           # Import Seaborn to plot heat maps
 from datetime import datetime   # Import Datetime to retreive current date/time
+
+def loadOptions(file, setup):
+    '''
+    Load user options from the provided file
+
+    Parameters
+    ----------
+    file : stri
+        Filename to load options from.
+    setup : object
+        Object containing all setup data.
+
+    Returns
+    -------
+    setup
+        Modified setup object.
+
+    '''
+    
+    def str2bool(v):
+        return v.lower() in ("True","true")
+
+    # Read options file
+    if os.path.isfile(file):
+        options = open(file, 'r')
+        for line in options.readlines():
+            if line[0] != '#':
+                line_cut = line.rstrip()
+                frags = line_cut.split(' = ') #' = '.split(line_cut)
+                frags0 = frags[0].split('.') #'.'.split(frags[0])
+                
+                category = frags0[0]
+                key = frags0[1]
+                value = frags[1]
+                
+                try:
+                    value = float(value)
+                    
+                    if value == int(value):
+                        value = int(value)
+                except:
+                    if value in ['True', 'true']:
+                        value = True
+                    elif value in ['False', 'false']:
+                        value = False
+                    else:
+                        value = str(value)
+                
+                category_upd = getattr(setup, category)
+                    
+                category_upd[str(key)] = value
+                    
+                print(' >> Changed "'+str(key)+'" in "'+str(category)+'" to "'+str(value)+'"')
+                    
+                setattr(setup, category, category_upd)
+    
+    return setup
 
 class settings(object):
     

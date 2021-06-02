@@ -21,6 +21,8 @@ import pandas as pd             # Import Pandas to store data in frames
 import numpy as np              # Import Numpy for computations
 import math                     # Import Math for mathematical operations
 import matplotlib.pyplot as plt # Import Pyplot to generate plots
+import os                       # Import OS to allow creation of folders
+
 from inspect import getmembers, isclass # To get list of all available models
 
 # Load main classes and methods
@@ -29,7 +31,7 @@ from core.preprocessing.user_interface import user_choice, \
     load_PRISM_result_file
 from core.commons import printWarning, createDirectory
 from core import modelDefinitions
-from core.masterClasses import settings
+from core.masterClasses import settings, loadOptions
 
 # Retreive a list of all available models
 modelClasses = np.array(getmembers(modelDefinitions, isclass))
@@ -53,20 +55,14 @@ model = modelClasses[application_id, 1]()
 setup = settings(application=model.name)
 setup.deltas = model.setup['deltas']
 
+loadOptions('options.txt', setup)
+
+# %%
+
 # Manual changes in general settings
 setup.setOptions(category='plotting', 
         exportFormats=['pdf'], 
         partitionPlot=False)
-
-setup.setOptions(category='mdp', 
-        prism_java_memory=7,
-        prism_model_writer='explicit', # Is either default or explicit
-        prism_folder="/Users/thom/Documents/PRISM/prism-imc-v4/prism/",
-        mode='interval')
-    
-setup.setOptions(category='scenarios', samples=25, samples_max=6400)
-
-setup.setOptions(category='main', iterative=True)
 
 print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
 
