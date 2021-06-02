@@ -20,6 +20,7 @@ from datetime import datetime   # Import Datetime to get current date/time
 import pandas as pd             # Import Pandas to store data in frames
 import numpy as np              # Import Numpy for computations
 import math                     # Import Math for mathematical operations
+import matplotlib.pyplot as plt # Import Pyplot to generate plots
 from inspect import getmembers, isclass # To get list of all available models
 
 # Load main classes and methods
@@ -63,7 +64,7 @@ setup.setOptions(category='mdp',
         prism_folder="/Users/thom/Documents/PRISM/prism-imc-v4/prism/",
         mode='interval')
     
-setup.setOptions(category='scenarios', samples=6400, samples_max=6400)
+setup.setOptions(category='scenarios', samples=25, samples_max=6400)
 
 setup.setOptions(category='main', iterative=True)
 
@@ -284,6 +285,8 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] \
     
     # Close the Pandas Excel writer and output the Excel file.
     writer.save()
+    
+    plt.close('all')
     
     # If iterative approach is enabled...
     if ScAb.setup.main['iterative'] is True:
