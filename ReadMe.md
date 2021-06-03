@@ -85,6 +85,7 @@ In addition to Python 3 (which is installed on the TACAS 21 virtual machine by d
    ```bash
    $ sudo apt update 
    $ sudo apt install xcb
+   $ sudo apt-get install --reinstall libxcb-xinerama0
    ```
 
 ## 4. Copy artefact files and install packages
@@ -99,6 +100,7 @@ $ pip3 install -r requirements.txt
 
 The following packages will be installed:
 
+- imageio==2.9.0
 - matplotlib==3.2.2
 - numpy==1.18.5
 - pandas==1.0.5
