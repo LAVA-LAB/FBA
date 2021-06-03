@@ -577,7 +577,7 @@ def UAVplots(ScAb, case_id, writer):
         UAVplot2D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value )
     
     elif ScAb.basemodel.modelDim == 3:
-        if ScAb.setup.main['iterative'] is False or ScAb.setup.plot['3D_UAV']:
+        if ScAb.setup.main['iterative'] is False or ScAb.setup.plotting['3D_UAV']:
         
             # Only plot trajectory plot in non-iterative mode (because it pauses the script)
             UAVplot3d_visvis( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value ) 
