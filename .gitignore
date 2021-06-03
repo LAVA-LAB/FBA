@@ -2,10 +2,7 @@
 __pycache__/
 *.pyc
 *.pyo
-
-_ancillary/*
-_dev/*
-_resultInterpretation/*
+*.DS_store
 
 output/*
 !output/readme.txt
