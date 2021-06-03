@@ -57,6 +57,7 @@ In addition to Python 3 (which is installed on the TACAS 21 virtual machine by d
 1. Git - Can be installed using the command:
 
    ```bash
+   $ sudo apt update 
    $ sudo apt install git
    ```
 
@@ -78,6 +79,13 @@ In addition to Python 3 (which is installed on the TACAS 21 virtual machine by d
 
    For more details on using PRISM, we refer to the PRISM documentation on 
    https://www.prismmodelchecker.org
+   
+4. To create the 3D UAV trajectory plots, you may need to install the Qt platform plugin XCB, which can be done using the command:
+
+   ```bash
+   $ sudo apt update 
+   $ sudo apt install xcb
+   ```
 
 ## 4. Copy artefact files and install packages
 
@@ -95,6 +103,7 @@ The following packages will be installed:
 - numpy==1.18.5
 - pandas==1.0.5
 - pyopengl==3.1.5
+- pyside==5.15.2
 - scipy==1.5.0
 - seaborn==0.10.1
 - xlrd==1.2.0
@@ -103,7 +112,11 @@ The following packages will be installed:
 
 ## 5. Set default folders and options
 
-To ensure that PRISM can be found by the script, **you need to modify the PRISM folder** in the  `options.txt` file. Set the PRISM folder to the one where you installed it (the filename should end with `/prism/`, such that it points the folder in which the `bin/` folder is located), and save your changes.
+To ensure that PRISM can be found by the script, **you need to modify the PRISM folder** in the  `options.txt` file. Set the PRISM folder to the one where you installed it (the filename should end with `/prism/`, such that it points the folder in which the `bin/` folder is located), and save your changes. For example, this line of the `options.txt` file can look like this:
+
+```
+/home/<location-to-prism>/prism-imc/prism/
+```
 
 If desired, you may also make other changes in the configuration of the script in the `options.txt` file. An overview of the most important settings is given below:
 
