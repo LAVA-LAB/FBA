@@ -7,5 +7,5 @@ mdp.mode = interval
 mdp.prism_model_writer = explicit
 mdp.prism_java_memory = 7
 main.iterative = True
-plot.partitionPlot = False
-plot.3D_UAV = True
+plotting.partitionPlot = False
+plotting.3D_UAV = True
