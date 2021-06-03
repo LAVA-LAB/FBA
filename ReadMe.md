@@ -10,13 +10,17 @@ Python version: `3.8.3`. For a list of the required Python packages, please see 
 
 ------
 
+
+
 # Table of contents
 
 [TOC]
 
 ------
 
-# Installation and execution
+
+
+# Installation and execution of the main program
 
 We tested the artefact with the *TACAS 21 Artefact Evaluation VM - Ubuntu 20.04 LTS*, which can be downloaded from the links specified in steps 1 and 2 below. Please follow the instructions below if you want to use the artefact within a virtual machine. 
 
@@ -111,18 +115,20 @@ If desired, you may also make other changes in the configuration of the script i
 - `mdp .prism_model_writer` : if “*explicit*”, a PRISM model is created in explicit form. If “*default*”, a standard PRISM model is created. See the PRISM documentation for more details.
 - `mdp.prism_java_memory` : the memory allocated to JAVA when running PRISM. The default value is 1 GB, but when solving large models, this may be increased (e.g. to 8 GB).
 - `main.iterative` : if True, the iterative scheme is enabled; if False, it is disabled
+- `plotting.partitionPlot` : if True, a 2D plot of the partition is created; if False, this plot is not created
+- `plotting.3D_UAV` : if True, the 3D plots for the 3D UAV benchmark are created. Note that **<u>this plot pauses the script until it is closed</u>**. If you do not want this behaviour, you need to disable this option.
 
 ## 6. Run the script
 
 Run the `SBA-RunFile.py` file to execute the program, by typing the command:
 
 ```bash
-$ python RunFile.py
+$ python SBA-RunFile.py
 ```
 
 You will be asked to make a number of choices:
 
-1. The **application** (i.e. model) you want to work with (see below for details on how to add a model). For some applications, you will be asked an additional question, such as the dimension (for the UAV case) and grid size (for the 1-zone BAS case).
+1. The **application** (i.e. benchmark) you want to work with (see below for details on how to add a model). For some applications, you will be asked an additional question, such as the dimension (for the UAV case) and grid size (for the 1-zone BAS case).
 2. Whether you want to run **Monte Carlo** simulations. If chosen to do so, you are asked an additional question to fill in the **number of Monte Carlo simulations** to run.
 3. Whether you want to **start a new abstraction** or **load existing PRISM results**.
 
@@ -143,6 +149,8 @@ For every iteration, a subfolder is created based on the number of samples that 
 - Various plots, showing the appropriate results for the current iteration.
 
 ------
+
+
 
 # Adding or modifying model definitions
 
@@ -188,3 +196,20 @@ where subscript c indicates that these matrices and vectors differ from the ones
 - Using a forward Euler method.
 - Using a Gears discretization method.
 
+------
+
+
+
+# Ancillary scripts
+
+In addition to the main Python program which is executed using `SBA-RunFile.py`, there are two ancillary scripts contained in the folder:
+
+### MatLab code to tabulate probability intervals
+
+We provide a convenient MatLab script, called `Tabulate-RunFile.m`, which can be used to tabulate all possible transition probability intervals for a given value of `N` (total number of samples) and `beta` (the confidence level). 
+
+For every combination of `N` and `beta`, the script creates a `.csv` file, that contains the tabulated transition probability intervals, e.g., named `probabilityTable_N=3200_beta=0.01.csv`. When running the main Python program for these values of `N` and `beta`, the tabulated data is loaded into Python, to compute the transition probability intervals of the interval MDP.
+
+### Python code to create turbulence samples
+
+The Python script `createTurbulenceSamples` can be used to create (non-Gaussian) noise samples for the 3D UAV case. The source code for the Dryden gust model used to create these samples, can be found in `core/UAV/dryden.py`. The script stored the samples in the `input/` folder, in a `.csv` file that contains the number of samples is contain in its name, e.g., `TurbulenceNoise_N=100.csv`.

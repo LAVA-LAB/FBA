@@ -1,3 +1,12 @@
+% Function to compute scenario-based transition probabilities for the
+% proposed iMDP abstraction.
+%
+% Code based on the procedure proposed in:
+%
+%   S. Garatti and M. Campi. Risk and complexity in scenario optimization. 
+%   Mathematical Programming, pages 1–37, 2019.
+% -------------------------------------------------------------------------
+
 function [epsL, epsU] = epsLU(k,N,bet)
     % Compute inverse beta function to guide initial choie of t1 and t2
     alphaL = betaincinv(bet,k,N-k+1); 

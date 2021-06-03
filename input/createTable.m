@@ -16,7 +16,7 @@ function out = createTable(N,beta)
         beta_list(k+1) = beta;
     end
 
-    filename = "probabilityTable_N="+N+"_beta="+beta+".csv";
+    filename = "input/probabilityTable_N="+N+"_beta="+beta+".csv";
     writematrix([N_list' k_list' beta_list' epsL' epsU'], filename) 
     
 end
