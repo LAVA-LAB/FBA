@@ -99,14 +99,14 @@ The following packages will be installed:
 
 ## 5. Set default folders and options
 
-To ensure that PRISM can be found by the script, **you need to modify the PRISM folder** in the  `options.txt` file. Set the PRISM folder to the one where you installed it (the filename should end with `/prism/`), and save your changes.
+To ensure that PRISM can be found by the script, **you need to modify the PRISM folder** in the  `options.txt` file. Set the PRISM folder to the one where you installed it (the filename should end with `/prism/`, such that it points the folder in which the `bin/` folder is located), and save your changes.
 
 If desired, you may also make other changes in the configuration of the script in the `options.txt` file. An overview of the most important settings is given below:
 
 - `scenarios.samples` : the number of samples the script uses in the first iteration
 - `scenarios.samples_max` : the number of samples after which the iterative scheme is terminated
 - `scenarios.confidence` : the confidence level used for computing transition probability intervals
-- `mdp.prism_folder` : folder where PRISM is located; should end with /prism/ (the folder in which the bin/ folder is located)
+- `mdp.prism_folder` : folder where PRISM is located; should end with `/prism/` (the folder in which the `bin/` folder is located)
 - `mdp.mode` : if “*interval*”, an interval MDP is created. If “*estimate*”, a regular MDP is created
 - `mdp .prism_model_writer` : if “*explicit*”, a PRISM model is created in explicit form. If “*default*”, a standard PRISM model is created. See the PRISM documentation for more details.
 - `mdp.prism_java_memory` : the memory allocated to JAVA when running PRISM. The default value is 1 GB, but when solving large models, this may be increased (e.g. to 8 GB).
