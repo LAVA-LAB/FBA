@@ -60,9 +60,6 @@ class robot(master.LTI_master):
         self.setup['specification']['goal']           = [[0, 0]]
         self.setup['specification']['critical']       = [[]]
         
-        # Covariance values of the process noise (w) and measurement noise (v)
-        self.setup['noise']['sigma_w_value'] = 0.15
-        
         # Discretization step size
         self.tau = 1.0
         
@@ -98,14 +95,15 @@ class robot(master.LTI_master):
             self.r          = len(self.C)
         
         # Disturbance matrix
-        self.W  = np.array([[3.5],[-0.7]])
+        self.Q  = np.array([[3.5],[-0.7]])
         
         # Determine system dimensions
         self.n = np.size(self.A,1)
         self.p = np.size(self.B,1)
         
+        # Covariance of the process noise
         self.noise = dict()
-        self.noise['w_cov'] = np.eye(np.size(self.A,1))*self.setup['noise']['sigma_w_value']
+        self.noise['w_cov'] = np.eye(np.size(self.A,1))*0.15
 
         
 class UAV(master.LTI_master):
@@ -183,9 +181,6 @@ class UAV(master.LTI_master):
         else:
             print('No valid dimension for the drone model was provided')
             sys.exit()
-
-        # Covariance values of the process noise (w) and measurement noise (v)
-        self.setup['noise']['sigma_w_value'] = 0.15
         
         # Discretization step size
         self.tau = 1.0
@@ -221,7 +216,7 @@ class UAV(master.LTI_master):
             self.B  = scipy.linalg.block_diag(Bblock, Bblock, Bblock)
             
             # Disturbance matrix
-            self.W  = np.array([[0],[0],[0],[0],[0],[0]])
+            self.Q  = np.array([[0],[0],[0],[0],[0],[0]])
             
             if observer:
                 # Observation matrix
@@ -233,7 +228,7 @@ class UAV(master.LTI_master):
             self.B  = scipy.linalg.block_diag(Bblock, Bblock)
         
             # Disturbance matrix
-            self.W  = np.array([[0],[0],[0],[0]])
+            self.Q  = np.array([[0],[0],[0],[0]])
         
             if observer:
                 # Observation matrix
@@ -244,9 +239,10 @@ class UAV(master.LTI_master):
         self.n = np.size(self.A,1)
         self.p = np.size(self.B,1)
 
+        # Covariance of the process noise
         self.noise = dict()
-        self.noise['w_cov'] = np.eye(np.size(self.A,1))*self.setup['noise']['sigma_w_value']
-   
+        self.noise['w_cov'] = np.eye(np.size(self.A,1))*0.15
+           
     def setTurbulenceNoise(self, N):
         '''
         Set the turbulence noise samples for N samples
@@ -403,11 +399,11 @@ class building_2room(master.LTI_master):
                 ])
         
         # Discretize model with respect to time
-        # self.A, self.B, self.W = discretizeGearsMethod(A_cont, B_cont, W_cont, self.tau)
+        # self.A, self.B, self.Q = discretizeGearsMethod(A_cont, B_cont, W_cont, self.tau)
         
         self.A = np.eye(4) + self.tau*A_cont
         self.B = B_cont*self.tau
-        self.W = W_cont*self.tau
+        self.Q = W_cont*self.tau
         
         # Determine system dimensions
         self.n = np.size(self.A,1)
@@ -418,7 +414,7 @@ class building_2room(master.LTI_master):
                 
         self.A_cont = A_cont
         self.B_cont = B_cont
-        self.W_cont = W_cont
+        self.Q_cont = W_cont
         
 class building_1room(master.LTI_master):
     
@@ -527,11 +523,11 @@ class building_1room(master.LTI_master):
                 ])
         
         # Discretize model with respect to time
-        # self.A, self.B, self.W = discretizeGearsMethod(A_cont, B_cont, W_cont, self.tau)
+        # self.A, self.B, self.Q = discretizeGearsMethod(A_cont, B_cont, W_cont, self.tau)
         
         self.A = np.eye(2) + self.tau*A_cont
         self.B = B_cont*self.tau
-        self.W = W_cont*self.tau
+        self.Q = W_cont*self.tau
         
         # Determine system dimensions
         self.n = np.size(self.A,1)

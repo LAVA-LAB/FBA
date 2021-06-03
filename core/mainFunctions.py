@@ -305,7 +305,7 @@ def makeModelFullyActuated(model, manualDimension='auto', observer=False):
     B_hat  = np.concatenate([ np.linalg.matrix_power(model.A, (dim-i)) \
                                       @ model.B for i in range(1,dim+1) ], 1)
     
-    W_hat  = sum([ np.linalg.matrix_power(model.A, (dim-i)) @ model.W
+    Q_hat  = sum([ np.linalg.matrix_power(model.A, (dim-i)) @ model.Q
                        for i in range(1,dim+1) ])
     
     w_sigma_hat  = sum([ np.array( np.linalg.matrix_power(model.A, (dim-i) ) \
@@ -316,8 +316,8 @@ def makeModelFullyActuated(model, manualDimension='auto', observer=False):
     # Overwrite original system matrices
     model.A               = A_hat
     model.B               = B_hat
-    model.W               = W_hat
-    model.W_flat          = W_hat.flatten()
+    model.Q               = Q_hat
+    model.Q_flat          = Q_hat.flatten()
     
     model.noise['w_cov']  = w_sigma_hat
     

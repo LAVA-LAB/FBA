@@ -96,7 +96,7 @@ class Abstraction(object):
         
         if np.linalg.matrix_rank(np.eye(model.n) - model.A) == model.n:
             model.equilibrium = np.linalg.inv(np.eye(model.n) - model.A) @ \
-                (model.B @ uAvg + model.W_flat)
+                (model.B @ uAvg + model.Q_flat)
         
         return model
     
@@ -291,7 +291,7 @@ class Abstraction(object):
             # Calculate inverse image of the current extreme control input
             x_inv_area[i,:] = self.model[delta].A_inv @ \
                 (self.model[delta].B @ np.array(list_elem).T + 
-                 self.model[delta].W_flat)  
+                 self.model[delta].Q_flat)  
     
         return x_inv_area
     
@@ -502,7 +502,7 @@ class Abstraction(object):
                 print('x_inv_area:',x_inv_area)
                 print('origin shift:',A_inv_d)       
                 print('targetPoint:',targetPoint,' - drift:',
-                      self.model[delta].W_flat)
+                      self.model[delta].Q_flat)
                 
                 predecessor_set = A_inv_d - x_inv_area
                 
@@ -1266,10 +1266,10 @@ class scenarioBasedAbstraction(Abstraction):
         
                                 # Reconstruct the control input required to achieve this target point
                                 # Note that we do not constrain the control input; we already know that a suitable control exists!
-                                u[k] = np.array(self.model[delta].B_pinv @ ( x_goal[k+delta] - self.model[delta].A @ x[k] - self.model[delta].W_flat ))
+                                u[k] = np.array(self.model[delta].B_pinv @ ( x_goal[k+delta] - self.model[delta].A @ x[k] - self.model[delta].Q_flat ))
                                 
                                 # Implement the control into the physical (unobservable) system
-                                x_hat = self.model[delta].A @ x[k] + self.model[delta].B @ u[k] + self.model[delta].W_flat
+                                x_hat = self.model[delta].A @ x[k] + self.model[delta].B @ u[k] + self.model[delta].Q_flat
                                 
                                 if self.setup.scenarios['gaussian'] is True:
                                     # Use Gaussian process noise
