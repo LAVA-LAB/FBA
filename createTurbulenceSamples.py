@@ -63,7 +63,7 @@ def createTurbulenceSamples(N, length):
 #############################
     
 # Main settings
-N = 1000         # Number of samples
+N = 100000         # Number of samples
 length = 1000   # Length of trajectories used to compute samples
 
 # Create samples

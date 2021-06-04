@@ -832,7 +832,10 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
     fig.position.h = 600
     im = vv.getframe(vv.gcf())
     ax.SetView({'zoom':0.042, 'elevation':25, 'azimuth':-35})
-    vv.screenshot('UAV_paths_screenshot.png', sf=3, bg='w', ob=vv.gcf())
+    
+    filename = setup.directories['outputFcase'] + 'UAV_paths_screenshot.png'
+    
+    vv.screenshot(filename, sf=3, bg='w', ob=vv.gcf())
     app.Run()
     
 def reachabilityHeatMap(ScAb):
