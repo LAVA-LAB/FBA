@@ -66,9 +66,10 @@ In addition to Python 3 (which is installed on the TACAS 21 virtual machine by d
 2. Java Development Kit (required to run PRISM) - Can be installed using the commands:
 
    ```bash
-   $ sudo apt update 
    $ sudo apt install default-jdk
    ```
+
+   
 
 3. PRISM (iMDP branch) - In the desired PRISM installation folder, run the following commands:
 
@@ -83,7 +84,6 @@ In addition to Python 3 (which is installed on the TACAS 21 virtual machine by d
 4. To create the 3D UAV trajectory plots, you may need to install a number of libraries requires for Qt, which can be done using the command:
 
    ```bash
-   $ sudo apt update 
    $ sudo apt-get install -y libdbus-1-3 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0                          libxcb-render-util0 libxcb-xinerama0 libxcb-xinput0 libxcb-xfixes0
    ```
 
