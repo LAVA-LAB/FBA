@@ -80,12 +80,11 @@ In addition to Python 3 (which is installed on the TACAS 21 virtual machine by d
    For more details on using PRISM, we refer to the PRISM documentation on 
    https://www.prismmodelchecker.org
    
-4. To create the 3D UAV trajectory plots, you may need to install the Qt platform plugin XCB, which can be done using the command:
+4. To create the 3D UAV trajectory plots, you may need to install a number of libraries requires for Qt, which can be done using the command:
 
    ```bash
    $ sudo apt update 
-   $ sudo apt install xcb
-   $ sudo apt-get install --reinstall libxcb-xinerama0
+   $ sudo apt-get install -y libdbus-1-3 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0                          libxcb-render-util0 libxcb-xinerama0 libxcb-xinput0 libxcb-xfixes0
    ```
 
 ## 4. Copy artefact files and install packages
@@ -105,7 +104,7 @@ The following packages will be installed:
 - numpy==1.18.5
 - pandas==1.0.5
 - pyopengl==3.1.5 (needed for visvis)
-- pyside2==5.15.2 (needed for visvis)
+- pyqt5==5.15.4 (needed for visvis)
 - scipy==1.5.0
 - seaborn==0.10.1
 - xlrd==1.2.0
@@ -128,7 +127,7 @@ If desired, you may also make other changes in the configuration of the script i
 - `mdp.prism_folder` : folder where PRISM is located; should end with `/prism/` (the folder in which the `bin/` folder is located)
 - `mdp.mode` : if “*interval*”, an interval MDP is created. If “*estimate*”, a regular MDP is created
 - `mdp .prism_model_writer` : if “*explicit*”, a PRISM model is created in explicit form. If “*default*”, a standard PRISM model is created. See the PRISM documentation for more details.
-- `mdp.prism_java_memory` : the memory allocated to Java when running PRISM. The default value is 1 GB, but when solving large models, this may be increased (the benchmarks in the paper all ran on a machine with 32 GB of memory allocated to Java).
+- `mdp.prism_java_memory` : the memory allocated to Java when running PRISM. The default value is 2 GB, but when solving large models, this may be increased (the benchmarks in the paper all ran on a machine with 32 GB of memory allocated to Java).
 - `main.iterative` : if True, the iterative scheme is enabled; if False, it is disabled
 - `plotting.partitionPlot` : if True, a 2D plot of the partition is created; if False, this plot is not created
 - `plotting.3D_UAV` : if True, the 3D plots for the 3D UAV benchmark are created. Note that **<u>this plot pauses the script until it is closed</u>**. If you do not want this behaviour, you need to disable this option.
