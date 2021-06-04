@@ -110,8 +110,9 @@ if setup.main['newRun'] is True:
 
 if setup.main['iterative'] is True and setup.main['newRun'] is False:
     printWarning("Iterative scheme cannot be combined with loading existing "+
-                 "PRISM results, so switch to new run")
-    setup.main['newRun'] = True
+                 "PRISM results, so iterative scheme disabled")
+    setup.main['iterative'] = False
+    setup.scenarios['samples_max'] = setup.scenarios['samples']
 
 # Create the main object for the current instance
 ScAb = scenarioBasedAbstraction(setup=setup, basemodel=model)
@@ -305,18 +306,19 @@ while ScAb.setup.scenarios['samples'] <= ScAb.setup.scenarios['samples_max'] \
 
 # %%
 
-# Save overall data in Excel (for all iterations combined)
-output_file = ScAb.setup.directories['outputF'] + \
-    ScAb.setup.time['datetime'] + '_iterative_results.xlsx'
-
-# Create a Pandas Excel writer using XlsxWriter as the engine
-writer = pd.ExcelWriter(output_file, engine='xlsxwriter')
-
-for key,df in iterative_results.items():
-    df.to_excel(writer, sheet_name=str(key))
-
-# Close the Pandas Excel writer and output the Excel file.
-writer.save()
+if ScAb.setup.main['iterative'] and ScAb.setup.main['newRun']:
+    # Save overall data in Excel (for all iterations combined)
+    output_file = ScAb.setup.directories['outputF'] + \
+        ScAb.setup.time['datetime'] + '_iterative_results.xlsx'
+    
+    # Create a Pandas Excel writer using XlsxWriter as the engine
+    writer = pd.ExcelWriter(output_file, engine='xlsxwriter')
+    
+    for key,df in iterative_results.items():
+        df.to_excel(writer, sheet_name=str(key))
+    
+    # Close the Pandas Excel writer and output the Excel file.
+    writer.save()
     
 datestring_end = datetime.now().strftime("%m-%d-%Y %H-%M-%S")             
 print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')

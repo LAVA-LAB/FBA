@@ -442,7 +442,8 @@ def policyPlot(setup, model, results, abstr):
     
     for axi in (ax.xaxis, ax.yaxis):
         for tic in axi.get_minor_ticks():
-            tic.tick1On = tic.tick2On = False
+            tic.tick1line.set_visible(False)
+            tic.tick2line.set_visible(False)
     
     # plt.grid(which='major', color='#CCCCCC', linewidth=0.3)
     plt.grid(which='minor', color='#CCCCCC', linewidth=0.3)
@@ -636,7 +637,8 @@ def UAVplot2D(setup, model, abstr, traces, cut_value):
     
     for axi in (ax.xaxis, ax.yaxis):
         for tic in axi.get_minor_ticks():
-            tic.tick1On = tic.tick2On = False
+            tic.tick1line.set_visible(False)
+            tic.tick2line.set_visible(False)
     
     # plt.grid(which='major', color='#CCCCCC', linewidth=0.3)
     plt.grid(which='minor', color='#CCCCCC', linewidth=0.3)

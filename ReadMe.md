@@ -100,17 +100,17 @@ $ pip3 install -r requirements.txt
 
 The following packages will be installed:
 
-- imageio==2.9.0
+- imageio==2.9.0 (needed for visvis)
 - matplotlib==3.2.2
 - numpy==1.18.5
 - pandas==1.0.5
-- pyopengl==3.1.5
-- pyside==5.15.2
+- pyopengl==3.1.5 (needed for visvis)
+- pyside2==5.15.2 (needed for visvis)
 - scipy==1.5.0
 - seaborn==0.10.1
 - xlrd==1.2.0
 - xlsxwriter==1.2.9
-- visvis==1.12.4
+- visvis==1.12.4 (to create 3D UAV plots)
 
 ## 5. Set default folders and options
 
@@ -128,7 +128,7 @@ If desired, you may also make other changes in the configuration of the script i
 - `mdp.prism_folder` : folder where PRISM is located; should end with `/prism/` (the folder in which the `bin/` folder is located)
 - `mdp.mode` : if “*interval*”, an interval MDP is created. If “*estimate*”, a regular MDP is created
 - `mdp .prism_model_writer` : if “*explicit*”, a PRISM model is created in explicit form. If “*default*”, a standard PRISM model is created. See the PRISM documentation for more details.
-- `mdp.prism_java_memory` : the memory allocated to JAVA when running PRISM. The default value is 1 GB, but when solving large models, this may be increased (e.g. to 8 GB).
+- `mdp.prism_java_memory` : the memory allocated to Java when running PRISM. The default value is 1 GB, but when solving large models, this may be increased (the benchmarks in the paper all ran on a machine with 32 GB of memory allocated to Java).
 - `main.iterative` : if True, the iterative scheme is enabled; if False, it is disabled
 - `plotting.partitionPlot` : if True, a 2D plot of the partition is created; if False, this plot is not created
 - `plotting.3D_UAV` : if True, the 3D plots for the 3D UAV benchmark are created. Note that **<u>this plot pauses the script until it is closed</u>**. If you do not want this behaviour, you need to disable this option.
@@ -144,6 +144,8 @@ $ python SBA-RunFile.py
 You will be asked to make a number of choices:
 
 1. The **application** (i.e. benchmark) you want to work with (see below for details on how to add a model). For some applications, you will be asked an additional question, such as the dimension (for the UAV case) and grid size (for the 1-zone BAS case).
+   - **<u>Note 1:</u>** the 3D UAV and 2-zone BAS applications are quite memory intense, and could take about an hour to run (depending on your machine). If you want to run a smaller case, please consider choosing the 2D UAV or 1-zone BAS application.
+   - **<u>Note 2:</u>** If you experience problems with creating the **3D trajectory plots** for the 3D UAV application, you can disable it by setting `plotting.3D_UAV = False` in the `options.txt` file (see Section 5).
 2. Whether you want to run **Monte Carlo** simulations. If chosen to do so, you are asked an additional question to fill in the **number of Monte Carlo simulations** to run.
 3. Whether you want to **start a new abstraction** or **load existing PRISM results**.
 
