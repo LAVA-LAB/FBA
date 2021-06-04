@@ -258,7 +258,7 @@ class UAV(master.LTI_master):
 
         '''
         
-        samples = np.genfromtxt('input/TurbulenceNoise_N=100000.csv', delimiter=',') / 5
+        samples = np.genfromtxt('input/TurbulenceNoise_N=1000.csv', delimiter=',')
         
         self.noise['samples'] = samples
         
