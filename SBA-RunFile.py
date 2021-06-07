@@ -62,7 +62,11 @@ loadOptions('options.txt', setup)
 # Manual changes in general settings
 setup.setOptions(category='plotting', 
         exportFormats=['pdf'], 
-        partitionPlot=False)
+        partitionPlot=True,
+        partitionPlot_plotHull=True)
+
+setup.setOptions(category='main',
+        skewed=True)
 
 print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
 

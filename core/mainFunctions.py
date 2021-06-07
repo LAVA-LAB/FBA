@@ -123,14 +123,20 @@ def computeScenarioBounds_sparse(setup, partition, abstr, trans, samples):
     # Initialize counts array
     counts = dict()
     
-    centers = computeRegionCenters(samples, partition)
+    # Transform samples back to hypercubic partition
+    samplesCubic = samples @ abstr['basis_vectors_inv']
+    
+    # Compute to which regions the samples belong
+    centers = computeRegionCenters(samplesCubic, partition)
     
     for s in range(Nsamples):
         
         key = tuple(centers[s])
         
         if key in abstr['allCenters']:
+            
             idx = abstr['allCenters'][ key ]
+            
             if idx in counts:
                 counts[idx] += 1
             else:

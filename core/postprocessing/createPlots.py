@@ -28,7 +28,7 @@ from ..commons import printWarning, mat_to_vec, cm2inch
 
 
 def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
-                        abstr, allOriginPointsNested, predecessor_set):
+                        abstr, allVerticesNested, predecessor_set):
     
     '''
     
@@ -50,7 +50,7 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
         Main dictionary of the LTI system model.
     abstr : dict
         Dictionay containing all information of the finite-state abstraction.
-    allOriginPointsNested : list
+    allVerticesNested : list
         Nested lists containing all origin points of all regions.
     predecessor_set : array
         Vertices of the predecessor set
@@ -74,10 +74,8 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
     else:
         plt.xlabel('$x_'+str(i0)+'$', labelpad=0)
         plt.ylabel('$x_'+str(i1)+'$', labelpad=-10)
-        
-    #### Partition plot v1
     
-    for k,poly in enumerate(allOriginPointsNested):
+    for k,poly in enumerate(allVerticesNested):
 
         if model.n <= 2 or ( \
             abstr['P'][k]['center'][j0] == model.setup['partition']['origin'][j0] and \
@@ -93,6 +91,11 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
             ax.plot(polyMat[hull.vertices,i0], polyMat[hull.vertices,i1], lw=1)
             ax.plot([polyMat[hull.vertices[0],i0], polyMat[hull.vertices[-1],i0]], \
                       [polyMat[hull.vertices[0],i1], polyMat[hull.vertices[-1],i1]], lw=1)
+        
+    ax.plot(0.3946, 4.5967, 'ro', lw=1)
+    ax.plot(-0.2611, 4.1995, 'ro', lw=1)
+    ax.plot(-1.7577, 3.2995, 'bo', lw=1)
+    ax.plot(-2.1345, 2.6954, 'go', lw=1)
         
     for k,target_point in enumerate(abstr['target']['d']):
           
@@ -124,7 +127,7 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
         fig = plt.figure(figsize=cm2inch(5.33, 4))
         ax = fig.add_subplot(111, projection="3d")
         
-        for k,poly in enumerate(allOriginPointsNested):
+        for k,poly in enumerate(allVerticesNested):
     
             # Convert list to numpy array
             poly = np.array(poly)

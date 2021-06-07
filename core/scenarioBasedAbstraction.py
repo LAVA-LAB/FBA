@@ -216,14 +216,9 @@ class Abstraction(object):
         
         return Delaunay(points, qhull_options='QJ')
     
-    def _createTargetPoints(self, cornerPoints):
+    def _createTargetPoints(self):
         '''
         Create target points, based on the vertices given
-
-        Parameters
-        ----------
-        cornerPoints : list
-            Vertices to compute target points for.
 
         Returns
         -------
@@ -398,7 +393,7 @@ class Abstraction(object):
         
         nr_corners = 2**self.basemodel.n
         
-        printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
+        printEvery = 1 #min(100, max(1, int(self.abstr['nr_actions']/10)))
         
         # Check if dimension of control area equals that if the state vector
         dimEqual = self.model[delta].p == self.basemodel.n
@@ -409,6 +404,8 @@ class Abstraction(object):
             # Use preferred method: map back the skewed image to squares
             
             basis_vectors = self._defBasisVectors(delta)   
+            
+            print('Basis vectors:',basis_vectors)
             
             for i,v1 in enumerate(basis_vectors):
                 for j,v2 in enumerate(basis_vectors):
@@ -598,10 +595,36 @@ class Abstraction(object):
         print('Creating actions (target points)...')
         
         self.abstr['allCorners']     = self._defAllCorners()
+        
+        ##########
+        
+        if self.setup.main['skewed']:
+        
+            self.abstr['basis_vectors'] = self._defBasisVectors(max(self.setup.deltas)) * 2
+            
+            for i in range(self.abstr['nr_regions']):
+                
+                # Compute skewed center region
+                self.abstr['P'][i]['center'] = self.abstr['P'][i]['center'] @ \
+                    self.abstr['basis_vectors']
+                
+                # Compute skewed vertices of region
+                self.abstr['allCorners'][i,:,:] = self.abstr['allCorners'][i] @ \
+                    self.abstr['basis_vectors']
+        
+        else:
+            
+            # If skewed partition disabled, just define identity matrix
+            self.abstr['basis_vectors'] = np.eye(self.basemodel.n)
+            
+        self.abstr['basis_vectors_inv'] = np.linalg.inv( self.abstr['basis_vectors'] )
+        
+        ##########
+        
         self.abstr['allCornersFlat'] = np.concatenate(self.abstr['allCorners'])
         
         # Create the target point for every action (= every state)
-        self.abstr['target'] = self._createTargetPoints(self.abstr['allCorners'])
+        self.abstr['target'] = self._createTargetPoints()
         self.abstr['nr_actions'] = len(self.abstr['target']['d'])
         
         print(' -- Number of actions (target points):',self.abstr['nr_actions'])
@@ -1208,7 +1231,8 @@ class scenarioBasedAbstraction(Abstraction):
                                 tab.print_row([n0, i, m, k, 'New time step'])
                             
                             # Compute all centers of regions associated with points
-                            center_coord = computeRegionCenters(x[k], self.basemodel.setup['partition']).flatten()
+                            center_coord = computeRegionCenters(x[k] @ self.abstr['basis_vectors_inv'], 
+                                                    self.basemodel.setup['partition']).flatten()
                             
                             if tuple(center_coord) in self.abstr['allCenters']:
                                 # Save that state is currently in region ii

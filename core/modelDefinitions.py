@@ -48,8 +48,8 @@ class robot(master.LTI_master):
         self.setup['control']['limits']['uMax'] =  [5]
         
         # Partition size
-        self.setup['partition']['nrPerDim']  = [21, 21]
-        self.setup['partition']['width']     = [2, 2]
+        self.setup['partition']['nrPerDim']  = [11,7] #[31, 11]
+        self.setup['partition']['width']     = [0.1, 0.1]
         self.setup['partition']['origin']    = [0, 0]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
@@ -95,7 +95,7 @@ class robot(master.LTI_master):
             self.r          = len(self.C)
         
         # Disturbance matrix
-        self.Q  = np.array([[3.5],[-0.7]])
+        self.Q  = np.array([[0],[0]]) #np.array([[3.5],[-0.7]])
         
         # Determine system dimensions
         self.n = np.size(self.A,1)
