@@ -76,7 +76,7 @@ def user_choice(title, items):
             
     return choice, choice_id
 
-def load_PRISM_result_file(output_folder, model_name, N):
+def load_PRISM_result_file(mode_prefix, output_folder, model_name, N):
     '''
     Lets the user load results from a set of existing PRISM files
 
@@ -106,7 +106,7 @@ def load_PRISM_result_file(output_folder, model_name, N):
     folder_list = next(os.walk(output_folder))
                        
     for folder in folder_list[1]:
-        if folder.startswith('ScAb_'+model_name):
+        if folder.startswith(mode_prefix+'_'+model_name):
         
             run_folder = output_folder + folder
             subfolder_list = next(os.walk(run_folder))

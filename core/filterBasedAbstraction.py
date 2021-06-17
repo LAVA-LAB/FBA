@@ -20,19 +20,21 @@ import csv                      # Import to create/load CSV files
 import sys                      # Allows to terminate the code at some point
 import os                       # Import OS to allow creationg of folders
 import random                   # Import to use random variables
+from scipy.stats import mvn
 
-from .mainFunctions import computeScenarioBounds_sparse, \
-    computeRegionCenters, cubic2skew, skew2cubic
-from .commons import tic, ticDiff, tocDiff, table, printWarning
+from .mainFunctions import computeScenarioBounds_sparse, defineDistances, \
+    computeRegionCenters, cubic2skew, skew2cubic, kalmanFilter
+from .commons import tic, ticDiff, tocDiff, table, printWarning, \
+    floor_decimal, extractRowBlockDiag
 
 from .createMDP import mdp
 
 from .abstraction import Abstraction
 
-class scenarioBasedAbstraction(Abstraction):
+class filterBasedAbstraction(Abstraction):
     def __init__(self, setup, basemodel):
         '''
-        Initialize scenario-based abstraction (ScAb) object
+        Initialize filter-based abstraction (FiAb) object
 
         Parameters
         ----------
@@ -63,42 +65,15 @@ class scenarioBasedAbstraction(Abstraction):
         
         Abstraction.definePartition(self)
         
-    def _loadScenarioTable(self, tableFile):
-        '''
-        Load tabulated bounds on the transition probabilities (computed using
-        the scenario approach).
-
-        Parameters
-        ----------
-        tableFile : str
-            File from which to load the table.
-
-        Returns
-        -------
-        memory : dict
-            Dictionary containing all loaded probability bounds / intervals.
-
-        '''
+        # Compute array of all region centers
+        allCentersArray = np.array([region['center'] for region in self.abstr['P'].values()])
         
-        memory = dict()
-        
-        if not os.path.isfile(tableFile):
-            sys.exit('ERROR: the following table file does not exist:'+
-                     str(tableFile))
-        
-        with open(tableFile, newline='') as csvfile:
-            reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
-            for i,row in enumerate(reader):
-                
-                strSplit = row[0].split(',')
-                
-                key = tuple( [int(float(i)) for i in strSplit[0:2]] + 
-                             [float(strSplit[2])] )
-                
-                value = [float(i) for i in strSplit[-2:]]
-                memory[key] = value
-                    
-        return memory
+        for a in range(self.abstr['nr_actions']):
+            
+            self.abstr['P'][a]['distances'] = self.abstr['target']['d'][a] - allCentersArray
+            
+            # self.abstr['P'][a]['distances'] = defineDistances(self.abstr['P'], 
+            #                                   self.abstr['target']['d'][a])
         
     def _computeProbabilityBounds(self, tab, k, delta):
         '''
@@ -119,49 +94,301 @@ class scenarioBasedAbstraction(Abstraction):
             Dictionary containing the computed transition probabilities.
 
         '''
-        
-        prob = dict()
 
         printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
 
-        # For every action (i.e. target point)
-        for a in range(self.abstr['nr_actions']):
+        nr_decimals = 5
+
+        # Determine minimum action time step width
+        min_delta = min(self.basemodel.setup['deltas'])
             
-            # Check if action a is available in any state at all
-            if len(self.abstr['actions_inv'][delta][a]) > 0:
-                    
-                prob[a] = dict()
+        if self.setup.lic['enabled'] and delta > min_delta and k not in ['steadystate']:
+
+            print(' -- Copy transition probabilities for',delta,'at time',k)
             
-                mu = self.abstr['target']['d'][a]
-                Sigma = self.model[delta].noise['w_cov']
-                
-                if self.setup.scenarios['gaussian'] is True:
-                    # Compute Gaussian noise samples
-                    samples = np.random.multivariate_normal(mu, Sigma, 
-                                    size=self.setup.scenarios['samples'])
+            # Copy transition probabilities
+            prob = self.abstr['prob'][min_delta][k]
                     
-                else:
-                    # Determine non-Gaussian noise samples (relative from 
-                    # target point)
-                    samples = mu + np.array(
-                        random.choices(self.model[delta].noise['samples'], 
-                        k=self.setup.scenarios['samples']) )
+        else:
+            
+            # (Re)initialize probability memory dictionary
+            prob = dict()
+            if k == 'steadystate':
+                prob_worst_mem = dict()
+                prob_best_mem  = dict()
+            else:
+                prob_mem = dict()
+            
+            # For every action (i.e. target point)
+            for a in range(self.abstr['nr_actions']):
+            
+                # Check if action a is available in any state at all
+                if len(self.abstr['actions_inv'][delta][a]) > 0 or \
+                    self.setup.lic['enabled']:
+                        
+                    prob[a] = dict()
+
+                    # Determine mean and covariance of distribution                
+                    mu = self.abstr['target']['d'][a]
+                    if k == 'steadystate':
+                        Sigma_worst = self.km[delta]['steady']['worst']
+                        Sigma_best = self.km[delta]['steady']['best']
+                        
+                        # Transform samples back to hypercubic partition
+                        muCubic = skew2cubic(mu, self.abstr)
+                        SigmaCubic_worst = self.abstr['basis_vectors_inv'].T @ Sigma_worst @ self.abstr['basis_vectors_inv'] 
+                        SigmaCubic_best = self.abstr['basis_vectors_inv'].T @ Sigma_best @ self.abstr['basis_vectors_inv'] 
+                        
+                        probs_worst_all = np.zeros(self.abstr['nr_regions'])
+                        probs_best_all  = np.zeros(self.abstr['nr_regions'])
+                        
+                        # For every possible resulting region
+                        for j in range(self.abstr['nr_regions']):
+                        
+                            # Compute the vector difference between the target point
+                            # and the current region
+                            coord_distance = tuple(self.abstr['P'][a]['distances'][j])
+                            coord_distance_min = tuple(-self.abstr['P'][a]['distances'][j])    
+                        
+                            # Check if we already calculated this one
+                            if coord_distance in prob_worst_mem and not self.setup.main['skewed']:
+                                
+                                # If so, copy from previous
+                                probs_worst_all[j] = prob_worst_mem[coord_distance]
+                                probs_best_all[j]  = prob_best_mem[coord_distance]
+                                
+                            elif coord_distance_min in prob_worst_mem and not self.setup.main['skewed']:
+                                
+                                # If so, copy from previous
+                                probs_worst_all[j] = prob_worst_mem[coord_distance_min]
+                                probs_best_all[j]  = prob_best_mem[coord_distance_min]
+                                
+                            else:    
+                        
+                                probs_worst_all[j] = floor_decimal(mvn.mvnun(
+                                    self.abstr['P'][j]['low'], self.abstr['P'][j]['upp'],
+                                    muCubic, SigmaCubic_worst)[0], 4)
+                                
+                                probs_best_all[j] = floor_decimal(mvn.mvnun(
+                                    self.abstr['P'][j]['low'], self.abstr['P'][j]['upp'],
+                                    muCubic, SigmaCubic_best)[0], 4)
+                                
+                                if not self.setup.main['skewed']:
+                                    prob_worst_mem[coord_distance] = probs_worst_all[j]
+                                    prob_best_mem[coord_distance]  = probs_best_all[j]
+                        
+                        nonzero_idxs = np.array([idx for idx,(ub1,ub2) in enumerate(zip(probs_worst_all, probs_best_all)) 
+                                                 if ub1 > 0 or ub2 > 0])
+                        
+                        probs_lb = np.minimum(probs_worst_all[nonzero_idxs], probs_best_all[nonzero_idxs]) \
+                                    - self.setup.belief['interval_margin']
+                        probs_ub = np.maximum(probs_worst_all[nonzero_idxs], probs_best_all[nonzero_idxs]) \
+                                    + self.setup.belief['interval_margin']
+                        
+                        # Compute deadlock probability intervals
+                        deadlock_lb = 1-sum( np.maximum(probs_worst_all[nonzero_idxs], probs_best_all[nonzero_idxs]) ) \
+                                    - self.setup.belief['interval_margin']
+                        deadlock_ub = 1-sum( np.minimum(probs_worst_all[nonzero_idxs], probs_best_all[nonzero_idxs]) ) \
+                                    + self.setup.belief['interval_margin']
+                                    
+                        probs_approx_all = np.mean((probs_worst_all, probs_best_all), axis=0)
+                        
+                    else:
+                        Sigma = self.km[delta]['cov_tilde'][k+delta]
+                        
+                        # Transform samples back to hypercubic partition
+                        muCubic = skew2cubic(mu, self.abstr)
+                        SigmaCubic = self.abstr['basis_vectors_inv'].T @ Sigma @ self.abstr['basis_vectors_inv'] 
                     
-                # Transform samples back to hypercubic partition
-                samplesCubic = skew2cubic(samples, self.abstr)
+                        probs_approx_all = np.zeros(self.abstr['nr_regions'])
+                        
+                        # For every possible resulting region
+                        for j in range(self.abstr['nr_regions']):
+                        
+                            # Compute the vector difference between the target point
+                            # and the current region
+                            coord_distance = tuple(self.abstr['P'][a]['distances'][j])
+                            coord_distance_min = tuple(-self.abstr['P'][a]['distances'][j])    
+                        
+                            # Check if we already calculated this one
+                            if coord_distance in prob_mem and not self.setup.main['skewed']:
+                                
+                                # If so, copy from previous
+                                probs_approx_all[j] = prob_mem[coord_distance]
+                                
+                            elif coord_distance_min in prob_mem and not self.setup.main['skewed']:
+                                
+                                # If so, copy from previous
+                                probs_approx_all[j] = prob_mem[coord_distance_min]
+                                
+                            else:
+                        
+                                probs_approx_all[j] = floor_decimal(mvn.mvnun(
+                                    self.abstr['P'][j]['low'], self.abstr['P'][j]['upp'],
+                                    muCubic, SigmaCubic)[0], 4)
+                                
+                                if not self.setup.main['skewed']:
+                                    prob_mem[coord_distance] = probs_approx_all[j]
+                        
+                        nonzero_idxs = np.array([idx for idx,ub in enumerate(probs_approx_all) if ub > 0])
+                        
+                        probs_lb = probs_approx_all[nonzero_idxs] - self.setup.belief['interval_margin']
+                        probs_ub = probs_approx_all[nonzero_idxs] + self.setup.belief['interval_margin']
                     
-                prob[a] = computeScenarioBounds_sparse(self.setup, 
-                      self.basemodel.setup['partition'], 
-                      self.abstr, self.trans, samplesCubic)
-                
-                # Print normal row in table
-                if a % printEvery == 0:
-                    nr_transitions = len(prob[a]['interval_idxs'])
-                    tab.print_row([delta, k, a, 
-                       'Probabilities computed (transitions: '+
-                       str(nr_transitions)+')'])
+                        # Compute deadlock probability intervals
+                        deadlock_lb = 1-sum(probs_approx_all[nonzero_idxs]) - self.setup.belief['interval_margin']
+                        deadlock_ub = 1-sum(probs_approx_all[nonzero_idxs]) + self.setup.belief['interval_margin']
+                    
+                    # Create interval strings (only entries for prob > 0)
+                    interval_strings = ["["+
+                                      str(floor_decimal(max(1e-4, lb),nr_decimals))+","+
+                                      str(floor_decimal(min(1,    ub),nr_decimals))+"]"
+                                      for lb,ub in zip(probs_lb, probs_ub)]
+                    
+                    deadlock_string = '['+ \
+                       str(floor_decimal(max(1e-4, deadlock_lb),nr_decimals))+','+ \
+                       str(floor_decimal(min(1,    deadlock_ub),nr_decimals))+']'
+                    
+                    # Create approximate prob. strings (only entries for prob > 0)
+                    approx_strings = [str(p) for p in probs_approx_all[nonzero_idxs]]
+                    
+                    # Compute approximate deadlock transition probabilities
+                    deadlock_approx = np.round(1-sum(probs_approx_all[nonzero_idxs]), nr_decimals)
+                    
+                    prob[a] = {
+                        'interval_strings': interval_strings,
+                        'interval_idxs': nonzero_idxs,
+                        'approx_strings': approx_strings,
+                        'approx_idxs': nonzero_idxs,
+                        'deadlock_interval_string': deadlock_string,
+                        'deadlock_approx': deadlock_approx,
+                    }
+                    
+                    # Print normal row in table
+                    if a % printEvery == 0:
+                        nr_transitions = len(prob[a]['interval_idxs'])
+                        tab.print_row([delta, k, a, 
+                           'Probabilities computed (transitions: '+
+                           str(nr_transitions)+')'])
                 
         return prob
+    
+    def KalmanPrediction(self):
+        '''
+        Perform the Kalman filter update step (for the progression of the
+        covariance matrix)
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        # Column widths for tabular prints
+        if self.setup.main['verbose']:
+            col_width = [8,8,46]
+            tab = table(col_width)
+        
+        self.km = dict()
+        
+        if self.setup.lic['enabled']:
+            # Determine maximum threshold for measure on covariance over time
+            maxA = self.setup.lic['LICMaxA']
+            minA = self.setup.lic['LICMinA']
+            self.km['maxEllipseSize'] = [i*minA + (1-i)*maxA for i in np.arange(0,1,1/self.N)]
+            
+        for delta in self.setup.deltas:
+            
+            # Print header row
+            if self.setup.main['verbose']:
+                tab.print_row(['DELTA','K','STATUS'], head=True)
+            
+            # Kalman filter list definitions
+            self.km[delta]                      = dict()
+            self.km[delta]['waiting_time']      = dict()
+            self.km[delta]['cov_pred']          = [None] * (self.N+delta)
+            self.km[delta]['cov']               = [None] * (self.N+delta)
+            self.km[delta]['cov_tilde']         = [None] * (self.N+delta)
+            self.km[delta]['cov_tilde_measure'] = [None] * (self.N+delta)
+            self.km[delta]['max_error_bound']   = [None] * (self.N+delta)
+            self.km[delta]['K_gain']            = [None] * (self.N+delta)
+            
+            # Initial belief of Kalman filter
+            for i in range(delta):
+                self.km[delta]['cov'][i] = np.eye(self.basemodel.n)*self.setup.belief['cov0']
+            
+            # For every time step in the finite horizon
+            for k in range(self.N):
+                
+                # Set waiting time to zeor by default
+                self.km[delta]['waiting_time'][k]  = 0
+                
+                # Perform Kalman filter prediction at current time k for delta-type action
+                self.km[delta]['cov_pred'][k+delta], self.km[delta]['K_gain'][k+delta], \
+                self.km[delta]['cov_tilde'][k+delta], self.km[delta]['cov'][k+delta], \
+                self.km[delta]['cov_tilde_measure'][k+delta], self.km[delta]['max_error_bound'][k+delta] = \
+                    kalmanFilter(self.model[delta], self.km[delta]['cov'][k])
+                
+                # If local information controller is active
+                if self.setup.lic['enabled']:
+                    # Then, a "worst-case" covariance matrix is used, and we
+                    # force the actual covariance always to below this
+                    
+                    # Set the worst-case covariance matrix to the circle with  
+                    # radius equal to the maximum measure (i.e. threshold)
+                    self.km[delta]['cov_tilde'][k+delta] = \
+                        np.eye(self.basemodel.n) * self.km['maxEllipseSize'][k]**2
+                    
+                    # If the actual measure if above the threshold, perform a
+                    # "wait action" (if possible) to reduce it
+                    if self.km[delta]['cov_tilde_measure'][k+delta] > self.km['maxEllipseSize'][k]:
+                        # Reduce the uncertainty after taking the action, until it's below the threshold
+                        
+                        # Set waiting time equal to the worst-case possible
+                        self.km[delta]['waiting_time'][k] = self.N
+                        
+                        # Determine how much stabilization time is needed to steer below the threshold
+                        gamma = 0
+                        delta_lowest = min(self.setup.deltas)
+                                                
+                        # Copy the measure on the covariance matrix
+                        covStabilize = self.km[delta]['cov'][k+delta]
+                        covMeasure = self.km[delta]['cov_tilde_measure'][k+delta]
+                        
+                        flag = False
+                        
+                        while not flag and k + delta + gamma*delta_lowest < self.N:
+                            if covMeasure <= self.km['maxEllipseSize'][k+gamma*delta_lowest]:
+                                # If measure is now below threshold, we're okay
+                                flag = True
+                                if self.setup.main['verbose']:
+                                    print('Have to wait',gamma,'steps of width',delta_lowest)
+                                    print('Measure is reduced to',covMeasure)
+                                
+                                # Store how long we must wait to reduce uncertainty
+                                self.km[delta]['waiting_time'][k] = np.copy(gamma)
+                                
+                            else:
+                                if self.setup.main['verbose']:
+                                    print('Covariance measure too high at',covMeasure,'; gamma is',gamma)
+                                
+                                # Increment gamma value (stabilization time)
+                                gamma += 1
+                                
+                                # Determine resulting covariance after wait
+                                _, _, _, covStabilize, covMeasure = \
+                                    kalmanFilter(self.model[delta_lowest], covStabilize)                            
+                    
+                # Print normal row in table
+                if self.setup.main['verbose']:
+                    tab.print_row([delta, k, 'Measure '+
+                       str(np.round(self.km[delta]['cov_tilde_measure'][k+delta], decimals=3))])
+                
+            # Delete iterable variable
+            del k
+        del delta
+        
+        
     
     def defActions(self):
         '''
@@ -193,17 +420,11 @@ class scenarioBasedAbstraction(Abstraction):
         
         self.trans = {'prob': {}}
                 
-        print(' -- Loading scenario approach table...')
-        
-        tableFile = 'input/probabilityTable_N='+ \
-                        str(self.setup.scenarios['samples'])+'_beta='+ \
-                        str(self.setup.scenarios['confidence'])+'.csv'
-        
-        # Load scenario approach table
-        self.trans['memory'] = self._loadScenarioTable(tableFile = tableFile)
-        
         # Retreive type of horizon
-        k_range = [0]
+        if self.setup.mdp['k_steady_state'] == None:
+            k_range = np.arange(self.N)
+        else:
+            k_range = np.arange(self.setup.mdp['k_steady_state'])
         
         print('Computing transition probabilities...')
         
@@ -226,6 +447,19 @@ class scenarioBasedAbstraction(Abstraction):
                 
             # Delete iterable variables
             del k
+            
+            # If 2-phase time horizon is enabled...
+            if self.setup.mdp['k_steady_state'] != None:
+                
+                # Print header row
+                if self.setup.main['verbose']:
+                    tab.print_row(['DELTA','K','ACTION','STATUS'], head=True)    
+                    
+                # Compute worst/best-case transition probabilities in 
+                # steady-state portion of the time horizon
+                self.trans['prob'][delta][self.setup.mdp['k_steady_state']] = \
+                    self._computeProbabilityBounds(tab, 'steadystate', delta)
+            
         del delta
         
         self.time['3_probabilities'] = tocDiff(False)
@@ -393,12 +627,18 @@ class scenarioBasedAbstraction(Abstraction):
         # Flip policy upside down (PRISM generates last time step at top!)
         policy_all = np.flipud(policy_all)
         
+        policy_all = extractRowBlockDiag(policy_all, self.abstr['nr_regions'])
+        
         self.results['optimal_policy'] = np.zeros(np.shape(policy_all))
         self.results['optimal_delta'] = np.zeros(np.shape(policy_all))
         self.results['optimal_reward'] = np.zeros(np.shape(policy_all))
         
         rewards_k0 = pd.read_csv(vector_file, header=None).iloc[1:].to_numpy()
-        self.results['optimal_reward'][0,:] = rewards_k0.flatten()
+        
+        reward_rows = int((len(rewards_k0)-1)/self.abstr['nr_regions'] + 1)
+        
+        self.results['optimal_reward'][0:reward_rows, :] = \
+            np.reshape(rewards_k0, (reward_rows, self.abstr['nr_regions']))
         
         # Split the optimal policy between delta and action itself
         for i,row in enumerate(policy_all):
@@ -568,9 +808,9 @@ class scenarioBasedAbstraction(Abstraction):
                                             
                         # Initialize the current simulation
                         
-                        x = np.zeros((self.N, self.basemodel.n))
-                        x_goal = [None]*self.N
-                        x_region = np.zeros(self.N).astype(int)
+                        x = np.zeros((self.N+1, self.basemodel.n))
+                        x_goal = [None]*(self.N+1)
+                        x_region = np.zeros(self.N+1).astype(int)
                         u = [None]*self.N
                         
                         actionToTake = np.zeros(self.N).astype(int)

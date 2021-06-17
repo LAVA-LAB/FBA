@@ -22,7 +22,7 @@ import sys                      # Import to allow terminating the script
 from .preprocessing.define_gears_order import discretizeGearsMethod        
 import core.preprocessing.user_interface as ui
 import core.masterClasses as master
-from .commons import setStateBlock
+from .commons import setStateBlock, defSpecBlock
 
 class robot(master.LTI_master):
     
@@ -48,8 +48,8 @@ class robot(master.LTI_master):
         self.setup['control']['limits']['uMax'] =  [5]
         
         # Partition size
-        self.setup['partition']['nrPerDim']  = [11,7] #[31, 11]
-        self.setup['partition']['width']     = [0.1, 0.1]
+        self.setup['partition']['nrPerDim']  = [21, 21] #[11, 11] 
+        self.setup['partition']['width']     = [2, 2] #[0.25, 0.25]
         self.setup['partition']['origin']    = [0, 0]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
@@ -57,14 +57,15 @@ class robot(master.LTI_master):
         self.setup['targets']['domain']      = 'auto'
 
         # Specification information
-        self.setup['specification']['goal']           = [[0, 0]]
+        self.setup['specification']['goal']           = setStateBlock(self.setup['partition'], a=[0], b=[0])
+        self.setup['specification']['goal']     = defSpecBlock(self.setup['partition'], a=[-1,1], b=[-1,1])
         self.setup['specification']['critical']       = [[]]
         
         # Discretization step size
         self.tau = 1.0
         
         # Step-bound on property
-        self.setup['endTime'] = 64 
+        self.setup['endTime'] = 64
     
     def setModel(self, observer):
         '''
@@ -89,10 +90,14 @@ class robot(master.LTI_master):
         self.B  = np.array([[self.tau**2/2],
                                 [self.tau]])
         
+        self.noise = dict()
+        
         if observer:
             # Observation matrix
             self.C          = np.array([[1, 0]])
             self.r          = len(self.C)
+            
+            self.noise['v_cov'] = np.eye(np.size(self.C,0))*0.15
         
         # Disturbance matrix
         self.Q  = np.array([[0],[0]]) #np.array([[3.5],[-0.7]])
@@ -102,7 +107,6 @@ class robot(master.LTI_master):
         self.p = np.size(self.B,1)
         
         # Covariance of the process noise
-        self.noise = dict()
         self.noise['w_cov'] = np.eye(np.size(self.A,1))*0.15
 
         
@@ -136,7 +140,7 @@ class UAV(master.LTI_master):
             self.setup['control']['limits']['uMax'] = [4, 4]        
     
             # Partition size
-            self.setup['partition']['nrPerDim']  = [7,4,7,4]
+            self.setup['partition']['nrPerDim']  = [9,5,9,5]
             self.setup['partition']['width']     = [2, 1.5, 2, 1.5]
             self.setup['partition']['origin']    = [0, 0, 0, 0]
             
@@ -145,11 +149,11 @@ class UAV(master.LTI_master):
             self.setup['targets']['domain']      = 'auto'
             
             # Specification information
-            self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=[6], b='all', c=[6], d='all')
+            self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=[-4,-6], b=[None], c=[4,6], d=[None])
             
             self.setup['specification']['critical'] = np.vstack((
-                setStateBlock(self.setup['partition'], a=[-6,-4,-2], b='all', c=[2], d='all'),
-                setStateBlock(self.setup['partition'], a=[4,6], b='all', c=[-6,-4], d='all')
+                setStateBlock(self.setup['partition'], a=[-6,-4], b=[None], c=[-2,0,2], d=[None]),
+                setStateBlock(self.setup['partition'], a=[4,6], b=[None], c=[-6,-4], d=[None])
                 ))
             
         elif self.modelDim == 3:
@@ -168,14 +172,14 @@ class UAV(master.LTI_master):
             self.setup['targets']['domain']      = 'auto'
             
             # Specification information
-            self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=[4,6], b='all', c=[4,6], d='all', e=[4,6], f='all')
+            self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=[4,6], b=[None], c=[4,6], d=[None], e=[4,6], f=[None])
             
             self.setup['specification']['critical']   = np.vstack((
-                setStateBlock(self.setup['partition'], a=[-2,0], b='all', c=[2,4,6], d='all', e='all', f='all'),
-                setStateBlock(self.setup['partition'], a=[-6,-4], b='all', c=[4,6], d='all', e=[4,6], f='all'),
-                setStateBlock(self.setup['partition'], a=[-2,0], b='all', c=[-6,-4,-2,0], d='all', e=[-6,-4], f='all'),
-                setStateBlock(self.setup['partition'], a=[2,4,6], b='all', c=[-6,-4], d='all', e=[-6,-4], f='all'),
-                setStateBlock(self.setup['partition'], a=[-2,0], b='all', c=[-6,-4], d='all', e=[-2,0], f='all')
+                setStateBlock(self.setup['partition'], a=[-2,0], b=[None], c=[2,4,6], d=[None], e=[None], f=[None]),
+                setStateBlock(self.setup['partition'], a=[-6,-4], b=[None], c=[4,6], d=[None], e=[4,6], f=[None]),
+                setStateBlock(self.setup['partition'], a=[-2,0], b=[None], c=[-6,-4,-2,0], d=[None], e=[-6,-4], f=[None]),
+                setStateBlock(self.setup['partition'], a=[2,4,6], b=[None], c=[-6,-4], d=[None], e=[-6,-4], f=[None]),
+                setStateBlock(self.setup['partition'], a=[-2,0], b=[None], c=[-6,-4], d=[None], e=[-2,0], f=[None])
                 ))
         
         else:
@@ -186,7 +190,7 @@ class UAV(master.LTI_master):
         self.tau = 1.0
         
         # Step-bound on property
-        self.setup['endTime'] = 64 
+        self.setup['endTime'] = 32
 
     def setModel(self, observer):
         '''
@@ -202,6 +206,8 @@ class UAV(master.LTI_master):
         None.
 
         '''
+        
+        self.noise = dict()
         
         # State transition matrix
         Ablock = np.array([[1, self.tau],
@@ -223,6 +229,8 @@ class UAV(master.LTI_master):
                 self.C          = np.array([[1, 0, 1, 0, 1, 0]])
                 self.r          = len(self.C)
                 
+                self.noise['v_cov'] = np.eye(np.size(self.C,0))*0.15
+                
         else:
             self.A  = scipy.linalg.block_diag(Ablock, Ablock)
             self.B  = scipy.linalg.block_diag(Bblock, Bblock)
@@ -235,13 +243,14 @@ class UAV(master.LTI_master):
                 self.C          = np.array([[1, 0, 1, 0]])
                 self.r          = len(self.C)
             
+                self.noise['v_cov'] = np.eye(np.size(self.C,0))*0.3
+            
         # Determine system dimensions
         self.n = np.size(self.A,1)
         self.p = np.size(self.B,1)
 
         # Covariance of the process noise
-        self.noise = dict()
-        self.noise['w_cov'] = np.eye(np.size(self.A,1))*0.15
+        self.noise['w_cov'] = np.eye(np.size(self.A,1))*0.015
            
     def setTurbulenceNoise(self, N):
         '''
@@ -306,7 +315,7 @@ class building_2room(master.LTI_master):
         self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], 
                                     a=[20], 
                                     b=[20], 
-                                    c='all', d='all')
+                                    c=[None], d=[None])
         
         self.setup['specification']['critical'] = [[]]
 
@@ -445,7 +454,7 @@ class building_1room(master.LTI_master):
             
         if gridType == 0:
             nrPerDim = [19, 20]
-            width = [0.2, 0.2]
+            width = [0.2, 0.4]
             goal = [21]
         else:
             nrPerDim = [40, 40]
@@ -462,7 +471,7 @@ class building_1room(master.LTI_master):
         self.setup['targets']['domain']      = 'auto'
         
         # Specification information
-        self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=goal, b='all')
+        self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=goal, b=[None])
         
         self.setup['specification']['critical'] = [[]]
         

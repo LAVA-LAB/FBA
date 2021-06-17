@@ -85,17 +85,13 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
             polyMat = np.array(poly)
             
             # Plot partitions and label
-            ax.text(abstr['P'][k]['center'][i0], abstr['P'][k]['center'][i1], k, \
-                      verticalalignment='center', horizontalalignment='center' )  
+            if k in abstr['goal']:
+                ax.text(abstr['P'][k]['center'][i0], abstr['P'][k]['center'][i1], k, \
+                          verticalalignment='center', horizontalalignment='center' )  
             hull = ConvexHull(polyMat, qhull_options='QJ')
             ax.plot(polyMat[hull.vertices,i0], polyMat[hull.vertices,i1], lw=1)
             ax.plot([polyMat[hull.vertices[0],i0], polyMat[hull.vertices[-1],i0]], \
                       [polyMat[hull.vertices[0],i1], polyMat[hull.vertices[-1],i1]], lw=1)
-        
-    ax.plot(0.3946, 4.5967, 'ro', lw=1)
-    ax.plot(-0.2611, 4.1995, 'ro', lw=1)
-    ax.plot(-1.7577, 3.2995, 'bo', lw=1)
-    ax.plot(-2.1345, 2.6954, 'go', lw=1)
         
     for k,target_point in enumerate(abstr['target']['d']):
           
@@ -498,13 +494,13 @@ def policyPlot(setup, model, results, abstr):
         
     plt.show()
         
-def UAVplots(ScAb, case_id, writer):
+def UAVplots(Ab, case_id, writer):
     '''
     Create the trajectory plots for the UAV benchmarks
 
     Parameters
     ----------
-    ScAb : abstraction instance
+    Ab : abstraction instance
         Full object of the abstraction being plotted for
     case_id : int
         Index for the current abstraction iteration
@@ -522,44 +518,44 @@ def UAVplots(ScAb, case_id, writer):
     from core.commons import setStateBlock
     
     # Determine desired state IDs
-    if ScAb.basemodel.name == 'UAV':
-        if ScAb.basemodel.modelDim == 2:
-            x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-6], b=[0], c=[-6], d=[0])
+    if Ab.basemodel.name == 'UAV':
+        if Ab.basemodel.modelDim == 2:
+            x_init = setStateBlock(Ab.basemodel.setup['partition'], a=[-6], b=[0], c=[-6], d=[0])
             
             cut_value = np.zeros(2)
-            for i,d in enumerate(range(1, ScAb.basemodel.n, 2)):
-                if ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 != round( ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 ):
+            for i,d in enumerate(range(1, Ab.basemodel.n, 2)):
+                if Ab.basemodel.setup['partition']['nrPerDim'][d]/2 != round( Ab.basemodel.setup['partition']['nrPerDim'][d]/2 ):
                     cut_value[i] = 0
                 else:
-                    cut_value[i] = ScAb.basemodel.setup['partition']['width'][d] / 2                
+                    cut_value[i] = Ab.basemodel.setup['partition']['width'][d] / 2                
             
-        elif ScAb.basemodel.modelDim == 3:
-            x_init = setStateBlock(ScAb.basemodel.setup['partition'], a=[-6], b=[0], c=[6], d=[0], e=[-6], f=[0])
+        elif Ab.basemodel.modelDim == 3:
+            x_init = setStateBlock(Ab.basemodel.setup['partition'], a=[-6], b=[0], c=[6], d=[0], e=[-6], f=[0])
             
             cut_value = np.zeros(3)
-            for i,d in enumerate(range(1, ScAb.basemodel.n, 2)):
-                if ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 != round( ScAb.basemodel.setup['partition']['nrPerDim'][d]/2 ):
+            for i,d in enumerate(range(1, Ab.basemodel.n, 2)):
+                if Ab.basemodel.setup['partition']['nrPerDim'][d]/2 != round( Ab.basemodel.setup['partition']['nrPerDim'][d]/2 ):
                     cut_value[i] = 0
                 else:
-                    cut_value[i] = ScAb.basemodel.setup['partition']['width'][d] / 2          
+                    cut_value[i] = Ab.basemodel.setup['partition']['width'][d] / 2          
             
     # Compute all centers of regions associated with points
-    x_init_centers = computeRegionCenters(np.array(x_init), ScAb.basemodel.setup['partition'])
+    x_init_centers = computeRegionCenters(np.array(x_init), Ab.basemodel.setup['partition'])
     
     # Filter to only keep unique centers
     x_init_unique = np.unique(x_init_centers, axis=0)
     
-    state_idxs = [ScAb.abstr['allCenters'][tuple(c)] for c in x_init_unique 
-                                   if tuple(c) in ScAb.abstr['allCenters']]
+    state_idxs = [Ab.abstr['allCentersCubic'][tuple(c)] for c in x_init_unique 
+                                   if tuple(c) in Ab.abstr['allCentersCubic']]
     
     print(' -- Perform simulations for initial states:',state_idxs)
     
-    ScAb.setup.montecarlo['init_states'] = state_idxs
-    ScAb.setup.montecarlo['iterations'] = 10000
-    ScAb.monteCarlo()
+    Ab.setup.montecarlo['init_states'] = state_idxs
+    Ab.setup.montecarlo['iterations'] = 10000
+    Ab.monteCarlo()
     
-    PRISM_reach = ScAb.results['optimal_reward'][0,state_idxs]
-    empirical_reach = ScAb.mc['results']['reachability_probability'][state_idxs]
+    PRISM_reach = Ab.results['optimal_reward'][0,state_idxs]
+    empirical_reach = Ab.mc['results']['reachability_probability'][state_idxs]
     
     print('Probabilistic reachability (PRISM): ',PRISM_reach)
     print('Empirical reachability (Monte Carlo):',empirical_reach)
@@ -573,18 +569,18 @@ def UAVplots(ScAb, case_id, writer):
     traces = []
     for i in state_idxs:
         for j in range(itersToShow):
-            traces += [ScAb.mc['traces'][0][i][j]]
+            traces += [Ab.mc['traces'][0][i][j]]
     
-    min_delta = int(min(ScAb.setup.deltas))
+    min_delta = int(min(Ab.setup.deltas))
     
-    if ScAb.basemodel.modelDim == 2:
-        UAVplot2D( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value )
+    if Ab.basemodel.modelDim == 2:
+        UAVplot2D( Ab.setup, Ab.model[min_delta], Ab.abstr, traces, cut_value )
     
-    elif ScAb.basemodel.modelDim == 3:
-        if ScAb.setup.main['iterative'] is False or ScAb.setup.plotting['3D_UAV']:
+    elif Ab.basemodel.modelDim == 3:
+        if Ab.setup.main['iterative'] is False or Ab.setup.plotting['3D_UAV']:
         
             # Only plot trajectory plot in non-iterative mode (because it pauses the script)
-            UAVplot3d_visvis( ScAb.setup, ScAb.model[min_delta], ScAb.abstr, traces, cut_value ) 
+            UAVplot3d_visvis( Ab.setup, Ab.model[min_delta], Ab.abstr, traces, cut_value ) 
     
     return performance_df
     
@@ -710,7 +706,7 @@ def UAVplot2D(setup, model, abstr, traces, cut_value):
         interpolated_points = interpolator(alpha)
         
         # Plot trace
-        plt.plot(*interpolated_points.T, '-', color="blue", linewidth=1);
+        plt.plot(*interpolated_points.T, '-', color="blue", linewidth=1)
         # plt.plot(x_values, y_values, color="blue")
     
     # Set tight layout
@@ -843,13 +839,13 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
     vv.screenshot(filename, sf=3, bg='w', ob=vv.gcf())
     app.Run()
     
-def reachabilityHeatMap(ScAb):
+def reachabilityHeatMap(Ab):
     '''
     Create heat map for the BAS benchmarks
 
     Parameters
     ----------
-    ScAb : abstraction instance
+    Ab : abstraction instance
         Full object of the abstraction being plotted for
 
     Returns
@@ -861,70 +857,123 @@ def reachabilityHeatMap(ScAb):
     import seaborn as sns
     from ..mainFunctions import definePartitions
 
-    if ScAb.basemodel.name == 'building_2room':
+    if Ab.basemodel.n == 2:
+
+        x_nr = Ab.basemodel.setup['partition']['nrPerDim'][0]
+        y_nr = Ab.basemodel.setup['partition']['nrPerDim'][1]
+        
+        cut_centers = definePartitions(Ab.basemodel.n, [x_nr, y_nr], 
+               Ab.basemodel.setup['partition']['width'], 
+               Ab.basemodel.setup['partition']['origin'], onlyCenter=True)        
+
+    elif Ab.basemodel.name == 'building_2room':
     
-        x_nr = ScAb.basemodel.setup['partition']['nrPerDim'][0]
-        y_nr = ScAb.basemodel.setup['partition']['nrPerDim'][1]
+        x_nr = Ab.basemodel.setup['partition']['nrPerDim'][0]
+        y_nr = Ab.basemodel.setup['partition']['nrPerDim'][1]
         
-        cut_centers = definePartitions(ScAb.basemodel.n, [x_nr, y_nr, 1, 1], 
-               ScAb.basemodel.setup['partition']['width'], 
-               ScAb.basemodel.setup['partition']['origin'], onlyCenter=True)
+        cut_centers = definePartitions(Ab.basemodel.n, [x_nr, y_nr, 1, 1], 
+               Ab.basemodel.setup['partition']['width'], 
+               Ab.basemodel.setup['partition']['origin'], onlyCenter=True)
         
-    elif ScAb.basemodel.name == 'building_1room':
-    
-        x_nr = ScAb.basemodel.setup['partition']['nrPerDim'][0]
-        y_nr = ScAb.basemodel.setup['partition']['nrPerDim'][1]
+    elif Ab.basemodel.name == 'UAV':
         
-        cut_centers = definePartitions(ScAb.basemodel.n, [x_nr, y_nr], 
-               ScAb.basemodel.setup['partition']['width'], 
-               ScAb.basemodel.setup['partition']['origin'], onlyCenter=True)
+        x_nr = Ab.basemodel.setup['partition']['nrPerDim'][0]
+        y_nr = Ab.basemodel.setup['partition']['nrPerDim'][2]
         
-    elif ScAb.basemodel.name == 'UAV':
+        cut_centers = definePartitions(Ab.basemodel.n, [x_nr, 1, y_nr, 1], 
+               Ab.basemodel.setup['partition']['width'], 
+               Ab.basemodel.setup['partition']['origin'], onlyCenter=True)
+                
+    else:
         
-        x_nr = ScAb.basemodel.setup['partition']['nrPerDim'][0]
-        y_nr = ScAb.basemodel.setup['partition']['nrPerDim'][2]
-        
-        cut_centers = definePartitions(ScAb.basemodel.n, [x_nr, 1, y_nr, 1], 
-               ScAb.basemodel.setup['partition']['width'], 
-               ScAb.basemodel.setup['partition']['origin'], onlyCenter=True)
-                          
+        printWarning('No appropriate model detected')
+        return
+          
     cut_values = np.zeros((x_nr, y_nr))
-    cut_coords = np.zeros((x_nr, y_nr, ScAb.basemodel.n))
+    cut_coords = np.zeros((x_nr, y_nr, Ab.basemodel.n))
     
-    cut_idxs = [ScAb.abstr['allCenters'][tuple(c)] for c in cut_centers 
-                                   if tuple(c) in ScAb.abstr['allCenters']]              
+    cut_idxs = [Ab.abstr['allCentersCubic'][tuple(c)] for c in cut_centers 
+                                   if tuple(c) in Ab.abstr['allCentersCubic']]              
     
     for i,(idx,center) in enumerate(zip(cut_idxs, cut_centers)):
         
         j = i % y_nr
         k = i // y_nr
         
-        cut_values[k,j] = ScAb.results['optimal_reward'][0,idx]
+        cut_values[k,j] = Ab.results['optimal_reward'][0,idx]
         cut_coords[k,j,:] = center
     
-    cut_df = pd.DataFrame( cut_values, index=cut_coords[:,0,0], columns=cut_coords[0,:,1] )
+    if Ab.basemodel.name == 'UAV':
+        cut_df = pd.DataFrame( cut_values, index=cut_coords[:,0,0], columns=cut_coords[0,:,2] )
+    else:
+        cut_df = pd.DataFrame( cut_values, index=cut_coords[:,0,0], columns=cut_coords[0,:,1] )
     
     fig = plt.figure(figsize=cm2inch(9, 8))
-    ax = sns.heatmap(cut_df.T, cmap="jet", #YlGnBu
-             vmin=0, vmax=1)
-    ax.figure.axes[-1].yaxis.label.set_size(20)
-    ax.invert_yaxis()
+    
+    # If regions are non-skewed, use standard Seaborn heatmap.
+    # If regions are skewed, we need to build the heatmap ourselves.
+    if not Ab.setup.main['skewed']:
+        ax = sns.heatmap(cut_df.T, cmap="jet", #YlGnBu
+                 vmin=0, vmax=1)
+        
+        ax.invert_yaxis()
+        ax.figure.axes[-1].yaxis.label.set_size(20)
+    
+    elif Ab.basemodel.n == 2 or True:
+        ax  = plt.axes()
+    
+        # Create heatmap values for probabilities
+        flat_values = cut_values.flatten()
+        colors = plt.cm.jet( flat_values )
+        
+        for value,color,vertices in zip(flat_values, colors, Ab.abstr['allVertices']):
+            
+            # Plot only if the reachability is above zero
+            if value > 0:
+            
+                # Compute convex hull
+                hull = ConvexHull(vertices, qhull_options='QJ')
+                
+                # Plot heamap based on skewed region
+                ax.fill(vertices[hull.vertices,0], vertices[hull.vertices,1], color=color, lw=0)
+        
+        if Ab.basemodel.name == 'UAV':
+            # Set aspect ratio
+            ax.set_aspect(aspect='equal')
+            
+            xlim=ax.get_xlim()
+            ylim=ax.get_ylim()
+            
+            ax.set_xlim(min(xlim[0],ylim[0]), max(xlim[1],ylim[1]))
+            ax.set_ylim(min(xlim[0],ylim[0]), max(xlim[1],ylim[1]))
+    
+        # Add legend
+        sm = plt.cm.ScalarMappable(cmap='jet', norm=plt.Normalize(vmin=0, vmax=1))
+        cb = plt.colorbar(sm)
+        cb.outline.set_visible(False)
+    
+    else:
+        printWarning('Heatmap for system of n>2 with skewed regions not (yet) supported.')
+        return
     
     # xticks = [t if i % 5 == 0 else '' for i,t in enumerate(cut_df.index.values.round(1))]
     # yticks = [t if i % 5 == 0 else '' for i,t in enumerate(cut_df.columns.values.round(1))]
     
     # ax.set_xticklabels(xticks, size = 13)
     # ax.set_yticklabels(yticks, size = 13)
-    ax.set_xlabel('Temp. zone 1', fontsize=15)
-    ax.set_ylabel('Temp. zone 2', fontsize=15)
-    ax.set_title("N = "+str(ScAb.setup.scenarios['samples']),fontsize=20)
+    ax.set_xlabel('x_1', fontsize=15)
+    ax.set_ylabel('x_2', fontsize=15)
+    if Ab.setup.main['mode'] == 'Filter':
+        ax.set_title("Filter-based abstraction",fontsize=18)
+    else:
+        ax.set_title("N = "+str(Ab.setup.scenarios['samples']),fontsize=18)
     
     # Set tight layout
     fig.tight_layout()
 
     # Save figure
-    filename = ScAb.setup.directories['outputFcase']+'safeset_N='+str(ScAb.setup.scenarios['samples'])
-    for form in ScAb.setup.plotting['exportFormats']:
+    filename = Ab.setup.directories['outputFcase']+'safeset_N='+str(Ab.setup.scenarios['samples'])
+    for form in Ab.setup.plotting['exportFormats']:
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
         
     plt.show()

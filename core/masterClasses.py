@@ -180,8 +180,6 @@ class settings(object):
         # Retreive working folder
         directories['base']     = os.getcwd()
         directories['output']   = directories['base']+'/output/'
-        directories['outputF']  = directories['output']+'ScAb_'+application+'_'+ \
-                                        timing['datetime']+'/'
         
         # Default plotting settings
         plot = dict()
@@ -202,6 +200,8 @@ class settings(object):
         main = dict()
         main['verbose']             = True
         main['iterative']           = True
+        main['skewed']              = False
+        main['model']               = ['Filter','Scenario'][1]
         
         self.mdp = mdp
         self.plotting = plot

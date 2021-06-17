@@ -24,6 +24,10 @@ import time                     # Import to create tic/toc functions
 import sys                      # Allows to terminate the code at some point
 import itertools                # Import to crate iterators
 import os                       # Import OS to allow creationg of folders
+import scipy.stats              # For statistical functions
+
+import matplotlib.transforms as transforms
+from matplotlib.patches import Ellipse
 
 class table(object):
     '''
@@ -356,7 +360,7 @@ def setStateBlock(partition, **kwargs):
 
     Returns
     -------
-    2D Numpy array
+    Numpy array
         Array with every row being the center coordinates of a region in the 
         block.
 
@@ -371,21 +375,49 @@ def setStateBlock(partition, **kwargs):
     
     row = [None for i in range(stateDim)]
     
-    center_domain = (np.array(partition['nrPerDim'])-1) * 0.5 * np.array(partition['width'])
-    
     for i,value in enumerate(kwargs.values()):
         
-        if value == 'all':
-            
-            row[i] = np.linspace(-center_domain[i] + np.array(partition['origin'][i]), 
-                                  center_domain[i] + np.array(partition['origin'][i]), 
-                                  partition['nrPerDim'][i])
-            
-        else:
-            
+        if value != None:
             row[i] = list(value)
             
     return np.array(list(itertools.product(*row)))
+
+def defSpecBlock(partition, **kwargs):
+    '''
+    Create a hyperrectangular region that can be used as either a goal or
+    critical region
+
+    Parameters
+    ----------
+    partition : dict
+        Dictionary of the partition of the abstraction.
+    **kwargs : (multiple) lists
+        Multiple arguments that give the lists of (center) coordinates to 
+        include in the block in every dimension.
+
+    Returns
+    -------
+    Numpy array
+        Array with every row being a vertex of the hyperrectangular region
+
+    '''
+    
+    nrArgs = len(kwargs)
+    stateDim = len(partition['nrPerDim'])
+    vertices = 2**stateDim
+    
+    if nrArgs != len(partition['nrPerDim']):
+        print('State dimension is',stateDim,'but only',nrArgs,'arguments given.')
+        sys.exit()
+    
+    extr = np.array(partition['nrPerDim']) * np.array(partition['width'])
+    
+    limits = np.array([value if value != None else [-extr[d], extr[d]] 
+                       for d,value in enumerate(kwargs.values())])
+    
+    vertices = np.array(list(itertools.product(*limits)))
+    
+    return vertices
 
 def unit_vector(vector):
     """ Returns the unit vector of the vector.  """
@@ -404,3 +436,111 @@ def angle_between(v1, v2):
     v1_u = unit_vector(v1)
     v2_u = unit_vector(v2)
     return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+
+def findMinDiff(arr):
+    """ Returns the minimal distance between the entries of array 'arr'
+    """
+    
+    n = len(arr)    
+     
+    # Sort array in non-decreasing order
+    arr = sorted(arr)
+     
+    # Initialize difference as infinite
+    diff = 10**20
+     
+    # Find the min diff by comparing adjacent
+    # pairs in sorted array
+    for i in range(n-1):
+        if arr[i+1] - arr[i] < diff:
+            diff = arr[i+1] - arr[i]
+     
+    # Return min diff
+    return diff
+
+def extractRowBlockDiag(array, n):
+    """ Returns the matrix of block diagonal elements of input 'array', each
+    block having a size of n x 1
+    """
+    
+    rows,cols = np.shape(array)
+    
+    array_out = np.empty_like(array[:,0:n])
+    
+    for row in range(rows):
+        if (row+1)*n > cols:
+            print('Warning, not enough columns, so stay in same ones')
+            array_out[row] = array[row, cols-n:]
+        else:
+            array_out[row] = array[row, row*n : (row+1)*n]
+    
+    return array_out
+
+def confidence_ellipse(mean, cov, ax, n_std=1.0, facecolor='none', **kwargs):
+    """
+    Create a plot of the 2-dimensional covariance ellipse
+
+    Parameters
+    ----------
+    x, y : array-like, shape (n, )
+        Input data.
+
+    ax : matplotlib.axes.Axes
+        The axes object to draw the ellipse into.
+
+    n_std : float
+        The number of standard deviations to determine the ellipse's radiuses.
+
+    **kwargs
+        Forwarded to `~matplotlib.patches.Ellipse`
+
+    Returns
+    -------
+    matplotlib.patches.Ellipse
+    """
+
+    pearson = cov[0, 1]/np.sqrt(cov[0, 0] * cov[1, 1])
+    
+    # Using a special case to obtain the eigenvalues of this
+    # two-dimensionl dataset.
+    ell_radius_x = np.sqrt(1 + pearson)
+    
+    if np.round(pearson, 6) == 1:
+        pearson = 1-1e-9
+    
+    ell_radius_y = np.sqrt(np.abs(1 - pearson))
+    
+    
+    
+    ellipse = Ellipse((0, 0), width=ell_radius_x * 2, height=ell_radius_y * 2,
+                      facecolor=facecolor, **kwargs)
+
+    # Calculating the stdandard deviation of x from
+    # the squareroot of the variance and multiplying
+    # with the given number of standard deviations.
+    scale_x = np.sqrt(cov[0, 0]) * n_std
+    mean_x = mean[0]
+
+    # calculating the stdandard deviation of y ...
+    scale_y = np.sqrt(cov[1, 1]) * n_std
+    mean_y = mean[1]
+
+    transf = transforms.Affine2D() \
+        .rotate_deg(45) \
+        .scale(scale_x, scale_y) \
+        .translate(mean_x, mean_y)
+
+    ellipse.set_transform(transf + ax.transData)
+    return ax.add_patch(ellipse)
+
+def rotate_ellipse(mat):
+    
+    theta = np.radians(30)
+    c, s = np.cos(theta), np.sin(theta)
+    R = np.array(((c, -s), (s, c)))
+    
+    return R @ mat @ R.T
+
+def Chi2probability(df, epsilon=0.05):
+    
+    return scipy.stats.chi2.ppf(1-epsilon, df=df)

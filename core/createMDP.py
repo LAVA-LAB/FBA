@@ -15,6 +15,8 @@ Contact e-mail address:     <anonymized>
 ______________________________________________________________________________
 """
 
+import numpy as np              # Import Numpy for computations
+
 from .commons import writeFile, printSuccess
 
 class mdp(object):
@@ -259,7 +261,7 @@ class mdp(object):
     
     def writePRISM_specification(self, mode, horizon):
         '''
-        Write the PRISM specificatoin / property to a file
+        Write the PRISM specification / property to a file
 
         Parameters
         ----------
@@ -279,24 +281,35 @@ class mdp(object):
         
         if horizon == 'infinite':
             # Infer number of time steps in horizon (at minimum delta value)
-            horizonLen = int(self.N/min(self.setup.deltas))
-            
-            if mode == 'estimate':
-                # If mode is default, set maximum probability as specification
-                specification = 'Pmax=? [ F<='+str(horizonLen)+' "reached" ]'
-                
-            elif mode == 'interval':
-                # If mode is interval, set lower bound of maximum prob. as spec.
-                specification = 'Pmaxmin=? [ F<='+str(horizonLen)+' "reached" ]'
-            
+            self.horizonLen = int(self.N/min(self.setup.deltas))
+        elif horizon == 'steadystate':
+            # Infer number of time steps in horizon (at minimum delta value)
+            self.horizonLen = int(self.N/min(self.setup.deltas))
         else:
-            if mode == 'estimate':
-                # If mode is default, set maximum probability as specification
-                specification = 'Pmax=? [ F "reached" ]'
+            # We always need to provide a maximum nr. of steps, so make equal
+            # to time horizon (even though horizon is also in the state space.)
+            self.horizonLen = int(self.N/min(self.setup.deltas))
+            
+        if mode == 'estimate':
+            # If mode is default, set maximum probability as specification
+            specification = 'Pmax=? [ F<='+str(self.horizonLen)+' "reached" ]'
+            
+        elif mode == 'interval':
+            # If mode is interval, set lower bound of maximum prob. as spec.
+            specification = 'Pmaxmin=? [ F<='+str(self.horizonLen)+' "reached" ]'
+            
+        # else:
+        #     # We always need to provide a maximum nr. of steps, so make equal
+        #     # to time horizon (even though horizon is also in the state space.)
+        #     horizonLen = self.N
+            
+        #     if mode == 'estimate':
+        #         # If mode is default, set maximum probability as specification
+        #         specification = 'Pmax=? [ F "reached" ]'
                 
-            elif mode == 'interval':
-                # If mode is interval, set lower bound of maximum prob. as spec.
-                specification = 'Pmaxmin=? [ F "reached" ]'
+        #     elif mode == 'interval':
+        #         # If mode is interval, set lower bound of maximum prob. as spec.
+        #         specification = 'Pmaxmin=? [ F "reached" ]'
             
         # Define specification file
         specfile = self.setup.directories['outputFcase']+ \
@@ -328,6 +341,21 @@ class mdp(object):
     
         '''
         
+        if self.setup.main['mode'] == 'Filter':
+            if self.setup.mdp['k_steady_state'] != None:
+                horizon = 'steadystate'
+                nr_states = self.nr_regions * (self.setup.mdp['k_steady_state'] + 1)
+                k_steps = np.arange(self.setup.mdp['k_steady_state'] + 1)
+                
+            else:
+                horizon = 'finite'
+                nr_states = self.nr_regions * self.N
+                k_steps = np.arange(self.N)
+        else:
+            horizon = 'infinite'
+            nr_states = self.nr_regions
+            k_steps = [0]
+        
         # Define PRISM filename
         PRISM_allfiles = self.setup.directories['outputFcase']+ \
             self.setup.mdp['filename']+"_"+mode+".all"
@@ -338,7 +366,7 @@ class mdp(object):
         PRISM_statefile = self.setup.directories['outputFcase']+ \
             self.setup.mdp['filename']+"_"+mode+".sta"
         
-        state_file_string = '\n'.join(['(x)\n0:(-1)'] + [str(i+1)+':('+str(i)+')' for i in range(self.nr_regions)])
+        state_file_string = '\n'.join(['(x)\n0:(-1)'] + [str(i+1)+':('+str(i)+')' for i in range(nr_states)])
         
         # Write content to file
         writeFile(PRISM_statefile, 'w', state_file_string)
@@ -351,10 +379,10 @@ class mdp(object):
             
         label_file_list = ['0="init" 1="deadlock" 2="reached"'] + \
                           ['0: 1'] + \
-                          ['' for i in range(self.nr_regions)]
+                          ['' for i in range(nr_states)]
         
         for i in range(self.nr_regions):
-            substring = str(i+1)+': 0'
+            substring = ''
             
             # Check if region is a deadlock state
             for delta in self.setup.deltas:
@@ -366,7 +394,9 @@ class mdp(object):
             if i in self.goodStates:
                 substring += ' 2'
             
-            label_file_list[i+2] = substring
+            for k in k_steps:
+                add = k*self.nr_regions
+                label_file_list[i+2 + add] = str(i+1 + add)+': 0' + substring
             
         label_file_string = '\n'.join(label_file_list)
            
@@ -379,116 +409,139 @@ class mdp(object):
         PRISM_transitionfile = self.setup.directories['outputFcase']+ \
             self.setup.mdp['filename']+"_"+mode+".tra"
             
-        transition_file_list = ['' for i in range(self.nr_regions)]
+        transition_file_list = ['' for i in k_steps]
             
         nr_choices_absolute = 0
         nr_transitions_absolute = 0
         
         printEvery = min(100, max(1, int(self.nr_regions/10)))
         
-        # For every state
-        for s in range(self.nr_regions):
+        # For every time step
+        for k in k_steps:
+        
+            string = ['' for i in range(self.nr_regions)]
             
+            add = k*self.nr_regions
             
-            if s % printEvery == 0:
-                print(' ---- Write for region',s)
-            
-            substring = ['' for i in range(len(self.setup.deltas))]
-            
-            choice = 0
-            selfloop = False
-            
-            # Check if region is a deadlock state
-            for delta_idx,delta in enumerate(self.setup.deltas):    
-            
-                if len(abstr['actions'][delta][s]) > 0:
-            
-                    subsubstring = ['' for i in range(len(abstr['actions'][delta][s]))]
-            
-                    # For every enabled action                
-                    for a_idx,a in enumerate(abstr['actions'][delta][s]):
+            # For every state
+            for s in range(self.nr_regions):
+                
+                
+                if s % printEvery == 0:
+                    print(' ---- Write for region',s)
+                
+                substring = ['' for i in range(len(self.setup.deltas))]
+                
+                choice = 0
+                selfloop = False
+                
+                # Check if region is a deadlock state
+                for delta_idx,delta in enumerate(self.setup.deltas):
+                    
+                    if horizon == 'infinite':
+                        add_succ = add
+                    else:
+                        add_succ = add + delta*self.nr_regions
                         
-                        # Define name of action
-                        actionLabel = "a_"+str(a)+"_d_"+str(delta)
-                        
-                        substring_start = str(s+1) +' '+ str(choice)
-                        
-                        if mode == 'interval':
-                        
-                            # Add probability to end in absorbing state
-                            deadlock_string = trans['prob'][delta][0][a]['deadlock_interval_string']
-                        
-                            # Retreive probability intervals (and corresponding state ID's)
-                            probability_strings = trans['prob'][delta][0][a]['interval_strings']
-                            probability_idxs    = trans['prob'][delta][0][a]['interval_idxs']
-                        
-                            # Absorbing state has index zero
-                            subsubstring_a = [substring_start+' 0 '+deadlock_string+' '+actionLabel]
+                        # Make sure that it is below the max. number of states
+                        while add_succ >= nr_states:
+                            add_succ -= self.nr_regions
+                
+                    if len(abstr['actions'][delta][s]) > 0 and (k <= self.N - delta or horizon=='steadystate'):
+                
+                        subsubstring = ['' for i in range(len(abstr['actions'][delta][s]))]
+                
+                        # For every enabled action                
+                        for a_idx,a in enumerate(abstr['actions'][delta][s]):
                             
-                            # Add resulting entries to the list
-                            subsubstring_b = [substring_start +" "+str(i+1)+" "+intv+" "+actionLabel 
-                                          for (i,intv) in zip(probability_idxs,probability_strings) if intv]
+                            # Define name of action
+                            actionLabel = "a_"+str(a)+"_d_"+str(delta)
                             
-                        else:
+                            substring_start = str(s+1+add) +' '+ str(choice)
                             
-                            # Add probability to end in absorbing state
-                            deadlock_string = str(trans['prob'][delta][0][a]['deadlock_approx'])
+                            if mode == 'interval':
                             
-                            # Retreive probability intervals (and corresponding state ID's)
-                            probability_strings = trans['prob'][delta][0][a]['approx_strings']
-                            probability_idxs    = trans['prob'][delta][0][a]['approx_idxs']
+                                # Add probability to end in absorbing state
+                                deadlock_string = trans['prob'][delta][k][a]['deadlock_interval_string']
                             
-                            if float(deadlock_string) > 0:
+                                # Retreive probability intervals (and corresponding state ID's)
+                                probability_strings = trans['prob'][delta][k][a]['interval_strings']
+                                probability_idxs    = trans['prob'][delta][k][a]['interval_idxs']
+                            
                                 # Absorbing state has index zero
                                 subsubstring_a = [substring_start+' 0 '+deadlock_string+' '+actionLabel]
-                            else:
-                                subsubstring_a = []
                                 
-                            # Add resulting entries to the list
-                            subsubstring_b = [substring_start +" "+str(i+1)+" "+intv+" "+actionLabel 
-                                          for (i,intv) in zip(probability_idxs,probability_strings) if intv]
+                                # Add resulting entries to the list
+                                subsubstring_b = [substring_start +" "+str(i+1+add_succ)+" "+intv+" "+actionLabel 
+                                              for (i,intv) in zip(probability_idxs,probability_strings) if intv]
+                                
+                            else:
+                                
+                                # Add probability to end in absorbing state
+                                deadlock_string = str(trans['prob'][delta][k][a]['deadlock_approx'])
+                                
+                                # Retreive probability intervals (and corresponding state ID's)
+                                probability_strings = trans['prob'][delta][k][a]['approx_strings']
+                                probability_idxs    = trans['prob'][delta][k][a]['approx_idxs']
+                                
+                                if float(deadlock_string) > 0:
+                                    # Absorbing state has index zero
+                                    subsubstring_a = [substring_start+' 0 '+deadlock_string+' '+actionLabel]
+                                else:
+                                    subsubstring_a = []
+                                    
+                                # Add resulting entries to the list
+                                subsubstring_b = [substring_start +" "+str(i+1+add_succ)+" "+intv+" "+actionLabel 
+                                              for (i,intv) in zip(probability_idxs,probability_strings) if intv]
+                                
+                            # Increase choice counter
+                            choice += 1
+                            nr_choices_absolute += 1
                             
-                        # Increase choice counter
-                        choice += 1
-                        nr_choices_absolute += 1
-                        
-                        nr_transitions_absolute += len(subsubstring_a) + len(subsubstring_b)
-                        
-                        subsubstring[a_idx] = '\n'.join(subsubstring_a + subsubstring_b)
-                    
-                else:
-                    
-                    # No actions enabled, so only add self-loop
-                    if selfloop is False:
-                        if mode == 'interval':
-                            selfloop_prob = '[1.0,1.0]'
-                        else:
-                            selfloop_prob = '1.0'
+                            nr_transitions_absolute += len(subsubstring_a) + len(subsubstring_b)
                             
-                        subsubstring = [str(s+1) +' 0 '+str(s+1)+' '+selfloop_prob]
-            
-                        selfloop = True
+                            subsubstring[a_idx] = '\n'.join(subsubstring_a + subsubstring_b)
                         
-                        # Increment choices and transitions both by one
-                        nr_choices_absolute += 1
-                        nr_transitions_absolute += 1
-                        choice += 1
-                    
                     else:
-                        subsubstring = []
                         
-                substring[delta_idx] = subsubstring
+                        # No actions enabled, so only add self-loop
+                        if selfloop is False:
+                            if mode == 'interval':
+                                selfloop_prob = '[1.0,1.0]'
+                            else:
+                                selfloop_prob = '1.0'
+                                
+                            if k > self.N - delta:
+                                # If time horizon reached, to absorbing state
+                                subsubstring = [str(s+1+add) +' 0 0 '+selfloop_prob]
+                            else:
+                                # If not horizon reached, self-loop
+                                subsubstring = [str(s+1+add) +' 0 '+str(s+1+add)+' '+selfloop_prob]
                 
-            transition_file_list[s] = substring
+                            selfloop = True
+                            
+                            # Increment choices and transitions both by one
+                            nr_choices_absolute += 1
+                            nr_transitions_absolute += 1
+                            choice += 1
+                        
+                        else:
+                            subsubstring = []
+                            
+                    substring[delta_idx] = subsubstring
+                    
+                string[s] = substring
+                    
+            transition_file_list[k] = string
             
         # transition_file_list = '\n'.join(transition_file_list)
-        flatten = lambda t: [item for sublist in t for subsublist in sublist for item in subsublist]
+        flatten = lambda t: [item for sublist in t for subsublist in sublist for subsubsublist in subsublist for item in subsubsublist]
         transition_file_list = '\n'.join(flatten(transition_file_list))
         
         print(' ---- String ready; write to file...')
         
         # Header contains nr of states, choices, and transitions
-        size_states = self.nr_regions+1
+        size_states = nr_states+1
         size_choices = nr_choices_absolute+1
         size_transitions = nr_transitions_absolute+1
         model_size = {'States': size_states, 
@@ -505,6 +558,6 @@ class mdp(object):
         writeFile(PRISM_transitionfile, 'w', header+firstrow+transition_file_list)
             
         ### Write specification file
-        specfile, specification = self.writePRISM_specification(mode, horizon='infinite')
+        specfile, specification = self.writePRISM_specification(mode, horizon=horizon)
         
         return model_size, PRISM_allfiles, specfile, specification

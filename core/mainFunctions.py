@@ -17,10 +17,13 @@ ______________________________________________________________________________
 
 import numpy as np
 import itertools
-from .commons import table, is_invertible, floor_decimal                        
-import core.modelDefinitions as models
-from scipy.stats import mvn
+from .commons import table, is_invertible, floor_decimal, confidence_ellipse, \
+    Chi2probability                   
 from scipy.spatial import Delaunay
+from scipy.linalg import sqrtm
+import cvxpy as cp
+
+import matplotlib.pyplot as plt
 
 def in_hull(p, hull):
     '''
@@ -123,19 +126,16 @@ def computeScenarioBounds_sparse(setup, partition, abstr, trans, samples):
     # Initialize counts array
     counts = dict()
     
-    # Transform samples back to hypercubic partition
-    samplesCubic = samples @ abstr['basis_vectors_inv']
-    
     # Compute to which regions the samples belong
-    centers = computeRegionCenters(samplesCubic, partition)
+    centers_cubic = computeRegionCenters(samples, partition)
     
     for s in range(Nsamples):
         
-        key = tuple(centers[s])
+        key = tuple(centers_cubic[s])
         
-        if key in abstr['allCenters']:
+        if key in abstr['allCentersCubic']:
             
-            idx = abstr['allCenters'][ key ]
+            idx = abstr['allCentersCubic'][ key ]
             
             if idx in counts:
                 counts[idx] += 1
@@ -190,8 +190,8 @@ def computeScenarioBounds_sparse(setup, partition, abstr, trans, samples):
     
     # Create interval strings (only entries for prob > 0)
     interval_strings = ["["+
-                      str(floor_decimal(max(1e-4, lb),5))+","+
-                      str(floor_decimal(min(1,    ub),5))+"]"
+                      str(floor_decimal(max(1e-4, lb),nr_decimals))+","+
+                      str(floor_decimal(min(1,    ub),nr_decimals))+"]"
                       for (lb, ub) in zip(probs_lb, probs_ub)]# if ub > 0]
     
     # Compute deadlock probability intervals
@@ -199,8 +199,8 @@ def computeScenarioBounds_sparse(setup, partition, abstr, trans, samples):
     deadlock_ub = floor_decimal(deadlock_upp, nr_decimals)
     
     deadlock_string = '['+ \
-                       str(floor_decimal(max(1e-4, deadlock_lb),5))+','+ \
-                       str(floor_decimal(min(1,    deadlock_ub),5))+']'
+                       str(floor_decimal(max(1e-4, deadlock_lb),nr_decimals))+','+ \
+                       str(floor_decimal(min(1,    deadlock_ub),nr_decimals))+']'
     
     # POINT ESTIMATE PROBABILITIES
     probability_approx = np.round(probability_approx, nr_decimals)
@@ -221,6 +221,241 @@ def computeScenarioBounds_sparse(setup, partition, abstr, trans, samples):
     }
     
     return returnDict
+
+def kalmanFilter(model, cov0):    
+    '''
+    For a given model in `model` and prior belief covariance `cov0`, perform
+    The Kalman filter steps related to the covariance (mean is not needed).
+
+    Parameters
+    ----------
+    model : dict
+        Main dictionary of the LTI system model.
+    cov0 : ndarray
+        n by n matrix of the covariance of the prior belief.
+
+    Returns
+    -------
+    cov_pred : ndarray
+        Predicted covariance (after the prediction step).
+    K_gain : ndarray
+        Optimal Kalman gain.
+    cov_tilde : ndarray
+        Covariance of the mean of the posterior belief.
+    cov : ndarray
+        Covariance of the posterior belief.
+    cov_tilde_measure : float
+        Measure on the covariance of the mean of the posterior belief.
+
+    '''
+    
+    # Predicted covariance of the belief
+    cov_pred = model.A @ cov0 @ model.A.T + model.noise['w_cov']
+    
+    # If matrix is invertible
+    if is_invertible(model.C @ cov_pred @ model.C.T + model.noise['v_cov']):
+        # Determine optimal Kalman gain
+        
+        K_gain   = cov_pred @ model.C.T @ \
+            np.linalg.inv(model.C @ cov_pred @ model.C.T + model.noise['v_cov'])
+        
+    else:
+        # If not invertible, set Kalman gain to zero
+        K_gain   = np.zeros((model.n, model.r))
+        
+    # Covariance of the expected mean of the future belief
+    cov_tilde = K_gain @ \
+    (model.C @ cov_pred @ model.C.T + model.noise['v_cov']) @ K_gain.T
+        
+    # Covariance of the future belief
+    cov = (np.eye(model.n) - K_gain @ model.C) @ cov_pred
+    
+    # Calculate measure on the covariance matrix of the mean of the future belief
+    cov_tilde_measure = covarianceEllipseSize( cov_tilde )
+    
+    # Compute the maximum error between the mean of the belief, and the actual
+    # state (maximum error is the maximum radius of the associated ellipse)
+    
+    error_epsilon = 0.2
+    
+    times_stddev = Chi2probability(df=model.n, epsilon=error_epsilon)
+    cov_error = cov * times_stddev**2
+    max_error_bound = covarianceEllipseSize(cov_error)
+    
+    return cov_pred, K_gain, cov_tilde, cov, cov_tilde_measure, max_error_bound
+
+def steadystateCovariance(covariances, verbose=False):
+    '''
+    Compute the best/worst case covariance matrix that contains a list of 
+    other covariance matrices
+
+    Parameters
+    ----------
+    covariances : list of arrays
+        List of numpy arrays describing the covariances.
+
+    Returns
+    -------
+    smallest_cov : array
+        Numpy array describing the covariances that contains all given inputs
+
+    '''
+    
+    print('iterative approach')
+    
+    if verbose:
+        fig, ax = plt.subplots(figsize=(6, 6))
+        mean = np.array([0,0])
+    
+        confidence_ellipse(mean, covariances[0], ax, n_std=1, edgecolor='firebrick')
+    
+    # Initialize the output covariance matrix
+    if not is_invertible(covariances[0]):
+        eigvalues, eigvectors = np.linalg.eig(covariances[0])
+        eigvalues_nonzero = np.maximum(1e-9, eigvalues)
+        cov = eigvectors @ np.diag(eigvalues_nonzero) @ np.linalg.inv(eigvectors)
+        worst_cov = cov
+        best_cov = cov
+    else:
+        worst_cov = covariances[0]
+        best_cov  = covariances[0]
+    
+    # Compute smallest ellipse that contains all ellipses starting from some k
+    for cov in covariances[1:]:
+        
+        if verbose:
+            # Plot current ellipse
+            confidence_ellipse(mean, cov, ax, n_std=1, edgecolor='firebrick')
+        
+        if not is_invertible(cov):
+            eigvalues, eigvectors = np.linalg.eig(cov)
+            eigvalues_nonzero = np.maximum(1e-9, eigvalues)
+            cov = eigvectors @ np.diag(eigvalues_nonzero) @ np.linalg.inv(eigvectors)
+        
+        # Compute the rotation matrix that transforms one ellipse to a circle    
+        R = sqrtm(np.linalg.inv(cov))
+        
+        # Apply this rotation matrix to the other ellipse
+        ellipse_worst = R @ worst_cov @ R.T
+        ellipse_best = R @ best_cov @ R.T
+        
+        # Compute the eigen values and vectors of the transformed ellipse
+        ellipse_worst_evals, ellipse__worst_evecs = np.linalg.eig(ellipse_worst)
+        ellipse_best_evals, ellipse_best_evecs = np.linalg.eig(ellipse_best)
+        
+        # Determine which eigen values (i.e. radii) are larger: ellipse vs circle
+        biggest_eigvals = np.maximum(1, ellipse_worst_evals)
+        smallest_eigvals = np.minimum(1, ellipse_best_evals)
+        
+        # Compute the smallest/biggest ellipse that contains both the circle and ellipse
+        worst_cov_transf = (ellipse__worst_evecs @ np.diag(biggest_eigvals) @ np.linalg.inv(ellipse__worst_evecs))
+        best_cov_transf  = (ellipse_best_evecs @ np.diag(smallest_eigvals) @ np.linalg.inv(ellipse_best_evecs))
+        
+        # Transform the smallest/biggest ellipse back using the inverse rotation matrix
+        worst_cov = np.linalg.inv(R) @ worst_cov_transf @ np.linalg.inv(R).T
+        best_cov  = np.linalg.inv(R) @ best_cov_transf @ np.linalg.inv(R).T
+        
+    if verbose:
+        confidence_ellipse(mean, np.real(worst_cov), ax, n_std=1, 
+                           label= 'Worst-case covariance', edgecolor='blue')
+        confidence_ellipse(mean, np.real(best_cov), ax, n_std=1, 
+                           label= 'Best-case covariance', edgecolor='blue')
+           
+        ax.autoscale()
+        ax.set_aspect('equal')
+        ax.set_title('Iterative eigenvalue approach')
+        plt.show()
+    
+    return {'worst': np.real(worst_cov), 'best': np.real(best_cov)}
+
+def steadystateCovariance_sdp(covariances, verbose=False):
+
+    print('SDP approach')    
+
+    # Dimension of the covariance matrix
+    n = len(covariances[0])    
+
+    # Solve for worst-case covariance matrix
+    X_w = cp.Variable((n,n), PSD=True)
+    X_b = cp.Variable((n,n), PSD=True)
+    
+    constraints_w = [X_w >> 0]
+    constraints_b = [X_b >> 0]
+    
+    if verbose:
+        fig, ax = plt.subplots(figsize=(6, 6))
+        
+        mean = np.array([0,0])
+    
+    # The operator >> denotes matrix inequality.
+    for cov in covariances:
+        
+        if verbose:
+            # Plot current ellipse
+            confidence_ellipse(mean, cov, ax, n_std=1, edgecolor='firebrick')
+        
+        # Increase eigenvalues artificially if some are zero
+        if not is_invertible(cov):
+        
+            eigvals, eigvecs = np.linalg.eig(cov)
+            eigvals = np.maximum(1e-9, eigvals)
+            cov = eigvecs @ np.diag(eigvals) @ np.linalg.inv(eigvecs)
+        
+        constraints_w += [X_w >> cov]
+        constraints_b += [cov >> X_b]
+        
+    prob_w = cp.Problem(cp.Minimize(cp.trace(X_w)), constraints_w)
+    prob_w.solve()
+    
+    prob_b = cp.Problem(cp.Maximize(cp.log_det(X_b)), constraints_b)
+    prob_b.solve()
+    
+    worst_cov = np.copy(X_w.value)
+    best_cov  = np.copy(X_b.value)
+        
+    if verbose:
+        confidence_ellipse(mean, worst_cov, ax, n_std=1, 
+                           label= 'Worst-case covariance', edgecolor='blue')
+        confidence_ellipse(mean, best_cov, ax, n_std=1, 
+                           label= 'Best-case covariance', edgecolor='blue')
+           
+        ax.autoscale()
+        ax.set_aspect('equal')
+        ax.set_title('Semi-definite programming approach')
+        plt.show()
+    
+    return {'worst': worst_cov, 'best': best_cov}
+
+def covarianceEllipseSize(cov):
+    '''
+    Computes the maximum radius of the ellipse that is associated with the
+    covariance matrix `cov`.
+
+    Parameters
+    ----------
+    cov : ndarray
+        Covariance matrix.
+
+    Returns
+    -------
+    ellipse_size : float
+        Maximum radius of the ellipse associated with the covariance matrix.
+
+    '''
+    
+    # Determine the largest size parameter of the rotated ellipse associated
+    # with the given covariance matrix
+    
+    # Determine eigenvectors and values
+    eigenval = np.linalg.eigvals(cov)
+    
+    # Retreive the largest value
+    max_eigenval = eigenval[np.argmax(eigenval)]
+    
+    # Determine largest width parameter of ellipse
+    ellipse_size = np.sqrt( max_eigenval )
+    
+    return ellipse_size
 
 def definePartitions(dim, nrPerDim, regionWidth, origin, onlyCenter=False):
     '''
@@ -331,3 +566,37 @@ def makeModelFullyActuated(model, manualDimension='auto', observer=False):
     model.tau             *= (dim+1)
     
     return model
+
+def defineDistances(partition, target):
+    '''
+    Define the mutual distance (per dimension) between any two target points.
+
+    Parameters
+    ----------
+    partition : dict
+        Dictionary containing the info regarding partisions.
+    target : int
+        Index of the base region to which we want to measure.
+
+    Returns
+    -------
+    distance_list : list
+        List of distances (per dimension) to the `base_region`.
+
+    '''
+    
+    # Define center of the base region as point A
+    
+    # For the center of every other region, compute difference to point A
+    distance_list = [ target - region['center']
+                     for region in partition.values()]
+        
+    return distance_list 
+
+def cubic2skew(cubic, abstr):
+    origin = abstr['origin']
+    return (np.array(cubic) - origin) @ abstr['basis_vectors'] + origin
+    
+def skew2cubic(skew, abstr):
+    origin = abstr['origin']
+    return (np.array(skew) - origin) @ abstr['basis_vectors_inv'] + origin
