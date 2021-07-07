@@ -18,11 +18,12 @@ ______________________________________________________________________________
 import numpy as np              # Import Numpy for computations
 import itertools                # Import to crate iterators
 import copy                     # Import to copy variables in Python
-import sys                      # Allows to terminate the code at some point
-from scipy.spatial import Delaunay # Import to create convex hulls
+import sys                      # Allows to terminate the code at sorme point
+from scipy.spatial import Delaunay, ConvexHull # Import to create convex hulls
+from scipy.spatial.qhull import _Qhull
 
-from .mainFunctions import definePartitions, \
-    in_hull, makeModelFullyActuated, cubic2skew, skew2cubic
+from .mainFunctions import definePartitions, computeRegionOverlap, \
+    in_hull, makeModelFullyActuated, cubic2skew, skew2cubic, point_in_hull
 from .commons import tocDiff, printWarning, findMinDiff
 from .postprocessing.createPlots import createPartitionPlot
 
@@ -108,24 +109,21 @@ class Abstraction(object):
         abstr['nr_regions'] = len(abstr['P'])
         abstr['origin'] = self.basemodel.setup['partition']['origin']
         
-        centerTuples = [tuple(abstr['P'][i]['center']) for i in 
-                        range(abstr['nr_regions'])] 
+        centerTuples = [tuple(region['center']) for region in abstr['P'].values()] 
         
         abstr['allCentersCubic'] = dict(zip(centerTuples, 
-                                       range(abstr['nr_regions'])))
+                                       abstr['P'].keys()))
         
         return abstr
     
-    def _defStateLabelSet(self, allVertices, subset):
+    def _defStateLabelSet(self, allVertices, blocks, typ="goal", epsilon=0):
         '''
-        Return the indices of regions associated with the unique centers.
+        Returns the indices of regions associated with the unique centers.
 
         Parameters
         ----------
-        allCenters : List
+        allVertices : List
             List of the center coordinates for all regions.
-        partition : Dict
-            Partition dictionary.
         subset : List
             List of points to return the unique centers for.
 
@@ -136,59 +134,60 @@ class Abstraction(object):
 
         '''
         
-        if np.shape(subset)[1] == 0:
-            return []
+        if len(blocks) == 0:
+            return {}
         
         else:
             
-            goal_regions = []
+            limits_overlap = {}
             
-            for row in subset:
+            for bl,block in blocks.items():
                 
-                for region,vertices in enumerate(allVertices):
-                        
-                    check = [True if entry == None or 
-                                      (not all(vertices[:,dim] <= entry) and
-                                       not all(vertices[:,dim] >= entry))
-                            else False for dim,entry in enumerate(row)]
-                    if all(check):
-                        goal_regions.append( region )
-                        
-            # Filter to only keep unique centers
-            return np.unique(goal_regions)
-        
-        
-        '''
-        if np.shape(subset)[1] == 0:
-            return []
-        
-        else:
-            
-            
-        
-            print('subset:',subset)    
-        
-            # Retreive list of points and convert to array
-            points = skew2cubic(subset, self.abstr)
+                # Account for maximum error bound (epsilon)
+                limits = block['limits']
+                
+                if typ == "goal":
                     
-            print('transformed points:',points)
-        
-            # Compute all centers of regions associated with points
-            centers_cubic = computeRegionCenters(points, partition)
-            
-            centers = cubic2skew(centers_cubic, self.abstr)
+                    goalAnywhere = False
+                    
+                    # A region is a goal region if it is completely
+                    # contained in the specified region (we want to have
+                    # a convervative under-approximation)
+                    
+                    limits_eps = np.vstack((limits[:,0] + epsilon, limits[:,1] - epsilon)).T
+                    
+                elif typ == "critical":
+                    
+                    # A region is a critical region if it contains any
+                    # part of the specified region (we want to have a
+                    # convervative over-approximation)
+                    
+                    limits_eps = np.vstack((limits[:,0] - epsilon, limits[:,1] + epsilon)).T
+                    
+                if any(limits[:,1] - limits[:,0] <= 0):
+                    return {}
+                    
+                for region,vertices in enumerate(allVertices):
+                    
+                    if all([    any(lims[0] < vertices[:,row]) 
+                            and any(lims[1] > vertices[:,row]) 
+                            for row,lims in enumerate(limits_eps) ]):
                         
-            print('centers',centers)
-            
-            # Filter to only keep unique centers
-            centers_unique = np.unique(centers, axis=0)
-            
-            print('Unique centers:',centers_unique)
-
-            # Return the ID's of regions associated with the unique centers            
-            return [allCenters[tuple(c)] for c in centers_unique 
-                               if tuple(c) in allCenters]
-        '''
+                        limits_region = np.vstack((self.abstr['P'][region]['low'],
+                                                  self.abstr['P'][region]['upp'])).T
+                        
+                        if region not in limits_overlap:
+                            limits_overlap[region] = {}
+                        
+                        limits_overlap[region][bl] = computeRegionOverlap(limits_region, limits_eps)
+                        
+                        if typ == "goal" and limits_overlap[region][bl] is not None:
+                            goalAnywhere = True
+                        
+        if typ == "goal" and goalAnywhere is False:
+            printWarning('Warning: the augmented goal region is not contained in any region')
+        
+        return limits_overlap
     
     def _defAllVertices(self):
         '''
@@ -211,10 +210,10 @@ class Abstraction(object):
         # Hence, the every partition has 2^n corners, with n the number of states.
         
         allOriginPointsNested = [[[
-            self.abstr['P'][i][bitRelation[bit]][bitIndex] 
+            region[bitRelation[bit]][bitIndex] 
                 for bitIndex,bit in enumerate(bitList)
             ] for bitList in bitCombinations 
-            ] for i in self.abstr['P']
+            ] for region in self.abstr['P'].values()
             ]
         
         return np.array(allOriginPointsNested)
@@ -272,8 +271,7 @@ class Abstraction(object):
         else:
         
             # Set default target points to the center of every region
-            target['d'] = [self.abstr['P'][j]['center'] for j in 
-                           range(self.abstr['nr_regions'])]
+            target['d'] = [region['center'] for region in self.abstr['P'].values()]
         
         targetPointTuples = [tuple(point) for point in target['d']]        
         target['inv'] = dict(zip(targetPointTuples, range(len(target['d']))))
@@ -403,7 +401,7 @@ class Abstraction(object):
         def f7(seq):
             seen = set()
             seen_add = seen.add
-            return [x for x in seq if not (x in seen or seen_add(x))]
+            return [int(x) for x in seq if not (x in seen or seen_add(x))]
         
         # Compute inverse reachability area
         x_inv_area = self._defInvArea(delta)
@@ -461,6 +459,14 @@ class Abstraction(object):
             # Use standard method: check if points are in (skewed) hull
             x_inv_hull = self._defInvHull(x_inv_area)
             
+            x_inv_qHull = _Qhull(b"i", x_inv_area,
+                  options=b"QJ",
+                  furthest_site=False,
+                  incremental=False, 
+                  interior_point=None)
+            
+            print(x_inv_qHull)
+            
             print('Normal inverse area:',x_inv_area)
         
             allRegionVertices = self.abstr['allVerticesFlat'] 
@@ -468,7 +474,8 @@ class Abstraction(object):
         import sys
         np.set_printoptions(threshold=sys.maxsize)
         
-        action_range = f7(np.concatenate(( self.abstr['goal'],
+        # Put goal regions up front of the list of actions
+        action_range = f7(np.concatenate(( list(self.abstr['goal'][0].keys()),
                            np.arange(self.abstr['nr_actions']) )))
         
         # For every action
@@ -505,6 +512,7 @@ class Abstraction(object):
             
                 # Check which points are in the convex hull
                 polypoints_vec = in_hull(allVertices, x_inv_hull)
+                polypoints_vec = point_in_hull(allVertices, x_inv_qHull)
             
                 # Map enabled vertices of the partitions to actual partitions
                 enabled_polypoints[action_id] = np.reshape(  polypoints_vec, 
@@ -520,29 +528,38 @@ class Abstraction(object):
             if self.setup.plotting['partitionPlot'] and \
                 action_id == int(self.abstr['nr_regions']/2):
 
-                print('x_inv_area:',x_inv_area)
-                print('origin shift:',A_inv_d)       
-                print('targetPoint:',targetPoint,' - drift:',
-                      self.model[delta].Q_flat)
+                # print('x_inv_area:',x_inv_area)
+                # print('origin shift:',A_inv_d)       
+                # print('targetPoint:',targetPoint,' - drift:',
+                #       self.model[delta].Q_flat)
                 
                 predecessor_set = A_inv_d - x_inv_area
                 
                 # Partition plot for the goal state, also showing pre-image
                 print('Create partition plot...')
                     
-                createPartitionPlot((0,1), (2,3), self.abstr['goal'], 
+                createPartitionPlot((0,1), (2,3), self.abstr['goal'][0], 
                     delta, self.setup, self.model[delta], self.abstr, 
                     self.abstr['allVertices'], predecessor_set)
             
             # Retreive the ID's of all states in which the action is enabled
             enabled_in_states[action_id] = np.nonzero(enabled_in)[0]
             
-            # Remove critical states from the list of enabled actions
-            enabled_in_states[action_id] = np.setdiff1d(
-                enabled_in_states[action_id], np.concatenate((self.abstr['critical'], self.abstr['goal'])))
-            
+            # If the local information controller is enabled, an action is
+            # only enabled anywhere, if there also exists a "waiting action"
+            # from that state to itself
+            if self.setup.lic['enabled']:
+                min_delta = min(self.setup.deltas)
+                
+                if delta == min_delta and action_id not in enabled_in_states[action_id]:
+                    # print(' >> ACTION',action_id,'DOES NOT EXIST IN ITSELF: disable for delta',delta)
+                    enabled_in_states[action_id] = np.array([])
+                elif delta != min_delta and action_id not in self.abstr['actions'][min_delta][action_id]:
+                    # print(' >> ACTION',action_id,'DOES NOT EXIST IN ITSELF disable for delta',delta)
+                    enabled_in_states[action_id] = np.array([])
+                
             if action_id % printEvery == 0:
-                if action_id in self.abstr['goal']:
+                if action_id in self.abstr['goal'][0]:
                     print(' -- GOAL action',str(action_id),'enabled in',
                           str(len(enabled_in_states[action_id])),
                           'states - target point:',
@@ -588,7 +605,7 @@ class Abstraction(object):
         # Reduce step size as much as possible
         min_delta = min(self.setup.deltas)
         
-        for div in range(min_delta, 1, -1):
+        for div in range(min_delta, 0, -1):
             if all(np.array(self.setup.deltas) % div) == 0:
                 print('Simplify step size by factor:',div)
                 self.N = int(self.N / div)
@@ -662,28 +679,39 @@ class Abstraction(object):
         # Create flat (2D) array of all vertices
         self.abstr['allVerticesFlat'] = np.concatenate(self.abstr['allVertices'])
         
-        # # Determine goal regions
-        self.abstr['goal'] = self._defStateLabelSet(
-            self.abstr['allVertices'],
-            self.basemodel.setup['specification']['goal'])
-        
-        # Determine critical regions
-        self.abstr['critical'] = self._defStateLabelSet(
-            self.abstr['allVertices'],
-            self.basemodel.setup['specification']['critical'])
+        self.abstr['goal'] = dict()
+        self.abstr['critical'] = dict()
             
-        #     # self.abstr['allCentersCubic'], 
-        #     # self.basemodel.setup['partition'], 
-        #     # self.basemodel.setup['specification']['goal'])
+        for k in range(1,self.N + max(self.setup.deltas)):    
+            
+            if self.setup.main['mode'] == 'Filter':
+                epsilon = self.km['max_error_bound'][k]
+            else:
+                epsilon = np.zeros(self.basemodel.n)
         
-        # 
-        # self.abstr['critical'] = self._defStateLabelSet(self.abstr['allCentersCubic'], 
-        #     self.basemodel.setup['partition'], 
-        #     self.basemodel.setup['specification']['critical'])
+            # Determine goal regions
+            self.abstr['goal'][k] = self._defStateLabelSet(
+                self.abstr['allVertices'],
+                self.basemodel.setup['specification']['goal'], typ="goal", epsilon=epsilon)
+            
+            # Determine critical regions
+            self.abstr['critical'][k] = self._defStateLabelSet(
+                self.abstr['allVertices'],
+                self.basemodel.setup['specification']['critical'], typ="critical", epsilon=epsilon)
+    
+        self.abstr['goal'][0] = self.abstr['goal'][1]
+        self.abstr['critical'][0] = self.abstr['critical'][1]
+            
+        self.abstr['goal']['zero_bound'] = self._defStateLabelSet(
+                self.abstr['allVertices'],
+                self.basemodel.setup['specification']['goal'], typ="goal", epsilon=0)
+        self.abstr['critical']['zero_bound'] = self._defStateLabelSet(
+                self.abstr['allVertices'],
+                self.basemodel.setup['specification']['critical'], typ="critical", epsilon=0)
         
         print(' -- Number of regions:',self.abstr['nr_regions'])
-        print(' -- Goal regions are:',self.abstr['goal'])
-        print(' -- Critical regions are:',self.abstr['critical'])
+        print(' -- Number of goal regions:',len(self.abstr['goal']['zero_bound']))
+        print(' -- Number of critical regions:',len(self.abstr['critical']['zero_bound']))
         
         # Create the target point for every action (= every state)
         self.abstr['target'] = self._createTargetPoints()

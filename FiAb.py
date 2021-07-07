@@ -37,22 +37,18 @@ def filterBasedScheme(Ab, case_id):
         # Create folder to save results
         createDirectory( Ab.setup.directories['outputFcase'] )    
         
-        # Apply Kalman filter to compute covariance over time
-        Ab.KalmanPrediction()
-        
         # Compute steady state covariance matrices (best/worst-case)
         k_stst = Ab.setup.mdp['k_steady_state']
         if k_stst != None:
           for delta in Ab.setup.deltas:
               
-            SDP = False
-            if SDP:
+            if Ab.setup.main['covarianceMode'] == 'SDP':
                 func = steadystateCovariance_sdp
             else:
                 func = steadystateCovariance
             
             Ab.km[delta]['steady'] = func(Ab.km[delta]['cov_tilde'][k_stst:], 
-                                          verbose=False)
+                                          verbose=True)
         
         # Calculate transition probabilities
         Ab.defTransitions()
@@ -79,11 +75,11 @@ def filterBasedScheme(Ab, case_id):
         
         # Load data into dataframes
         policy_df   = pd.DataFrame( Ab.results['optimal_policy'], 
-         columns=range(Ab.abstr['nr_regions']), index=range(horizonLen)).T
+         columns=range(len(Ab.abstr['P'])), index=range(horizonLen)).T
         delta_df    = pd.DataFrame( Ab.results['optimal_delta'], 
-         columns=range(Ab.abstr['nr_regions']), index=range(horizonLen)).T
+         columns=range(len(Ab.abstr['P'])), index=range(horizonLen)).T
         reward_df   = pd.DataFrame( Ab.results['optimal_reward'], 
-         columns=range(Ab.abstr['nr_regions']), index=range(horizonLen)).T
+         columns=range(len(Ab.abstr['P'])), index=range(horizonLen)).T
         
         # Write dataframes to a different worksheet
         policy_df.to_excel(writer, sheet_name='Optimal policy')
@@ -103,7 +99,7 @@ def filterBasedScheme(Ab, case_id):
         cols = Ab.setup.montecarlo['init_timesteps']
         MCsims_df = pd.DataFrame( 
             Ab.mc['results']['reachability_probability'], \
-            columns=cols, index=range(Ab.abstr['nr_regions']) )
+            columns=cols, index=Ab.abstr['P'].keys())
             
         # Write Monte Carlo results to Excel
         MCsims_df.to_excel(writer, sheet_name='Empirical reach.')

@@ -24,7 +24,7 @@ from matplotlib import cm
 from scipy.spatial import ConvexHull
 from matplotlib.patches import Rectangle
 
-from ..commons import printWarning, mat_to_vec, cm2inch
+from ..commons import printWarning, mat_to_vec, cm2inch, confidence_ellipse
 
 
 def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
@@ -59,10 +59,6 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
     -------
     None.
     '''
-
-    
-    i0,i1 = i_tup
-    j0,j1 = j_tup
     
     fig = plt.figure(figsize=cm2inch(12, 7))
     ax = fig.add_subplot(111)
@@ -71,7 +67,14 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
     if model.n <= 2:        
         plt.xlabel('$x_1$', labelpad=0)
         plt.ylabel('$x_2$', labelpad=-10)
+        
+        i0 = 0
+        i1 = 1
+        
     else:
+        i0,i1 = i_tup
+        j0,j1 = j_tup
+        
         plt.xlabel('$x_'+str(i0)+'$', labelpad=0)
         plt.ylabel('$x_'+str(i1)+'$', labelpad=-10)
     
@@ -85,7 +88,7 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
             polyMat = np.array(poly)
             
             # Plot partitions and label
-            if k in abstr['goal']:
+            if k in abstr['goal']['zero_bound']:
                 ax.text(abstr['P'][k]['center'][i0], abstr['P'][k]['center'][i1], k, \
                           verticalalignment='center', horizontalalignment='center' )  
             hull = ConvexHull(polyMat, qhull_options='QJ')
@@ -452,7 +455,7 @@ def policyPlot(setup, model, results, abstr):
     ax.set_ylim(min_xy[iy], max_xy[iy])
     
     # Draw goal states
-    for goal in abstr['goal']:
+    for goal in abstr['goal']['zero_bound']:
         
         goalState = abstr['P'][goal]
         
@@ -461,7 +464,7 @@ def policyPlot(setup, model, results, abstr):
         ax.add_patch(goalState)
     
     # Draw critical states
-    for crit in abstr['critical']:
+    for crit in abstr['critical']['zero_bound']:
         
         critState = abstr['P'][crit]
         
@@ -494,7 +497,7 @@ def policyPlot(setup, model, results, abstr):
         
     plt.show()
         
-def UAVplots(Ab, case_id, writer):
+def UAVplots(Ab, case_id, writer = None):
     '''
     Create the trajectory plots for the UAV benchmarks
 
@@ -520,7 +523,7 @@ def UAVplots(Ab, case_id, writer):
     # Determine desired state IDs
     if Ab.basemodel.name == 'UAV':
         if Ab.basemodel.modelDim == 2:
-            x_init = setStateBlock(Ab.basemodel.setup['partition'], a=[-6], b=[0], c=[-6], d=[0])
+            x_init = setStateBlock(Ab.basemodel.setup['partition'], a=[-2], b=[0], c=[-6], d=[0])
             
             cut_value = np.zeros(2)
             for i,d in enumerate(range(1, Ab.basemodel.n, 2)):
@@ -551,7 +554,7 @@ def UAVplots(Ab, case_id, writer):
     print(' -- Perform simulations for initial states:',state_idxs)
     
     Ab.setup.montecarlo['init_states'] = state_idxs
-    Ab.setup.montecarlo['iterations'] = 10000
+    Ab.setup.montecarlo['iterations'] = 100
     Ab.monteCarlo()
     
     PRISM_reach = Ab.results['optimal_reward'][0,state_idxs]
@@ -562,20 +565,65 @@ def UAVplots(Ab, case_id, writer):
     
     performance_df = pd.DataFrame( {'PRISM reachability': PRISM_reach.flatten(),
                                     'Empirical reachability': empirical_reach.flatten() }, index=[case_id] )
-    performance_df.to_excel(writer, sheet_name='Performance')
+    if writer != None:
+        performance_df.to_excel(writer, sheet_name='Performance')
     
-    itersToShow = 10
+    itersToShow = 1
     
     traces = []
+    
     for i in state_idxs:
         for j in range(itersToShow):
-            traces += [Ab.mc['traces'][0][i][j]]
+            traces += [Ab.mc['traces'][0][i][j]['x']]
+            
+    if Ab.setup.main['mode'] == 'Filter':
+        belief_traces = {'mu': [], 'cov': []}
+        for i in state_idxs:
+            for j in range(itersToShow):
+                belief_traces['mu'] += [Ab.mc['traces'][0][i][j]['bel_mu']]
+                belief_traces['cov'] += [Ab.mc['traces'][0][i][j]['bel_cov']]
+                
+    else:
+        belief_traces = None
     
     min_delta = int(min(Ab.setup.deltas))
     
     if Ab.basemodel.modelDim == 2:
-        UAVplot2D( Ab.setup, Ab.model[min_delta], Ab.abstr, traces, cut_value )
+        
+        animate = True
+        
+        if animate:
+            plot_times = np.arange(1, Ab.N+1)
+        else:        
+            plot_times = [Ab.N]
+            
+        filenames = ['' for i in range(len(plot_times))]
+            
+        for i,plot_time in enumerate(plot_times):
+            filenames[i] = UAVplot2D(plot_time, Ab.N, Ab.setup, 
+                Ab.model[min_delta], Ab.abstr, Ab.km['max_error_bound'],
+                cut_value, traces, belief_traces)
+
+        if animate:
     
+            import cv2
+            
+            img_array = []
+            for filename in filenames:
+                img = cv2.imread(filename)
+                height, width, layers = img.shape
+                size = (width,height)
+                img_array.append(img)
+            
+            
+            video_filename = Ab.setup.directories['outputFcase']+'drone_trajectory_video.mp4'
+            fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+            out = cv2.VideoWriter(video_filename,fourcc, 1, size)
+             
+            for i in range(len(img_array)):
+                out.write(img_array[i])
+            out.release()
+            
     elif Ab.basemodel.modelDim == 3:
         if Ab.setup.main['iterative'] is False or Ab.setup.plotting['3D_UAV']:
         
@@ -584,7 +632,8 @@ def UAVplots(Ab, case_id, writer):
     
     return performance_df
     
-def UAVplot2D(setup, model, abstr, traces, cut_value):
+def UAVplot2D(plot_time, N, setup, model, abstr, max_error_bound, cut_value, 
+              traces, belief_traces = None):
     '''
     Create 2D trajectory plots for the 2D UAV benchmark
 
@@ -646,36 +695,51 @@ def UAVplot2D(setup, model, abstr, traces, cut_value):
     ax.set_xlim(min_xy[ix], max_xy[ix])
     ax.set_ylim(min_xy[iy], max_xy[iy])
     
-    # Draw goal states
-    for goal in abstr['goal']:
+    # Draw goal regions
+    for region in model.setup['specification']['goal'].values():
         
-        goalState = abstr['P'][goal]
-        if goalState['center'][1] == cut_value[0] and goalState['center'][3] == cut_value[1]:
+        lower  = region['limits'][:,0]
+        size   = region['limits'][:,1] - region['limits'][:,0]
         
-            goal_lower = [goalState['low'][ix], goalState['low'][iy]]
-            goalState = Rectangle(goal_lower, width=width[ix], height=width[iy], color="green", alpha=0.3, linewidth=None)
-            ax.add_patch(goalState)
-    
-    # Draw critical states
-    for crit in abstr['critical']:
+        lower_eps  = lower + max_error_bound[plot_time, :]
+        size_eps   = size - 2*max_error_bound[plot_time, :]
         
-        critState = abstr['P'][crit]
-        if critState['center'][1] == cut_value[0] and critState['center'][3] == cut_value[1]:
+        state = Rectangle(lower[[ix, iy]], width=size[ix], height=size[iy], 
+                              color="green", alpha=0.3, linewidth=None)
+        ax.add_patch(state)
         
-            critStateLow = [critState['low'][ix], critState['low'][iy]]
-            criticalState = Rectangle(critStateLow, width=width[ix], height=width[iy], color="red", alpha=0.3, linewidth=None)
-            ax.add_patch(criticalState)
+        bound = Rectangle(lower_eps[[ix, iy]], width=size_eps[ix], height=size_eps[iy], 
+                              edgecolor="green", linestyle='dashed', facecolor='None')
+        ax.add_patch(bound)
+        
+        
+    # Draw critical regions
+    for region in model.setup['specification']['critical'].values():
+        
+        lower  = region['limits'][:,0]
+        size   = region['limits'][:,1] - region['limits'][:,0]
+        
+        lower_eps  = lower - max_error_bound[plot_time, :]
+        size_eps   = size + 2*max_error_bound[plot_time, :]
+        
+        state = Rectangle(lower[[ix, iy]], width=size[ix], height=size[iy], 
+                              color="red", alpha=0.3, linewidth=None)
+        ax.add_patch(state)
+        
+        bound = Rectangle(lower_eps[[ix, iy]], width=size_eps[ix], height=size_eps[iy], 
+                              edgecolor="red", linestyle='dashed', facecolor='None')
+        ax.add_patch(bound)
     
     with plt.rc_context({"font.size": 5}):        
         # Draw every X-th label
         skip = 1
-        for i in range(0, abstr['nr_regions'], skip):
+        for i in range(0, len(abstr['P']), skip):
             
             state = abstr['P'][i]
             if state['center'][1] == cut_value[0] and state['center'][3] == cut_value[1]:
                             
                 ax.text(abstr['P'][i]['center'][ix], abstr['P'][i]['center'][iy], i, \
-                          verticalalignment='center', horizontalalignment='center' ) 
+                          va='baseline', ha='center' ) 
             
     # Add traces
     for i,trace in enumerate(traces):
@@ -687,37 +751,68 @@ def UAVplot2D(setup, model, abstr, traces, cut_value):
         # Convert nested list to 2D array
         trace_array = np.array(trace)
         
+        length = min(plot_time, np.shape(trace_array)[0])
+        
         # Extract x,y coordinates of trace
-        x = trace_array[:, ix]
-        y = trace_array[:, iy]
+        x = trace_array[:length, ix]
+        y = trace_array[:length, iy]
         points = np.array([x,y]).T
         
         # Plot precise points
-        plt.plot(*points.T, 'o', markersize=4, color="black");
+        plt.plot(*points.T, 'o', markersize=3, color="black");
         
-        # Linear length along the line:
-        distance = np.cumsum( np.sqrt(np.sum( np.diff(points, axis=0)**2, axis=1 )) )
-        distance = np.insert(distance, 0, 0)/distance[-1]
+        for j,point in enumerate(points):
+            
+            ax.text(point[0], point[1], str(j), c='red', verticalalignment='center', horizontalalignment='center')
         
-        # Interpolation for different methods:
-        alpha = np.linspace(0, 1, 75)
+            if belief_traces != None:
+                mean = belief_traces['mu'][i][j][ [ix,iy] ]
+                row_idx = col_idx = np.array([ix, iy])
+                cov = belief_traces['cov'][i][j][ row_idx[:, None], col_idx ]
+                
+                confidence_ellipse(mean, cov, ax, n_std=1, edgecolor='gold',
+                                   facecolor='gold', alpha=0.6)
         
-        interpolator =  interp1d(distance, points, kind='quadratic', axis=0)
-        interpolated_points = interpolator(alpha)
+        if length > 2:
         
-        # Plot trace
-        plt.plot(*interpolated_points.T, '-', color="blue", linewidth=1)
-        # plt.plot(x_values, y_values, color="blue")
+            # Linear length along the line:
+            distance = np.cumsum( np.sqrt(np.sum( np.diff(points, axis=0)**2, axis=1 )) )
+            distance = np.insert(distance, 0, 0)/distance[-1]
+            
+            # Interpolation for different methods:
+            alpha = np.linspace(0, 1, 75)
+            
+            interpolator =  interp1d(distance, points, kind='quadratic', axis=0)
+            interpolated_points = interpolator(alpha)
+            
+            # Plot trace
+            plt.plot(*interpolated_points.T, '-', color="blue", linewidth=0.5)
+            # plt.plot(x_values, y_values, color="blue")
+            
+        elif length == 2:
+            
+            plt.plot(*points.T[:2, :], '-', color="blue", linewidth=0.5)
+    
+    # Set title
+    ax.set_title("Trajectory up to time k="+str(plot_time), fontsize=8)
     
     # Set tight layout
     fig.tight_layout()
     
     # Save figure
-    filename = setup.directories['outputFcase']+'drone_trajectory'
-    for form in setup.plotting['exportFormats']:
-        plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
+    filename = setup.directories['outputFcase']+'drone_trajectory_k='+str(plot_time)
+    formats = setup.plotting['exportFormats']
+    
+    if 'png' not in formats:
+        formats += ['png']
+    
+    for form in formats:
+        if form != 'pdf' or plot_time == N:
+            plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight', dpi=300)
         
     plt.show()
+    
+    return filename+'.png'
     
 def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
     '''
@@ -760,7 +855,7 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
                                 model.setup['partition']['width'][4]])    
     
     # Draw goal states
-    for goal in abstr['goal']:
+    for goal in abstr['goal']['zero_bound']:
         
         goalState = abstr['P'][goal]
         if goalState['center'][1] == cut_value[0] and goalState['center'][3] == cut_value[1] and goalState['center'][5] == cut_value[2]:
@@ -773,7 +868,7 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
             goal.faceColor = (0,1,0,0.5)
             
     # Draw critical states
-    for crit in abstr['critical']:
+    for crit in abstr['critical']['zero_bound']:
         
         critState = abstr['P'][crit]
         if critState['center'][1] == cut_value[0] and critState['center'][3] == cut_value[1] and critState['center'][5] == cut_value[2]:
@@ -883,7 +978,7 @@ def reachabilityHeatMap(Ab):
         cut_centers = definePartitions(Ab.basemodel.n, [x_nr, 1, y_nr, 1], 
                Ab.basemodel.setup['partition']['width'], 
                Ab.basemodel.setup['partition']['origin'], onlyCenter=True)
-                
+        
     else:
         
         printWarning('No appropriate model detected')

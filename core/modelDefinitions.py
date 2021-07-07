@@ -41,7 +41,7 @@ class robot(master.LTI_master):
         
         # Set value of delta (how many time steps are grouped together)
         # Used to make the model fully actuated
-        self.setup['deltas'] = [2]
+        self.setup['deltas'] = [2] #[2,4,8]
         
         # Authority limit for the control u, both positive and negative
         self.setup['control']['limits']['uMin'] =  [-5]
@@ -57,15 +57,14 @@ class robot(master.LTI_master):
         self.setup['targets']['domain']      = 'auto'
 
         # Specification information
-        self.setup['specification']['goal']           = setStateBlock(self.setup['partition'], a=[0], b=[0])
-        self.setup['specification']['goal']     = defSpecBlock(self.setup['partition'], a=[-1,1], b=[-1,1])
-        self.setup['specification']['critical']       = [[]]
+        self.setup['specification']['goal']     = {1: defSpecBlock(self.setup['partition'], a=[-2,2], b=[-2,2])}
+        self.setup['specification']['critical'] = {1: defSpecBlock(self.setup['partition'], a=[9.9,10.1], b=None)}
         
         # Discretization step size
         self.tau = 1.0
         
         # Step-bound on property
-        self.setup['endTime'] = 64
+        self.setup['endTime'] = 16#64
     
     def setModel(self, observer):
         '''
@@ -98,6 +97,8 @@ class robot(master.LTI_master):
             self.r          = len(self.C)
             
             self.noise['v_cov'] = np.eye(np.size(self.C,0))*0.15
+            
+            self.filter = {'cov0': np.diag([2, 2])}
         
         # Disturbance matrix
         self.Q  = np.array([[0],[0]]) #np.array([[3.5],[-0.7]])
@@ -128,7 +129,7 @@ class UAV(master.LTI_master):
         
         # Set value of delta (how many time steps are grouped together)
         # Used to make the model fully actuated
-        self.setup['deltas'] = [2]
+        self.setup['deltas'] = [2,4]
         
         # Let the user make a choice for the model dimension
         self.modelDim, _  = ui.user_choice('model dimension',[2,3])
@@ -149,12 +150,11 @@ class UAV(master.LTI_master):
             self.setup['targets']['domain']      = 'auto'
             
             # Specification information
-            self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=[-4,-6], b=[None], c=[4,6], d=[None])
+            self.setup['specification']['goal']     = {1: defSpecBlock(self.setup['partition'], a=[-9, -5], b=None, c=[5, 9], d=None)}
             
-            self.setup['specification']['critical'] = np.vstack((
-                setStateBlock(self.setup['partition'], a=[-6,-4], b=[None], c=[-2,0,2], d=[None]),
-                setStateBlock(self.setup['partition'], a=[4,6], b=[None], c=[-6,-4], d=[None])
-                ))
+            self.setup['specification']['critical'] = {1: defSpecBlock(self.setup['partition'], a=[-9,-3.5], b=None, c=[-2,2], d=None),
+                                                       2: defSpecBlock(self.setup['partition'], a=[3.5, 6.5], b=None, c=[-9, -4], d=None),
+                                                       3: defSpecBlock(self.setup['partition'], a=[-0.5, 4], b=None, c=[-1, 3], d=None)}
             
         elif self.modelDim == 3:
             
@@ -190,7 +190,7 @@ class UAV(master.LTI_master):
         self.tau = 1.0
         
         # Step-bound on property
-        self.setup['endTime'] = 32
+        self.setup['endTime'] = 12
 
     def setModel(self, observer):
         '''
@@ -226,7 +226,7 @@ class UAV(master.LTI_master):
             
             if observer:
                 # Observation matrix
-                self.C          = np.array([[1, 0, 1, 0, 1, 0]])
+                self.C          = np.array([[1,0,0,0,0,0], [0,0,1,0,0,0], [0,0,0,0,1,0]])
                 self.r          = len(self.C)
                 
                 self.noise['v_cov'] = np.eye(np.size(self.C,0))*0.15
@@ -238,20 +238,23 @@ class UAV(master.LTI_master):
             # Disturbance matrix
             self.Q  = np.array([[0],[0],[0],[0]])
         
+            # Covariance of the process noise
+            self.noise['w_cov'] = np.diag([0.10, 0.02, 0.10, 0.02])
+        
             if observer:
                 # Observation matrix
-                self.C          = np.array([[1, 0, 1, 0]])
+                self.C          = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
                 self.r          = len(self.C)
-            
-                self.noise['v_cov'] = np.eye(np.size(self.C,0))*0.3
+                
+                self.noise['v_cov'] = np.eye(np.size(self.C,0))*0.2
+                
+        if observer:
+            self.filter = {'cov0': np.diag([8, .2, 4, .2])}
             
         # Determine system dimensions
         self.n = np.size(self.A,1)
         self.p = np.size(self.B,1)
-
-        # Covariance of the process noise
-        self.noise['w_cov'] = np.eye(np.size(self.A,1))*0.015
-           
+   
     def setTurbulenceNoise(self, N):
         '''
         Set the turbulence noise samples for N samples
@@ -454,12 +457,12 @@ class building_1room(master.LTI_master):
             
         if gridType == 0:
             nrPerDim = [19, 20]
-            width = [0.2, 0.4]
-            goal = [21]
+            width = [0.2, 0.2]
+            goal = [20.6,21.4]#[20.9, 21.1]
         else:
             nrPerDim = [40, 40]
             width = [0.1, 0.1]
-            goal = [20.95, 21.05]
+            goal = [20.6, 21.4]
         
         # Partition size
         self.setup['partition']['nrPerDim']  = nrPerDim
@@ -471,15 +474,15 @@ class building_1room(master.LTI_master):
         self.setup['targets']['domain']      = 'auto'
         
         # Specification information
-        self.setup['specification']['goal'] = setStateBlock(self.setup['partition'], a=goal, b=[None])
+        self.setup['specification']['goal'] = {1: defSpecBlock(self.setup['partition'], a=goal, b=None)}
         
-        self.setup['specification']['critical'] = [[]]
+        self.setup['specification']['critical'] = {}
         
         # Discretization step size
         self.tau = 15 # NOTE: in minutes for BAS!
         
         # Step-bound on property
-        self.setup['endTime'] = 64
+        self.setup['endTime'] = 16#64
 
     def setModel(self, observer):           
         '''
@@ -531,6 +534,17 @@ class building_1room(master.LTI_master):
                 [ (k0_a*w*Tswb) ],
                 ])
         
+        self.noise = dict()
+        
+        if observer:
+            # Observation matrix
+            self.C          = np.eye(2) #np.array([[1, 0]])
+            self.r          = len(self.C)
+            
+            self.noise['v_cov'] = np.eye(np.size(self.C,0))*0.1
+            
+            self.filter = {'cov0': np.diag([0.5, 0.5])}
+        
         # Discretize model with respect to time
         # self.A, self.B, self.Q = discretizeGearsMethod(A_cont, B_cont, W_cont, self.tau)
         
@@ -541,8 +555,7 @@ class building_1room(master.LTI_master):
         # Determine system dimensions
         self.n = np.size(self.A,1)
         self.p = np.size(self.B,1)
-
-        self.noise = dict()
+        
         self.noise['w_cov'] = np.diag([ BAS.Zone1['Tz']['sigma'], BAS.Radiator['rw']['sigma'] ])
 
         

@@ -28,6 +28,7 @@ import scipy.stats              # For statistical functions
 
 import matplotlib.transforms as transforms
 from matplotlib.patches import Ellipse
+from scipy.spatial import Delaunay
 
 class table(object):
     '''
@@ -410,14 +411,16 @@ def defSpecBlock(partition, **kwargs):
         print('State dimension is',stateDim,'but only',nrArgs,'arguments given.')
         sys.exit()
     
-    extr = np.array(partition['nrPerDim']) * np.array(partition['width'])
+    extr = partition['origin'] + np.array(partition['nrPerDim']) * np.array(partition['width']) * 2
     
     limits = np.array([value if value != None else [-extr[d], extr[d]] 
                        for d,value in enumerate(kwargs.values())])
     
     vertices = np.array(list(itertools.product(*limits)))
     
-    return vertices
+    # hull = Delaunay(vertices, qhull_options='QJ')
+    
+    return {'vertices': vertices, 'limits': limits} #, 'hull': hull}
 
 def unit_vector(vector):
     """ Returns the unit vector of the vector.  """

@@ -251,7 +251,7 @@ class scenarioBasedAbstraction(Abstraction):
             
             # Create PRISM file (explicit way)
             model_size, self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
-                self.mdp.writePRISM_explicit(self.abstr, self.trans, self.setup.mdp['mode'])   
+                self.mdp.writePRISM_explicit(self.abstr, self.trans, mode=self.setup.mdp['mode'])   
         
         else:
         
@@ -435,7 +435,7 @@ class scenarioBasedAbstraction(Abstraction):
         
         print('\nGenerate plots')
         
-        if self.abstr['nr_regions'] <= 1000:
+        if len(self.abstr['P']) <= 1000:
         
             from .postprocessing.createPlots import createProbabilityPlots
             
@@ -490,7 +490,7 @@ class scenarioBasedAbstraction(Abstraction):
         n_list = self.setup.montecarlo['init_timesteps']
         
         self.mc['results']['reachability_probability'] = \
-            np.zeros((self.abstr['nr_regions'],len(n_list)))
+            np.zeros((len(self.abstr['P']),len(n_list)))
         
         # Column widths for tabular prints
         if self.setup.main['verbose']:
@@ -500,7 +500,7 @@ class scenarioBasedAbstraction(Abstraction):
             print(' -- Computing required Gaussian random variables...')
         
         if self.setup.montecarlo['init_states'] == False:
-            init_state_idxs = np.arange(self.abstr['nr_regions'])
+            init_state_idxs = self.abstr['P'].keys() #np.arange(len(self.abstr['P']))
             
         else:
             init_state_idxs = self.setup.montecarlo['init_states']
@@ -551,14 +551,14 @@ class scenarioBasedAbstraction(Abstraction):
                     # (given by the optimal policy to the MDP)
                     delta = self.results['optimal_delta'][n0,i]
                     
-                    if i in self.abstr['goal']:
+                    if i in self.abstr['goal'][n0]:
                         # If the initial state is already the goal state, succes
                         # Then abort the current iteration, as we have achieved the goal
                         self.mc['results'][n0][i]['goalReached'][m] = True
                         
                         if self.setup.main['verbose']:
                             tab.print_row([n0, i, m, n0, 'Initial state is goal state'], sort="Success")
-                    elif delta == 0:
+                    elif delta == -1:
                         # If delta is zero, no policy is known, and reachability is zero
                         if self.setup.main['verbose']:
                             tab.print_row([n0, i, m, n0, 'No initial policy known, so abort'], sort="Warning")
@@ -607,7 +607,7 @@ class scenarioBasedAbstraction(Abstraction):
                                 x_region[k] = -1
                             
                             # If current region is the goal state ... 
-                            if x_region[k] in self.abstr['goal']:
+                            if x_region[k] in self.abstr['goal'][k]:
                                 # Then abort the current iteration, as we have achieved the goal
                                 self.mc['results'][n0][i]['goalReached'][m] = True
                                 
@@ -615,7 +615,7 @@ class scenarioBasedAbstraction(Abstraction):
                                     tab.print_row([n0, i, m, k, 'Goal state reached'], sort="Success")
                                 break
                             # If current region is in critical states...
-                            elif x_region[k] in self.abstr['critical']:
+                            elif x_region[k] in self.abstr['critical'][k]:
                                 # Then abort current iteration
                                 if self.setup.main['verbose']:
                                     tab.print_row([n0, i, m, k, 'Critical state reached, so abort'], sort="Warning")

@@ -18,10 +18,11 @@ ______________________________________________________________________________
 import numpy as np
 import itertools
 from .commons import table, is_invertible, floor_decimal, confidence_ellipse, \
-    Chi2probability                   
+    Chi2probability, tocDiff
 from scipy.spatial import Delaunay
 from scipy.linalg import sqrtm
 import cvxpy as cp
+from scipy.stats import mvn
 
 import matplotlib.pyplot as plt
 
@@ -42,6 +43,11 @@ def in_hull(p, hull):
     boolArray = hull.find_simplex(p) >= 0
 
     return boolArray
+    
+def point_in_hull(queries, hull):
+    equations = hull.get_simplex_facet_array()[2].T
+    
+    return np.all(queries @ equations[:-1] < - equations[-1], axis=1)
 
 def computeRegionCenters(points, partition):
     '''
@@ -271,16 +277,61 @@ def kalmanFilter(model, cov0):
     cov = (np.eye(model.n) - K_gain @ model.C) @ cov_pred
     
     # Calculate measure on the covariance matrix of the mean of the future belief
-    cov_tilde_measure = covarianceEllipseSize( cov_tilde )
+    cov_tilde_measure, _ = covarianceEllipseSize( cov_tilde )
     
-    # Compute the maximum error between the mean of the belief, and the actual
-    # state (maximum error is the maximum radius of the associated ellipse)
+    hyperbox = True
     
-    error_epsilon = 0.2
-    
-    times_stddev = Chi2probability(df=model.n, epsilon=error_epsilon)
-    cov_error = cov * times_stddev**2
-    max_error_bound = covarianceEllipseSize(cov_error)
+    if not hyperbox:
+        ### Method with separated dimensions
+        
+        # Compute the maximum error between the mean of the belief, and the actual
+        # state
+        beta = 0.05
+        cumprob = 0.5 * np.ones(model.n)
+        epsilon = np.zeros(model.n)
+        
+        origin = np.zeros(model.n)
+        
+        for dim in range(model.n):
+            while cumprob[dim] > beta:
+                epsilon[dim] += 0.01
+                
+                
+                lower = [-100 for d in range(model.n)]
+                upper = [100 if d != dim else -epsilon[d] for d in range(model.n)]
+                
+                cumprob[dim] = mvn.mvnun(lower=lower, upper=upper, means=origin, covar=cov)[0]
+        
+        
+        max_error_bound = epsilon
+        
+    else:
+        ### Hyper-rectangular method with single parameters
+        
+        beta = 0.4
+        cumprob = 0
+        epsilon = 0
+        inf_dims = []
+        inf_lim = 10
+        
+        count = 0
+        count_max = 10000
+        while cumprob < 1-beta:
+            if count > count_max:
+                print(' -- Computing error bound aborted after',count_max,'iterations')
+                break
+            
+            epsilon += 0.001
+            
+            lower = [-epsilon if d not in inf_dims else -inf_lim for d in range(model.n)]
+            upper = [ epsilon if d not in inf_dims else  inf_lim for d in range(model.n)]
+            
+            cumprob = mvn.mvnun(lower=lower,
+                                upper=upper,
+                                means=np.zeros(model.n), covar=cov)[0]
+            
+        max_error_bound = np.array([epsilon if d not in inf_dims else inf_lim 
+                                    for d in range(model.n)])
     
     return cov_pred, K_gain, cov_tilde, cov, cov_tilde_measure, max_error_bound
 
@@ -359,7 +410,7 @@ def steadystateCovariance(covariances, verbose=False):
         confidence_ellipse(mean, np.real(worst_cov), ax, n_std=1, 
                            label= 'Worst-case covariance', edgecolor='blue')
         confidence_ellipse(mean, np.real(best_cov), ax, n_std=1, 
-                           label= 'Best-case covariance', edgecolor='blue')
+                           label= 'Best-case covariance', edgecolor='red')
            
         ax.autoscale()
         ax.set_aspect('equal')
@@ -407,7 +458,7 @@ def steadystateCovariance_sdp(covariances, verbose=False):
     prob_w = cp.Problem(cp.Minimize(cp.trace(X_w)), constraints_w)
     prob_w.solve()
     
-    prob_b = cp.Problem(cp.Maximize(cp.log_det(X_b)), constraints_b)
+    prob_b = cp.Problem(cp.Maximize(cp.trace(X_b)), constraints_b)
     prob_b.solve()
     
     worst_cov = np.copy(X_w.value)
@@ -417,7 +468,7 @@ def steadystateCovariance_sdp(covariances, verbose=False):
         confidence_ellipse(mean, worst_cov, ax, n_std=1, 
                            label= 'Worst-case covariance', edgecolor='blue')
         confidence_ellipse(mean, best_cov, ax, n_std=1, 
-                           label= 'Best-case covariance', edgecolor='blue')
+                           label= 'Best-case covariance', edgecolor='red')
            
         ax.autoscale()
         ax.set_aspect('equal')
@@ -449,13 +500,15 @@ def covarianceEllipseSize(cov):
     # Determine eigenvectors and values
     eigenval = np.linalg.eigvals(cov)
     
-    # Retreive the largest value
+    # Retreive the largest/smallest value
     max_eigenval = eigenval[np.argmax(eigenval)]
+    min_eigenval = eigenval[np.argmin(eigenval)]
     
-    # Determine largest width parameter of ellipse
-    ellipse_size = np.sqrt( max_eigenval )
+    # Determine width parameter of ellipse
+    max_ellipse_size = np.sqrt( max_eigenval )
+    min_ellipse_size = np.sqrt( min_eigenval )
     
-    return ellipse_size
+    return max_ellipse_size, min_ellipse_size
 
 def definePartitions(dim, nrPerDim, regionWidth, origin, onlyCenter=False):
     '''
@@ -600,3 +653,32 @@ def cubic2skew(cubic, abstr):
 def skew2cubic(skew, abstr):
     origin = abstr['origin']
     return (np.array(skew) - origin) @ abstr['basis_vectors_inv'] + origin
+
+def computeRegionOverlap(limitsA, limitsB):
+    '''
+    Compute the intersection (overlap) between two given regions
+
+    Parameters
+    ----------
+    limitsA : Array
+        Specification of the first region.
+    limitsA : Array
+        Specification of the second region.
+
+    Returns
+    -------
+    limits : Array
+        Specification of the intersections of the two input regions.
+
+    '''
+    
+    low = np.maximum(limitsA[:,0], limitsB[:,0])
+    upp = np.minimum(limitsA[:,1], limitsB[:,1])
+    
+    if all(low < upp):
+        
+        return np.vstack((low, upp)).T
+    
+    else:
+        
+        return None

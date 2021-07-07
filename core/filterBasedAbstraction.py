@@ -23,7 +23,8 @@ import random                   # Import to use random variables
 from scipy.stats import mvn
 
 from .mainFunctions import computeScenarioBounds_sparse, defineDistances, \
-    computeRegionCenters, cubic2skew, skew2cubic, kalmanFilter
+    computeRegionCenters, cubic2skew, skew2cubic, kalmanFilter, in_hull, \
+    steadystateCovariance, steadystateCovariance_sdp, covarianceEllipseSize
 from .commons import tic, ticDiff, tocDiff, table, printWarning, \
     floor_decimal, extractRowBlockDiag
 
@@ -63,6 +64,9 @@ class filterBasedAbstraction(Abstraction):
         
         Abstraction.__init__(self)
         
+        # Apply Kalman filter to compute covariance over time
+        self.KalmanPrediction()
+        
         Abstraction.definePartition(self)
         
         # Compute array of all region centers
@@ -71,11 +75,10 @@ class filterBasedAbstraction(Abstraction):
         for a in range(self.abstr['nr_actions']):
             
             self.abstr['P'][a]['distances'] = self.abstr['target']['d'][a] - allCentersArray
-            
-            # self.abstr['P'][a]['distances'] = defineDistances(self.abstr['P'], 
-            #                                   self.abstr['target']['d'][a])
+            # self.abstr['P'][a]['euclidDist'] = np.hypot(*(self.abstr['target']['d'][a] - allCentersArray).T)
+            # self.abstr['P'][a]['priority'] = [i for i,d in enumerate(self.abstr['P'][a]['distances']) if sum(d == 0) == len(d)-1]
         
-    def _computeProbabilityBounds(self, tab, k, delta):
+    def _computeProbabilityBounds(self, tab, k, delta, verbose=False):
         '''
         Compute transition probability intervals (bounds)
 
@@ -98,146 +101,325 @@ class filterBasedAbstraction(Abstraction):
         printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
 
         nr_decimals = 5
+        threshold_decimals = 4
 
         # Determine minimum action time step width
-        min_delta = min(self.basemodel.setup['deltas'])
-            
+        min_delta = min(self.setup.deltas)
+        
         if self.setup.lic['enabled'] and delta > min_delta and k not in ['steadystate']:
 
             print(' -- Copy transition probabilities for',delta,'at time',k)
             
             # Copy transition probabilities
-            prob = self.abstr['prob'][min_delta][k]
+            prob = self.trans['prob'][min_delta][k]
                     
         else:
             
+            # Above the threshold distance, we already know that the prob.
+            # to reach it, is below the number of threshold decimals
+            threshold_distance = np.full(self.basemodel.n, np.inf)
+            
+            # Determine covariance of distribution                
+            if k == 'steadystate':
+                Sigma_worst = self.km[delta]['steady']['worst']
+                Sigma_best  = self.km[delta]['steady']['best']
+                
+                SigmaEqual = False
+                
+            elif self.setup.lic['enabled']:
+                # Retreive waiting time
+                gamma = self.km[delta]['waiting_time'][k]
+                
+                Sigma_worst = self.km[delta]['cov_tilde'][k+delta+gamma]
+                Sigma_best  = self.km['cov_tilde_min']
+                
+                SigmaEqual = False
+                
+            else:
+                Sigma_worst = self.km[delta]['cov_tilde'][k+delta]
+                Sigma_best  = self.km[delta]['cov_tilde'][k+delta]
+                
+                SigmaEqual = True
+                
+            # Transform covariance back to hypercubic partition
+            SigmaCubic_worst = self.abstr['basis_vectors_inv'].T @ Sigma_worst @ self.abstr['basis_vectors_inv'] 
+            SigmaCubic_best = self.abstr['basis_vectors_inv'].T @ Sigma_best @ self.abstr['basis_vectors_inv'] 
+            
+            ######
+            
+            maxA, _ = covarianceEllipseSize(SigmaCubic_worst)
+            maxB, _ = covarianceEllipseSize(SigmaCubic_best)
+            maxStdev = max([maxA,maxB])
+            
+            from scipy.stats import norm
+            limit_norm = norm.ppf(1-10**-(threshold_decimals+1), loc=0, scale=maxStdev) + \
+                            self.basemodel.setup['partition']['width']
+            
+            print('Max. distance for non-zero probability:',limit_norm)
+            
+            ######
+            
             # (Re)initialize probability memory dictionary
             prob = dict()
-            if k == 'steadystate':
-                prob_worst_mem = dict()
-                prob_best_mem  = dict()
-            else:
-                prob_mem = dict()
+            prob_worst_mem = dict()
+            prob_best_mem  = dict()
             
             # For every action (i.e. target point)
             for a in range(self.abstr['nr_actions']):
             
                 # Check if action a is available in any state at all
-                if len(self.abstr['actions_inv'][delta][a]) > 0 or \
-                    self.setup.lic['enabled']:
+                if len(self.abstr['actions_inv'][delta][a]) > 0: # or \
+                    #self.setup.lic['enabled']:
                         
                     prob[a] = dict()
-
-                    # Determine mean and covariance of distribution                
+                        
+                    # Retrieve and transform mean of distribution
                     mu = self.abstr['target']['d'][a]
-                    if k == 'steadystate':
-                        Sigma_worst = self.km[delta]['steady']['worst']
-                        Sigma_best = self.km[delta]['steady']['best']
-                        
-                        # Transform samples back to hypercubic partition
-                        muCubic = skew2cubic(mu, self.abstr)
-                        SigmaCubic_worst = self.abstr['basis_vectors_inv'].T @ Sigma_worst @ self.abstr['basis_vectors_inv'] 
-                        SigmaCubic_best = self.abstr['basis_vectors_inv'].T @ Sigma_best @ self.abstr['basis_vectors_inv'] 
-                        
-                        probs_worst_all = np.zeros(self.abstr['nr_regions'])
-                        probs_best_all  = np.zeros(self.abstr['nr_regions'])
-                        
-                        # For every possible resulting region
-                        for j in range(self.abstr['nr_regions']):
-                        
-                            # Compute the vector difference between the target point
-                            # and the current region
-                            coord_distance = tuple(self.abstr['P'][a]['distances'][j])
-                            coord_distance_min = tuple(-self.abstr['P'][a]['distances'][j])    
-                        
-                            # Check if we already calculated this one
-                            if coord_distance in prob_worst_mem and not self.setup.main['skewed']:
-                                
-                                # If so, copy from previous
-                                probs_worst_all[j] = prob_worst_mem[coord_distance]
-                                probs_best_all[j]  = prob_best_mem[coord_distance]
-                                
-                            elif coord_distance_min in prob_worst_mem and not self.setup.main['skewed']:
-                                
-                                # If so, copy from previous
-                                probs_worst_all[j] = prob_worst_mem[coord_distance_min]
-                                probs_best_all[j]  = prob_best_mem[coord_distance_min]
-                                
-                            else:    
-                        
-                                probs_worst_all[j] = floor_decimal(mvn.mvnun(
-                                    self.abstr['P'][j]['low'], self.abstr['P'][j]['upp'],
-                                    muCubic, SigmaCubic_worst)[0], 4)
-                                
-                                probs_best_all[j] = floor_decimal(mvn.mvnun(
-                                    self.abstr['P'][j]['low'], self.abstr['P'][j]['upp'],
-                                    muCubic, SigmaCubic_best)[0], 4)
-                                
-                                if not self.setup.main['skewed']:
-                                    prob_worst_mem[coord_distance] = probs_worst_all[j]
-                                    prob_best_mem[coord_distance]  = probs_best_all[j]
-                        
-                        nonzero_idxs = np.array([idx for idx,(ub1,ub2) in enumerate(zip(probs_worst_all, probs_best_all)) 
-                                                 if ub1 > 0 or ub2 > 0])
-                        
-                        probs_lb = np.minimum(probs_worst_all[nonzero_idxs], probs_best_all[nonzero_idxs]) \
-                                    - self.setup.belief['interval_margin']
-                        probs_ub = np.maximum(probs_worst_all[nonzero_idxs], probs_best_all[nonzero_idxs]) \
-                                    + self.setup.belief['interval_margin']
-                        
-                        # Compute deadlock probability intervals
-                        deadlock_lb = 1-sum( np.maximum(probs_worst_all[nonzero_idxs], probs_best_all[nonzero_idxs]) ) \
-                                    - self.setup.belief['interval_margin']
-                        deadlock_ub = 1-sum( np.minimum(probs_worst_all[nonzero_idxs], probs_best_all[nonzero_idxs]) ) \
-                                    + self.setup.belief['interval_margin']
-                                    
-                        probs_approx_all = np.mean((probs_worst_all, probs_best_all), axis=0)
-                        
-                    else:
-                        Sigma = self.km[delta]['cov_tilde'][k+delta]
-                        
-                        # Transform samples back to hypercubic partition
-                        muCubic = skew2cubic(mu, self.abstr)
-                        SigmaCubic = self.abstr['basis_vectors_inv'].T @ Sigma @ self.abstr['basis_vectors_inv'] 
+                    muCubic = skew2cubic(mu, self.abstr)
                     
-                        probs_approx_all = np.zeros(self.abstr['nr_regions'])
+                    probs_worst_all = np.zeros(len(self.abstr['P']))
+                    probs_best_all  = np.zeros(len(self.abstr['P']))
+                    
+                    prob_goal_worst_sum = 0
+                    prob_goal_best_sum = 0
+                    
+                    prob_critical_worst_sum = 0
+                    prob_critical_best_sum = 0
+                    
+                    # For every possible resulting region
+                    for j,region in self.abstr['P'].items():
                         
-                        # For every possible resulting region
-                        for j in range(self.abstr['nr_regions']):
+                        ### 1) Main transition probability
+                        # Compute the vector difference between the target point
+                        # and the current region
+                        coord_distance = self.abstr['P'][a]['distances'][j]
                         
-                            # Compute the vector difference between the target point
-                            # and the current region
-                            coord_distance = tuple(self.abstr['P'][a]['distances'][j])
-                            coord_distance_min = tuple(-self.abstr['P'][a]['distances'][j])    
+                        if any(np.abs(coord_distance) > limit_norm):
+                            continue
                         
-                            # Check if we already calculated this one
-                            if coord_distance in prob_mem and not self.setup.main['skewed']:
-                                
-                                # If so, copy from previous
-                                probs_approx_all[j] = prob_mem[coord_distance]
-                                
-                            elif coord_distance_min in prob_mem and not self.setup.main['skewed']:
-                                
-                                # If so, copy from previous
-                                probs_approx_all[j] = prob_mem[coord_distance_min]
+                        # Check if we already calculated this one
+                        if tuple(coord_distance) in prob_worst_mem and not self.setup.main['skewed']:
+                            
+                            # If so, copy from previous
+                            probs_worst = prob_worst_mem[tuple(coord_distance)]
+                            probs_best  = prob_best_mem[tuple(coord_distance)]
+                            
+                        elif tuple(-coord_distance) in prob_worst_mem and not self.setup.main['skewed']:
+                            
+                            # If so, copy from previous
+                            probs_worst = prob_worst_mem[tuple(-coord_distance)]
+                            probs_best  = prob_best_mem[tuple(-coord_distance)]
+                            
+                        else:    
+                    
+                            # If both covariances are equal, only compute once
+                            if SigmaEqual:
+                                probs_worst = probs_best = \
+                                    floor_decimal(mvn.mvnun(
+                                    region['low'], region['upp'],
+                                    muCubic, SigmaCubic_worst)[0], threshold_decimals)
                                 
                             else:
-                        
-                                probs_approx_all[j] = floor_decimal(mvn.mvnun(
-                                    self.abstr['P'][j]['low'], self.abstr['P'][j]['upp'],
-                                    muCubic, SigmaCubic)[0], 4)
+                                probs_worst = floor_decimal(mvn.mvnun(
+                                    region['low'], region['upp'],
+                                    muCubic, SigmaCubic_worst)[0], threshold_decimals)
                                 
-                                if not self.setup.main['skewed']:
-                                    prob_mem[coord_distance] = probs_approx_all[j]
+                                probs_best = floor_decimal(mvn.mvnun(
+                                    region['low'], region['upp'],
+                                    muCubic, SigmaCubic_best)[0], threshold_decimals)
+                            
+                            if not self.setup.main['skewed']:
+                                prob_worst_mem[tuple(coord_distance)] = probs_worst
+                                prob_best_mem[tuple(coord_distance)]  = probs_best
                         
-                        nonzero_idxs = np.array([idx for idx,ub in enumerate(probs_approx_all) if ub > 0])
+                        if k == 'steadystate':
+                            k_prime = self.setup.mdp['k_steady_state'] + delta
+                        else:
+                            k_prime = k + delta
                         
-                        probs_lb = probs_approx_all[nonzero_idxs] - self.setup.belief['interval_margin']
-                        probs_ub = probs_approx_all[nonzero_idxs] + self.setup.belief['interval_margin']
+                        ### 2) Probability to reach goal state
+                        # Subtract the probability to end up in a goal state
+                        if j in self.abstr['goal'][k_prime] and (probs_worst > 0 or probs_best > 0):
+                            
+                            all_limits = self.abstr['goal'][k_prime][j]
+                        
+                            # If both covariances are equal, only compute once
+                            if SigmaEqual:
+                                prob_goal_worst = prob_goal_best = \
+                                    floor_decimal(sum([mvn.mvnun(
+                                     list(lims[:,0]), list(lims[:,1]), muCubic, SigmaCubic_worst)[0] 
+                                     for lims in all_limits.values()
+                                     ]), 6)     
+                        
+                            else:
+                                prob_goal_worst = floor_decimal(sum([mvn.mvnun(
+                                    list(lims[:,0]), list(lims[:,1]), muCubic, SigmaCubic_worst)[0] 
+                                    for lims in all_limits.values()
+                                    ]), 6)
+                                prob_goal_best = floor_decimal(sum([mvn.mvnun(
+                                    list(lims[:,0]), list(lims[:,1]), muCubic, SigmaCubic_best)[0] 
+                                    for lims in all_limits.values()
+                                    ]), 6)
+                                
+                        else:
+                            prob_goal_worst = 0
+                            prob_goal_best  = 0
+                        
+                        ### 3) Probability to reach critical state
+                        # Subtract the probability to end up in a critical state
+                        if j in self.abstr['critical'][k_prime] and (probs_worst > 0 or probs_best > 0):
+                            
+                            all_limits = self.abstr['critical'][k_prime][j]
+                                
+                            # If both covariances are equal, only compute once
+                            if SigmaEqual:
+                                prob_critical_worst = prob_critical_best = \
+                                    floor_decimal(sum([mvn.mvnun(
+                                    lims[:,0], lims[:,1], muCubic, SigmaCubic_worst)[0] 
+                                    for lims in all_limits.values()
+                                    ]), threshold_decimals)
+                            
+                            else:
+                                prob_critical_worst = floor_decimal(sum([mvn.mvnun(
+                                    lims[:,0], lims[:,1], muCubic, SigmaCubic_worst)[0] 
+                                    for lims in all_limits.values()
+                                    ]), threshold_decimals)
+                                
+                                prob_critical_best = floor_decimal(sum([mvn.mvnun(
+                                    lims[:,0], lims[:,1], muCubic, SigmaCubic_best)[0] 
+                                    for lims in all_limits.values()
+                                    ]), threshold_decimals)
+                            
+                        else:
+                            prob_critical_worst = 0
+                            prob_critical_best  = 0
+                            
+                        probs_worst_all[j] = np.copy(probs_worst - prob_critical_worst - prob_goal_worst)
+                        probs_best_all[j]  = np.copy(probs_best - prob_critical_best - prob_goal_best)
+                        
+                        prob_goal_worst_sum += prob_goal_worst
+                        prob_goal_best_sum  += prob_goal_best
                     
-                        # Compute deadlock probability intervals
-                        deadlock_lb = 1-sum(probs_approx_all[nonzero_idxs]) - self.setup.belief['interval_margin']
-                        deadlock_ub = 1-sum(probs_approx_all[nonzero_idxs]) + self.setup.belief['interval_margin']
+                        prob_critical_worst_sum += prob_critical_worst
+                        prob_critical_best_sum += prob_critical_best
+                    
+                    nonzero_idxs = np.array([idx for idx,(ub1,ub2) in enumerate(zip(probs_worst_all, probs_best_all)) 
+                                             if ub1 > 0 or ub2 > 0])
+                    
+                    if len(nonzero_idxs) > 0:
+                        approx = np.vstack((probs_worst_all[nonzero_idxs], probs_best_all[nonzero_idxs]))
+                    else:
+                        approx = np.array([[]])
+                    goal        = np.array([prob_goal_worst_sum, prob_goal_best_sum])
+                    critical    = np.array([prob_critical_worst_sum, prob_critical_best_sum])
+                        
+                    # else:
+                        
+                    #     # Retreive waiting time
+                    #     gamma = self.km[delta]['waiting_time'][k]
+                        
+                    #     Sigma = self.km[delta]['cov_tilde'][k+delta+gamma]
+                        
+                    #     # Transform samples back to hypercubic partition
+                    #     muCubic = skew2cubic(mu, self.abstr)
+                    #     SigmaCubic = self.abstr['basis_vectors_inv'].T @ Sigma @ self.abstr['basis_vectors_inv'] 
+                    
+                    #     probs_approx_all = np.zeros(len(self.abstr['P']))
+                    #     prob_goal_sum = 0
+                    #     prob_critical_sum = 0
+                        
+                    #     # For every possible resulting region
+                    #     for j,region in self.abstr['P'].items():
+                        
+                    #         ### 1) Main transition probability
+                    #         # Compute the vector difference between the target point
+                    #         # and the current region
+                    #         coord_distance = tuple(self.abstr['P'][a]['distances'][j])
+                    #         coord_distance_min = tuple(-self.abstr['P'][a]['distances'][j])    
+                        
+                    #         # Check if we already calculated this one
+                    #         if coord_distance in prob_mem and not self.setup.main['skewed']:
+                                
+                    #             # If so, copy from previous
+                    #             probs_approx = prob_mem[coord_distance]
+                                
+                    #         elif coord_distance_min in prob_mem and not self.setup.main['skewed']:
+                                
+                    #             # If so, copy from previous
+                    #             probs_approx = prob_mem[coord_distance_min]
+                                
+                    #         else:
+                        
+                    #             # Compute new transition
+                    #             probs_approx = floor_decimal(mvn.mvnun(
+                    #                 region['low'], region['upp'],
+                    #                 muCubic, SigmaCubic)[0], 4)
+                                
+                    #             # Add to memory
+                    #             if not self.setup.main['skewed']:
+                    #                 prob_mem[coord_distance] = probs_approx
+                                  
+                    #         ### 2) Probability to reach goal state
+                    #         # Subtract the probability to end up in a goal state
+                    #         if j in self.abstr['goal'][k+delta] and probs_approx > 0:
+                                
+                    #             all_limits = self.abstr['goal'][k+delta][j]
+                            
+                    #             prob_goal = floor_decimal(sum([mvn.mvnun(
+                    #                 list(lims[:,0]), list(lims[:,1]), muCubic, SigmaCubic)[0] 
+                    #                 for lims in all_limits.values()
+                    #                 ]), 5)
+                                
+                    #         else:
+                    #             prob_goal = 0
+                                 
+                    #         ### 3) Probability to reach critical state
+                    #         # Subtract the probability to end up in a critical state
+                    #         if j in self.abstr['critical'][k+delta] and probs_approx > 0:
+                                
+                    #             all_limits = self.abstr['critical'][k+delta][j]
+                                
+                    #             prob_critical = floor_decimal(sum([mvn.mvnun(
+                    #                 list(lims[:,0]), list(lims[:,1]), muCubic, SigmaCubic)[0] 
+                    #                 for lims in all_limits.values()
+                    #                 ]), 5)
+                                
+                    #         else:
+                    #             prob_critical = 0
+                            
+                    #         probs_approx_all[j] = np.copy(probs_approx - prob_critical - prob_goal)
+                    #         prob_critical_sum += prob_critical
+                    #         prob_goal_sum += prob_goal
+                        
+                    #     nonzero_idxs = np.array([idx for idx,ub in enumerate(probs_approx_all) if ub > 0])
+                        
+                    #     if len(nonzero_idxs) > 0:
+                    #         approx = np.array([probs_approx_all[nonzero_idxs]])
+                    #     else:
+                    #         approx = np.array([[]])
+                    #     goal = np.array([prob_goal_sum])
+                    #     critical = np.array([prob_critical_sum])
+                        
+                    # Compute probability intervals
+                    probs_lb = np.min(approx, axis=0) - self.setup.main['interval_margin']
+                    probs_ub = np.max(approx, axis=0) + self.setup.main['interval_margin']
+                       
+                    # Compute deadlock probability intervals
+                    deadlock_lb = 1-sum(np.max(approx, axis=0)) - max(goal) - max(critical) - self.setup.main['interval_margin']
+                    deadlock_ub = 1-sum(np.min(approx, axis=0)) - min(goal) - min(critical) + self.setup.main['interval_margin']
+                        
+                    # Compute probability intervals to reach goal
+                    goal_lb = min(goal) - self.setup.main['interval_margin']
+                    goal_ub = max(goal) + self.setup.main['interval_margin']    
+                    
+                    # Compute approximate probability to reach goal
+                    goal_approx = np.round(np.mean(goal), nr_decimals)
+                        
+                    critical_lb = min(critical) - self.setup.main['interval_margin']
+                    critical_ub = max(critical) + self.setup.main['interval_margin']  
+                    
+                    # Compute approximate probability to reach critical
+                    critical_approx = np.round(np.mean(critical), nr_decimals)
                     
                     # Create interval strings (only entries for prob > 0)
                     interval_strings = ["["+
@@ -248,12 +430,29 @@ class filterBasedAbstraction(Abstraction):
                     deadlock_string = '['+ \
                        str(floor_decimal(max(1e-4, deadlock_lb),nr_decimals))+','+ \
                        str(floor_decimal(min(1,    deadlock_ub),nr_decimals))+']'
+                       
+                    if goal_approx != 0:
+                        goal_string = '['+ \
+                           str(floor_decimal(max(1e-4, goal_lb),nr_decimals))+','+ \
+                           str(floor_decimal(min(1,    goal_ub),nr_decimals))+']'
+                    
+                    else:
+                        goal_string = None
+                        
+                    if critical_approx != 0:
+                        
+                        critical_string = '['+ \
+                           str(floor_decimal(max(1e-4, critical_lb),nr_decimals))+','+ \
+                           str(floor_decimal(min(1,    critical_ub),nr_decimals))+']'
+                    
+                    else:
+                        critical_string = None
                     
                     # Create approximate prob. strings (only entries for prob > 0)
-                    approx_strings = [str(p) for p in probs_approx_all[nonzero_idxs]]
+                    approx_strings = np.mean(approx, axis=0)
                     
                     # Compute approximate deadlock transition probabilities
-                    deadlock_approx = np.round(1-sum(probs_approx_all[nonzero_idxs]), nr_decimals)
+                    deadlock_approx = np.round(1-sum(approx_strings)-goal_approx-critical_approx, nr_decimals)
                     
                     prob[a] = {
                         'interval_strings': interval_strings,
@@ -262,10 +461,14 @@ class filterBasedAbstraction(Abstraction):
                         'approx_idxs': nonzero_idxs,
                         'deadlock_interval_string': deadlock_string,
                         'deadlock_approx': deadlock_approx,
+                        'goal_interval_string': goal_string,
+                        'goal_approx': goal_approx,
+                        'critical_interval_string': critical_string,
+                        'critical_approx': critical_approx
                     }
                     
                     # Print normal row in table
-                    if a % printEvery == 0:
+                    if a % printEvery == 0 and verbose:
                         nr_transitions = len(prob[a]['interval_idxs'])
                         tab.print_row([delta, k, a, 
                            'Probabilities computed (transitions: '+
@@ -290,6 +493,7 @@ class filterBasedAbstraction(Abstraction):
             tab = table(col_width)
         
         self.km = dict()
+        max_error_bound = np.zeros((len(self.setup.deltas), self.N+max(self.setup.deltas), self.basemodel.n))
         
         if self.setup.lic['enabled']:
             # Determine maximum threshold for measure on covariance over time
@@ -297,7 +501,10 @@ class filterBasedAbstraction(Abstraction):
             minA = self.setup.lic['LICMinA']
             self.km['maxEllipseSize'] = [i*minA + (1-i)*maxA for i in np.arange(0,1,1/self.N)]
             
-        for delta in self.setup.deltas:
+        # List to compute best-case covariance
+        covTildeAll = []
+            
+        for delta_idx,delta in enumerate(self.setup.deltas):
             
             # Print header row
             if self.setup.main['verbose']:
@@ -310,12 +517,11 @@ class filterBasedAbstraction(Abstraction):
             self.km[delta]['cov']               = [None] * (self.N+delta)
             self.km[delta]['cov_tilde']         = [None] * (self.N+delta)
             self.km[delta]['cov_tilde_measure'] = [None] * (self.N+delta)
-            self.km[delta]['max_error_bound']   = [None] * (self.N+delta)
             self.km[delta]['K_gain']            = [None] * (self.N+delta)
             
             # Initial belief of Kalman filter
             for i in range(delta):
-                self.km[delta]['cov'][i] = np.eye(self.basemodel.n)*self.setup.belief['cov0']
+                self.km[delta]['cov'][i] = np.eye(self.basemodel.n)*self.basemodel.filter['cov0']
             
             # For every time step in the finite horizon
             for k in range(self.N):
@@ -326,13 +532,16 @@ class filterBasedAbstraction(Abstraction):
                 # Perform Kalman filter prediction at current time k for delta-type action
                 self.km[delta]['cov_pred'][k+delta], self.km[delta]['K_gain'][k+delta], \
                 self.km[delta]['cov_tilde'][k+delta], self.km[delta]['cov'][k+delta], \
-                self.km[delta]['cov_tilde_measure'][k+delta], self.km[delta]['max_error_bound'][k+delta] = \
+                self.km[delta]['cov_tilde_measure'][k+delta], max_error_bound[delta_idx,k+delta, :] = \
                     kalmanFilter(self.model[delta], self.km[delta]['cov'][k])
                 
                 # If local information controller is active
                 if self.setup.lic['enabled']:
-                    # Then, a "worst-case" covariance matrix is used, and we
-                    # force the actual covariance always to below this
+                    
+                    covTildeAll += [np.copy(self.km[delta]['cov_tilde'][k+delta])]
+                    
+                    # Then, a best/worst-case covariance matrix is used, and
+                    # we force the actual covariance always to below this
                     
                     # Set the worst-case covariance matrix to the circle with  
                     # radius equal to the maximum measure (i.e. threshold)
@@ -376,19 +585,31 @@ class filterBasedAbstraction(Abstraction):
                                 gamma += 1
                                 
                                 # Determine resulting covariance after wait
-                                _, _, _, covStabilize, covMeasure = \
+                                _, _, _, covStabilize, covMeasure, _ = \
                                     kalmanFilter(self.model[delta_lowest], covStabilize)                            
                     
                 # Print normal row in table
                 if self.setup.main['verbose']:
-                    tab.print_row([delta, k, 'Measure '+
+                    tab.print_row([delta, k, 'Measure: '+
                        str(np.round(self.km[delta]['cov_tilde_measure'][k+delta], decimals=3))])
+                    tab.print_row([delta, k, 'Error bound (epsilon): '+
+                       str(np.round(max_error_bound[delta_idx, k+delta], decimals=3))])
                 
             # Delete iterable variable
             del k
         del delta
         
+        # Compute error bound by which obstacles are augmented
+        self.km['max_error_bound']   = np.max(max_error_bound, axis=0)
         
+        # Compute best-case covariance (for local information controller)
+        if self.setup.lic['enabled']:
+            if self.setup.main['covarianceMode'] == 'SDP':
+                func = steadystateCovariance_sdp
+            else:
+                func = steadystateCovariance
+            
+            self.km['cov_tilde_min'] = func(covTildeAll, verbose=True)['best']
     
     def defActions(self):
         '''
@@ -485,7 +706,7 @@ class filterBasedAbstraction(Abstraction):
             
             # Create PRISM file (explicit way)
             model_size, self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
-                self.mdp.writePRISM_explicit(self.abstr, self.trans, self.setup.mdp['mode'])   
+                self.mdp.writePRISM_explicit(self.abstr, self.trans, mode=self.setup.mdp['mode'], km=self.km)   
         
         else:
         
@@ -623,22 +844,22 @@ class filterBasedAbstraction(Abstraction):
         
         self.results = dict()
         
-        policy_all = pd.read_csv(policy_file, header=None).iloc[:, 1:].fillna(-1).to_numpy()
+        policy_all = pd.read_csv(policy_file, header=None).iloc[:, 3:].fillna(-1).to_numpy()
         # Flip policy upside down (PRISM generates last time step at top!)
         policy_all = np.flipud(policy_all)
         
-        policy_all = extractRowBlockDiag(policy_all, self.abstr['nr_regions'])
+        policy_all = extractRowBlockDiag(policy_all, len(self.abstr['P']))
         
         self.results['optimal_policy'] = np.zeros(np.shape(policy_all))
         self.results['optimal_delta'] = np.zeros(np.shape(policy_all))
         self.results['optimal_reward'] = np.zeros(np.shape(policy_all))
         
-        rewards_k0 = pd.read_csv(vector_file, header=None).iloc[1:].to_numpy()
+        rewards_k0 = pd.read_csv(vector_file, header=None).iloc[3:].to_numpy()
         
-        reward_rows = int((len(rewards_k0)-1)/self.abstr['nr_regions'] + 1)
+        reward_rows = int((len(rewards_k0)-1)/len(self.abstr['P']) + 1)
         
         self.results['optimal_reward'][0:reward_rows, :] = \
-            np.reshape(rewards_k0, (reward_rows, self.abstr['nr_regions']))
+            np.reshape(rewards_k0, (reward_rows, len(self.abstr['P'])))
         
         # Split the optimal policy between delta and action itself
         for i,row in enumerate(policy_all):
@@ -675,7 +896,7 @@ class filterBasedAbstraction(Abstraction):
         
         print('\nGenerate plots')
         
-        if self.abstr['nr_regions'] <= 1000:
+        if len(self.abstr['P']) <= 1000:
         
             from .postprocessing.createPlots import createProbabilityPlots
             
@@ -730,7 +951,7 @@ class filterBasedAbstraction(Abstraction):
         n_list = self.setup.montecarlo['init_timesteps']
         
         self.mc['results']['reachability_probability'] = \
-            np.zeros((self.abstr['nr_regions'],len(n_list)))
+            np.zeros((len(self.abstr['P']),len(n_list)))
         
         # Column widths for tabular prints
         if self.setup.main['verbose']:
@@ -740,7 +961,7 @@ class filterBasedAbstraction(Abstraction):
             print(' -- Computing required Gaussian random variables...')
         
         if self.setup.montecarlo['init_states'] == False:
-            init_state_idxs = np.arange(self.abstr['nr_regions'])
+            init_state_idxs = np.arange(len(self.abstr['P']))
             
         else:
             init_state_idxs = self.setup.montecarlo['init_states']
@@ -753,6 +974,10 @@ class filterBasedAbstraction(Abstraction):
                     np.zeros(self.model[delta].n), self.model[delta].noise['w_cov'],
                    ( len(n_list), len(init_state_idxs), self.setup.montecarlo['iterations'], self.N ))
         
+            v_array = np.random.multivariate_normal(
+                    np.zeros(self.basemodel.r), self.basemodel.noise['v_cov'], 
+                   ( len(n_list), len(init_state_idxs), self.setup.montecarlo['iterations'], self.N ))
+            
         # For each starting time step in the list
         for n0id,n0 in enumerate(n_list):
             
@@ -785,20 +1010,20 @@ class filterBasedAbstraction(Abstraction):
                 # For each of the monte carlo iterations
                 for m in range(self.setup.montecarlo['iterations']):
                     
-                    self.mc['traces'][n0][i][m] = []
+                    self.mc['traces'][n0][i][m] = {'k': [], 'x': [], 'bel_mu': [], 'bel_cov': [], 'y': []}
                     
                     # Retreive the initial action time-grouping to be chosen
                     # (given by the optimal policy to the MDP)
                     delta = self.results['optimal_delta'][n0,i]
                     
-                    if i in self.abstr['goal']:
+                    if False :#i in self.abstr['goal'][n0]:
                         # If the initial state is already the goal state, succes
                         # Then abort the current iteration, as we have achieved the goal
                         self.mc['results'][n0][i]['goalReached'][m] = True
                         
                         if self.setup.main['verbose']:
                             tab.print_row([n0, i, m, n0, 'Initial state is goal state'], sort="Success")
-                    elif delta == 0:
+                    elif delta == -1:
                         # If delta is zero, no policy is known, and reachability is zero
                         if self.setup.main['verbose']:
                             tab.print_row([n0, i, m, n0, 'No initial policy known, so abort'], sort="Warning")
@@ -809,8 +1034,11 @@ class filterBasedAbstraction(Abstraction):
                         # Initialize the current simulation
                         
                         x = np.zeros((self.N+1, self.basemodel.n))
-                        x_goal = [None]*(self.N+1)
+                        y = np.zeros((self.N, self.basemodel.r))
+                        mu = np.zeros((self.N, self.basemodel.n))
+                        mu_goal = [None]*(self.N+1)
                         x_region = np.zeros(self.N+1).astype(int)
+                        mu_region = np.zeros(self.N+1).astype(int)
                         u = [None]*self.N
                         
                         actionToTake = np.zeros(self.N).astype(int)
@@ -819,11 +1047,24 @@ class filterBasedAbstraction(Abstraction):
                         # Set initial time
                         k = n0
                         
-                        # True state model dynamics
-                        x[n0] = np.array(regionA['center'])
+                        # Construct initial belief
+                        mu[n0] = np.array(regionA['center'])
                         
-                        # Add current state to trace
-                        self.mc['traces'][n0][i][m] += [x[n0]]
+                        # Determine initial state and measurement
+                        w_init = np.random.multivariate_normal(
+                            np.zeros(self.basemodel.n), self.km[delta]['cov'][n0])
+                        v_init = v_array[n0id, i_abs, m, k]
+                        
+                        # True state model dynamics
+                        x[n0] = mu[n0] + w_init
+                        y[n0] = self.model[delta].C @ np.array(x[n0]) + v_init
+                        
+                        # Add current state, belief, etc. to trace
+                        self.mc['traces'][n0][i][m]['k'] += [n0]
+                        self.mc['traces'][n0][i][m]['x'] += [x[n0]]
+                        self.mc['traces'][n0][i][m]['bel_mu'] += [mu[n0]]
+                        self.mc['traces'][n0][i][m]['bel_cov'] += [self.km[delta]['cov'][n0]]
+                        self.mc['traces'][n0][i][m]['y'] += [y[n0]]
                         
                         # For each time step in the finite time horizon
                         while k < self.N / min(self.setup.deltas):
@@ -831,36 +1072,58 @@ class filterBasedAbstraction(Abstraction):
                             if self.setup.main['verbose']:
                                 tab.print_row([n0, i, m, k, 'New time step'])
                             
-                            # Compute all centers of regions associated with points
+                            # Determine in which region the TRUE state is
                             x_cubic = skew2cubic(x[k], self.abstr)
                             
-                            cubic_center = computeRegionCenters(x_cubic, 
+                            cubic_center_x = computeRegionCenters(x_cubic, 
                                                     self.basemodel.setup['partition']).flatten()
                             
-                            if tuple(cubic_center) in self.abstr['allCentersCubic']:
-                                # Save that state is currently in region ii
-                                x_region[k] = self.abstr['allCentersCubic'][tuple(cubic_center)]
-                                
-                                # Retreive the action from the policy
-                                actionToTake[k] = self.results['optimal_policy'][k, x_region[k]]
-                            else:
-                                x_region[k] = -1
+                            # Determine in which region the BELIEF MEAN is
+                            mu_cubic = skew2cubic(mu[k], self.abstr)
                             
-                            # If current region is the goal state ... 
-                            if x_region[k] in self.abstr['goal']:
+                            cubic_center_mu = computeRegionCenters(mu_cubic, 
+                                                    self.basemodel.setup['partition']).flatten()
+                            
+                            ###
+                            
+                            # Check if the state is in a goal region
+                            if any([in_hull( x_cubic, block['hull'] ) for block in self.basemodel.setup['specification']['goal'].values()]):
+                                
                                 # Then abort the current iteration, as we have achieved the goal
                                 self.mc['results'][n0][i]['goalReached'][m] = True
                                 
                                 if self.setup.main['verbose']:
                                     tab.print_row([n0, i, m, k, 'Goal state reached'], sort="Success")
-                                break
-                            # If current region is in critical states...
-                            elif x_region[k] in self.abstr['critical']:
+                                break  
+                            
+                            # Check if the state is in a critical region
+                            if any([in_hull( x_cubic, block['hull'] ) for block in self.basemodel.setup['specification']['critical'].values()]):
+                                
                                 # Then abort current iteration
                                 if self.setup.main['verbose']:
                                     tab.print_row([n0, i, m, k, 'Critical state reached, so abort'], sort="Warning")
                                 break
-                            elif x_region[k] == -1:
+                            
+                            ###
+                            
+                            if tuple(cubic_center_x) in self.abstr['allCentersCubic']:
+                                # Save region of TRUE state
+                                x_region[k] = self.abstr['allCentersCubic'][tuple(cubic_center_x)]
+                                
+                            else:
+                                x_region[k] = -1
+                                
+                            if tuple(cubic_center_mu) in self.abstr['allCentersCubic']:
+                                # Save region of BELIEF MEAN state
+                                mu_region[k] = self.abstr['allCentersCubic'][tuple(cubic_center_mu)]
+                                
+                                # Retreive the action from the policy
+                                actionToTake[k] = self.results['optimal_policy'][k, mu_region[k]]
+                                
+                            else:
+                                mu_region[k] = -1
+                            
+                            if mu_region[k] == -1:
                                 if self.setup.main['verbose']:
                                     tab.print_row([n0, i, m, k, 'Absorbing state reached, so abort'], sort="Warning")
                                 break
@@ -873,7 +1136,7 @@ class filterBasedAbstraction(Abstraction):
     
                             # Update the value of the time-grouping of the action
                             # dictated by the optimal policy
-                            deltaToTake[k] = self.results['optimal_delta'][k, x_region[k]]
+                            deltaToTake[k] = self.results['optimal_delta'][k, mu_region[k]]
                             delta = deltaToTake[k]
                             
                             # If delta is zero, no policy is known, and reachability is zero
@@ -882,18 +1145,42 @@ class filterBasedAbstraction(Abstraction):
                                     tab.print_row([n0, i, m, k, 'Action type undefined, so abort'], sort="Warning")
                                 break
                             
+                            if self.setup.lic['enabled']:
+                                # If the local information controller is active,
+                                # also account for the "waiting time"
+                                
+                                # Retreive gamma value
+                                gamma = self.km[delta]['waiting_time'][k]
+                                
+                                # Multiply with the minimum time step width to get waiting time
+                                waiting_time = gamma*min_delta
+                                
+                                # Print message
+                                if self.setup.main['verbose']:
+                                    tab.print_row([n0, i, m, k, 'Wait for '+str(gamma)+'*'+\
+                                               str(min_delta)+'='+str(waiting_time)+' time steps'])
+                            else:
+                                # If local information controller is not active,
+                                # simply set the waiting time to zero
+                                gamma = 0
+                                waiting_time = 0
+                                
                             if self.setup.main['verbose']:
-                                tab.print_row([n0, i, m, k, 'In state: '+str(x_region[k])+', take action: '+str(actionToTake[k])+' (delta='+str(delta)+')'])
+                                tab.print_row([n0, i, m, k, 'Belief state '+str(mu_region[k])+', true state '+str(x_region[k])+', action '+str(actionToTake[k])+' (delta='+str(delta)+')'])
                             
-                            # Only perform another movement if k < N-tau (of base model)
-                            if k < self.N:
+                            # Only perform another movement if k < N
+                            if k < self.N - delta:
                             
                                 # Move predicted mean to the future belief to the target point of the next state
-                                x_goal[k+delta] = self.abstr['target']['d'][actionToTake[k]]
+                                mu_goal[k+delta] = self.abstr['target']['d'][actionToTake[k]]
         
                                 # Reconstruct the control input required to achieve this target point
                                 # Note that we do not constrain the control input; we already know that a suitable control exists!
-                                u[k] = np.array(self.model[delta].B_pinv @ ( x_goal[k+delta] - self.model[delta].A @ x[k] - self.model[delta].Q_flat ))
+                                u[k] = np.array(self.model[delta].B_pinv @ ( mu_goal[k+delta] - self.model[delta].A @ x[k] - self.model[delta].Q_flat ))
+                                
+                                if any(self.basemodel.setup['control']['limits']['uMin'] > u[k]) or \
+                                   any(self.basemodel.setup['control']['limits']['uMax'] < u[k]):
+                                    tab.print_row([n0, i, m, k, 'Control input '+str(u[k])+' outside limits'], sort="Warning")
                                 
                                 # Implement the control into the physical (unobservable) system
                                 x_hat = self.model[delta].A @ x[k] + self.model[delta].B @ u[k] + self.model[delta].Q_flat
@@ -907,11 +1194,63 @@ class filterBasedAbstraction(Abstraction):
                                     
                                     x[k+delta] = x_hat + disturbance
                                     
-                                # Add current state to trace
-                                self.mc['traces'][n0][i][m] += [x[k+delta]]
+                                # Generate a measurement of the true state
+                                y[k+delta] = self.model[delta].C @ x[k+delta] + v_array[n0id, i_abs, m, k]
+                                
+                                # Update the belief based on action and measurement                    
+                                mu[k+delta] = mu_goal[k+delta] + self.km[delta]['K_gain'][k+delta] @ \
+                                                        (y[k+delta] - self.model[delta].C @ mu_goal[k+delta])    
+                                
+                                # Add current state, belief, etc. to trace
+                                self.mc['traces'][n0][i][m]['k'] += [k+delta]
+                                self.mc['traces'][n0][i][m]['x'] += [x[k+delta]]
+                                self.mc['traces'][n0][i][m]['bel_mu'] += [mu[k+delta]]
+                                self.mc['traces'][n0][i][m]['bel_cov'] += [self.km[delta]['cov'][k+delta]]
+                                self.mc['traces'][n0][i][m]['y'] += [y[k+delta]]
+                            
+                                # Update the belief for the waiting time
+                                for g in range(gamma):
+                                    # Currently at time k, plus delta of action, plus waiting time
+                                    kg = k + delta + (g+1)*min_delta
+                                    
+                                    # If waiting does not fit in time horizon anymore, break
+                                    if kg >= self.N:
+                                        if self.setup.main['verbose']:
+                                            tab.print_row([n0, i, m, kg-min_delta, 'Time horizon exceeded by waiting, so abort'], sort="Warning")
+                                        break
+                                    
+                                    if self.setup.main['verbose']:
+                                        tab.print_row([n0, i, m, kg-min_delta, 'Wait until time: '+str(kg)])
+                                        
+                                    # Reconstruct the control input required to achieve this target point
+                                    # Note that we do not constrain the control input; we already know that a suitable control exists!
+                                    u[kg] = np.array(self.model[min_delta].B_pinv @ ( mu_goal[k+delta] - self.model[min_delta].A @ mu[kg-min_delta] - self.model[min_delta].Q_flat ))
+                                    
+                                    if any(self.basemodel.setup['control']['limits']['uMin'] > u[kg]) or \
+                                       any(self.basemodel.setup['control']['limits']['uMax'] < u[kg]):
+                                        tab.print_row([n0, i, m, kg-min_delta, 'Control input '+str(u[kg])+' outside limits'], sort="Warning")
+                                    
+                                    # Implement the control into the physical (unobservable) system
+                                    x_hat = self.model[min_delta].A @ x[kg-min_delta] + self.model[min_delta].B @ u[kg] + self.model[min_delta].Q_flat
+                                    
+                                    if self.setup.scenarios['gaussian'] is True:
+                                        # Use Gaussian process noise
+                                        x[kg] = x_hat + w_array[min_delta][n0id, i_abs, m, kg]
+                                    else:
+                                        # Use generated samples                                    
+                                        disturbance = random.choice(self.model[min_delta].noise['samples'])
+                                        
+                                        x[kg] = x_hat + disturbance
+                                    
+                                    # Since we wait in the same state, dynamics are changed accordingly
+                                    y[kg] = self.model[min_delta].C @ x[kg] + v_array[n0id, i_abs, m, kg]
+                                    
+                                    # Update the belief based on action and measurement
+                                    mu[kg] = mu_goal[k+delta] + self.km[min_delta]['K_gain'][kg] @ \
+                                                            (y[kg] - self.model[min_delta].C @ mu_goal[k+delta])
                             
                             # Increase iterator variable by the value of delta associated to chosen action
-                            k += delta
+                            k += delta + waiting_time
                         
                 # Set of monte carlo iterations completed for specific initial state
                 

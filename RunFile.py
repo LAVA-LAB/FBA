@@ -116,15 +116,10 @@ else:
     model.setModel(observer=False)
     
     
-    
-    
 setup.lic = {'enabled': False, 'LICMaxA': 1.5, 'LICMinA': 1.5}
-setup.belief = {'cov0': 10*np.eye(model.n), 'interval_margin': 0.01}
-setup.mdp['k_steady_state'] = 6
-    
-
-
-    
+setup.mdp['k_steady_state'] = 5
+setup.main['covarianceMode'] = ['SDP','iterative'][0]
+setup.main['interval_margin'] = 0.001
 
 # If TRUE monte carlo simulations are performed
 _, choice = user_choice( \
@@ -186,6 +181,7 @@ print('APPLICATION FINISHED AT', datestring_end)
 
 # %%
 
+'''
 cov_hat = Ab.km[1]['cov_pred'][4]
 cov = Ab.km[1]['cov'][4]
 cov_tilde = Ab.km[1]['cov_tilde'][4]
@@ -238,3 +234,4 @@ while any(cumprob > beta):
         cumprob[dim] = mvn.mvnun(lower=lower, upper=upper, means=[0,0], covar=cov)[0]
 
 print('Error bound is:',epsilon)
+'''
