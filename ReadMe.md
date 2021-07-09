@@ -176,17 +176,16 @@ You can add models or change the existing ones by modifying the file `core/model
 
 Here, the basic setup of the application is defined. This includes the following elements:
 
-- `setup['deltas']` (list of integers) is assigned a list of integers (with only one value by default). It denotes the number of discrete time steps that are grouped together, to render the dynamical system fully actuated. For example, if the dimension of the state is 6, and the dimension of the control input is 3, then it will be `setup['deltas'] = [2]`.
-- `setup['control']['limits'] ['uMin'] / ['uMax']` (list of integers) are the control authority limits. It is given as a list, and every entry reflects a dimension of the state.
-- `setup['partition']['nrPerDim']` (list of integers) is the number of regions defined in every dimension of the state space. Note that the partition has a region centred at the origin when odd values are given.
-- `setup['partition']['width']` (list of floats) is the width of the regions in every dimension of the state space.
-- `setup['partition']['origin']` (list of floats) denotes the origin of the partitioned region of the state space. 
-- `setup['targets']['nrPerDim']` (either `'auto'` or a list of integers) is the number of target points defined in every dimension of the state. When `'auto'` is given, the number of target points equals the number of regions of the partition.
-- `setup['targets']['domain']` (either `'auto'` or a list of integers) is the domain over which target points are defined. When `'auto'` is given, the domain is set equal to that of the state space partition.
-- `setup['specification']['goal']` (nested list of floats) is the list of points whose associated partitioned regions are in the goal region. The function `setStateBlock()` is a helper function to easily define blocks of goal regions, by creating slices in the state space partition in given dimensions.
-- `setup['specification']['critical']` (nested list of floats) is the list of points whose associated partitioned regions are in the critical region. The function `setStateBlock()` is a helper function to easily define blocks of critical regions, by creating slices in the state space partition in given dimensions.
-- `tau` (float) is the time discretization step size.
-- `setup['endTime']` (integer > 0) is the finite time horizon over which the reach-avoid problem is solved.
+- `deltas` (list of integers) is assigned a list of integers (with only one value by default). It denotes the number of discrete time steps that are grouped together, to render the dynamical system fully actuated. For example, if the dimension of the state is 6, and the dimension of the control input is 3, then it will be `deltas = [2]`.
+- `control['limits'] ['uMin'] / ['uMax']` (list of integers) are the control authority limits. It is given as a list, and every entry reflects a dimension of the state.
+- `partition['nrPerDim']` (list of integers) is the number of regions defined in every dimension of the state space. Note that the partition has a region centred at the origin when odd values are given.
+- `partition['width']` (list of floats) is the width of the regions in every dimension of the state space.
+- `partition['origin']` (list of floats) denotes the origin of the partitioned region of the state space. 
+- `targets['nrPerDim']` (either `'auto'` or a list of integers) is the number of target points defined in every dimension of the state. When `'auto'` is given, the number of target points equals the number of regions of the partition.
+- `targets['domain']` (either `'auto'` or a list of integers) is the domain over which target points are defined. When `'auto'` is given, the domain is set equal to that of the state space partition.
+- `spec['goal']` (nested list of floats) is the list of points whose associated partitioned regions are in the goal region. The function `setStateBlock()` is a helper function to easily define blocks of goal regions, by creating slices in the state space partition in given dimensions.
+- `spec['critical']` (nested list of floats) is the list of points whose associated partitioned regions are in the critical region. The function `setStateBlock()` is a helper function to easily define blocks of critical regions, by creating slices in the state space partition in given dimensions.
+- `endTime` (integer > 0) is the finite time horizon over which the reach-avoid problem is solved.
 
 ### SetModel function
 
@@ -202,6 +201,8 @@ where:
 - If Gaussian noise is used, `noise['w_cov']` is the covariance matrix of the w-term in the equation above. Note that non-Gaussian noise (from the Dryden gust model) is used for the UAV case.
 
 Note that is the current version of the codes is not compatible (yet) with partial observability (i.e. defining an observer). Thus, make sure to set the argument `observer = False`.
+
+- `tau` (float) is the time discretization step size.
 
 For some models, the model definition is given in non-discretized form, i.e.
 $$

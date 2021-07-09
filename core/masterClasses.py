@@ -258,20 +258,9 @@ class LTI_master(object):
 
         '''
         
-        partition = dict()
-        specification = dict()
-        targets = dict()
-        noise = dict()
-        control = dict()
-        control['limits'] = dict()
-        
-        self.setup = {
-                'partition' :       partition,
-                'specification' :   specification,
-                'targets' :         targets,
-                'noise' :           noise,
-                'control' :         control,
-                'endTime' :         32
-            }
+        self.partition = dict()
+        self.spec = dict()
+        self.targets = dict()
+        self.control = {'limits': {}}
         
         self.name = type(self).__name__

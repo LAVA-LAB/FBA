@@ -21,16 +21,15 @@ import sys                      # Allows to terminate the code at some point
 import os                       # Import OS to allow creationg of folders
 import random                   # Import to use random variables
 
-from .mainFunctions import computeScenarioBounds_sparse, \
-    computeRegionCenters, cubic2skew, skew2cubic
-from .commons import tic, ticDiff, tocDiff, table, printWarning
+from .mainFunctions import computeRegionCenters, cubic2skew, skew2cubic
+from .commons import tic, ticDiff, tocDiff, table, printWarning, floor_decimal
 
 from .createMDP import mdp
 
 from .abstraction import Abstraction
 
 class scenarioBasedAbstraction(Abstraction):
-    def __init__(self, setup, basemodel):
+    def __init__(self, setup, system):
         '''
         Initialize scenario-based abstraction (ScAb) object
 
@@ -38,7 +37,7 @@ class scenarioBasedAbstraction(Abstraction):
         ----------
         setup : dict
             Setup dictionary.
-        basemodel : dict
+        system : dict
             Base model for which to create the abstraction.
 
         Returns
@@ -49,18 +48,12 @@ class scenarioBasedAbstraction(Abstraction):
         
         # Copy setup to internal variable
         self.setup = setup
-        self.basemodel = basemodel
-        
-        # Define empty dictionary for monte carlo sims. (even if not used)
-        self.mc = dict()   
-        
-        # Start timer
-        tic()
-        ticDiff()
-        self.time = dict()
+        self.system = system
+        self.km = None
         
         Abstraction.__init__(self)
         
+        # Define state space partition
         Abstraction.definePartition(self)
         
     def _loadScenarioTable(self, tableFile):
@@ -133,7 +126,7 @@ class scenarioBasedAbstraction(Abstraction):
                 prob[a] = dict()
             
                 mu = self.abstr['target']['d'][a]
-                Sigma = self.model[delta].noise['w_cov']
+                Sigma = self.model[delta]['noise']['w_cov']
                 
                 if self.setup.scenarios['gaussian'] is True:
                     # Compute Gaussian noise samples
@@ -144,14 +137,14 @@ class scenarioBasedAbstraction(Abstraction):
                     # Determine non-Gaussian noise samples (relative from 
                     # target point)
                     samples = mu + np.array(
-                        random.choices(self.model[delta].noise['samples'], 
+                        random.choices(self.model[delta]['noise']['samples'], 
                         k=self.setup.scenarios['samples']) )
                     
                 # Transform samples back to hypercubic partition
                 samplesCubic = skew2cubic(samples, self.abstr)
                     
-                prob[a] = computeScenarioBounds_sparse(self.setup, 
-                      self.basemodel.setup['partition'], 
+                prob[a] = self._scenarioTransition(self.setup, 
+                      self.system.partition, 
                       self.abstr, self.trans, samplesCubic)
                 
                 # Print normal row in table
@@ -163,18 +156,146 @@ class scenarioBasedAbstraction(Abstraction):
                 
         return prob
     
-    def defActions(self):
+    def _scenarioTransition(setup, partition, abstr, trans, samples):
         '''
-        Define the actions of the finite-state abstraction (performed once,
-        outside the iterative scheme).
-
+        Compute the transition probability intervals
+    
+        Parameters
+        ----------
+        setup : dict
+            Setup dictionary.
+        partition : dict
+            Dictionary of the partition.
+        abstr : dict
+            Dictionay containing all information of the finite-state abstraction.
+        trans : dict
+            Dictionary with all data for the transition probabilities
+        samples : 2D Numpy array
+            Numpy array, with every row being a sample of the process noise.
+    
         Returns
         -------
-        None.
-
+        returnDict : dict
+            Dictionary with the computed (intervals of) transition probabilities.
+    
         '''
         
-        Abstraction.defineActions(self)
+        # Number of decision variables always equal to one
+        d = 1
+        Nsamples = setup.scenarios['samples']
+        beta = setup.scenarios['confidence']
+        
+        # Initialize counts array
+        counts = dict()
+        
+        # Compute to which regions the samples belong
+        centers_cubic = computeRegionCenters(samples, partition)
+        
+        for s in range(Nsamples):
+            
+            key = tuple(centers_cubic[s])
+            
+            if key in abstr['allCentersCubic']:
+                
+                idx = abstr['allCentersCubic'][ key ]
+                
+                if idx in counts:
+                    counts[idx] += 1
+                else:
+                    counts[idx] = 1
+        
+        # Count number of samples not in any region (i.e. in absorbing state)
+        k = Nsamples - sum(counts.values()) + d
+    
+        key_lb = tuple( [Nsamples, k, beta] )
+        key_ub = tuple( [Nsamples, k-1, beta] ) 
+        
+        deadlock_low = trans['memory'][key_ub][0]
+        if k > Nsamples:
+            deadlock_upp = 1
+        else:
+            deadlock_upp = trans['memory'][key_lb][1]
+    
+        # Initialize vectors for probability bounds
+        probability_low = np.zeros(len(counts))
+        probability_upp = np.zeros(len(counts))
+        probability_approx = np.zeros(len(counts))
+        
+        interval_idxs = np.zeros(len(counts), dtype=int)
+        approx_idxs = np.zeros(len(counts), dtype=int)
+    
+        # Enumerate over all the non-zero bins
+        for i, (region,count) in enumerate(counts.items()): #zip(np.arange(abstr['nr_regions'])[nonEmpty], counts[nonEmpty]):
+            
+            k = Nsamples - count + d
+            
+            key_lb = tuple( [Nsamples, k,   beta] )
+            key_ub = tuple( [Nsamples, k-1, beta] )
+            
+            if k > Nsamples:
+                probability_low[i] = 0                
+            else:
+                probability_low[i] = 1 - trans['memory'][key_lb][1]
+            probability_upp[i] = 1 - trans['memory'][key_ub][0]
+            
+            interval_idxs[i] = int(region)
+            
+            # Point estimate transition probability (count / total)
+            probability_approx[i] = count / Nsamples
+            approx_idxs[i] = int(region)
+        
+        nr_decimals = 5
+        
+        # PROBABILITY INTERVALS
+        probs_lb = floor_decimal(probability_low, nr_decimals)
+        probs_ub = floor_decimal(probability_upp, nr_decimals)
+        
+        # Create interval strings (only entries for prob > 0)
+        interval_strings = ["["+
+                          str(floor_decimal(max(1e-4, lb),nr_decimals))+","+
+                          str(floor_decimal(min(1,    ub),nr_decimals))+"]"
+                          for (lb, ub) in zip(probs_lb, probs_ub)]# if ub > 0]
+        
+        # Compute deadlock probability intervals
+        deadlock_lb = floor_decimal(deadlock_low, nr_decimals)
+        deadlock_ub = floor_decimal(deadlock_upp, nr_decimals)
+        
+        deadlock_string = '['+ \
+                           str(floor_decimal(max(1e-4, deadlock_lb),nr_decimals))+','+ \
+                           str(floor_decimal(min(1,    deadlock_ub),nr_decimals))+']'
+        
+        # POINT ESTIMATE PROBABILITIES
+        probability_approx = np.round(probability_approx, nr_decimals)
+        
+        # Create approximate prob. strings (only entries for prob > 0)
+        approx_strings = [str(p) for p in probability_approx]# if p > 0]
+        
+        # Compute approximate deadlock transition probabilities
+        deadlock_approx = np.round(1-sum(probability_approx), nr_decimals)
+        
+        returnDict = {
+            'interval_strings': interval_strings,
+            'interval_idxs': interval_idxs,
+            'approx_strings': approx_strings,
+            'approx_idxs': approx_idxs,
+            'deadlock_interval_string': deadlock_string,
+            'deadlock_approx': deadlock_approx,
+        }
+        
+        return returnDict
+    
+    # def defActions(self):
+    #     '''
+    #     Define the actions of the finite-state abstraction (performed once,
+    #     outside the iterative scheme).
+
+    #     Returns
+    #     -------
+    #     None.
+
+    #     '''
+        
+    #     Abstraction.defineActions(self)
     
     def defTransitions(self):
         '''
@@ -232,221 +353,222 @@ class scenarioBasedAbstraction(Abstraction):
         print('Transition probabilities calculated - time:',
               self.time['3_probabilities'])
 
-    def buildMDP(self):
-        '''
-        Build the (i)MDP and create all respective PRISM files.
+    # def buildMDP(self):
+    #     '''
+    #     Build the (i)MDP and create all respective PRISM files.
 
-        Returns
-        -------
-        model_size : dict
-            Dictionary describing the number of states, choices, and 
-            transitions.
+    #     Returns
+    #     -------
+    #     model_size : dict
+    #         Dictionary describing the number of states, choices, and 
+    #         transitions.
 
-        '''
+    #     '''
         
-        # Initialize MDP object
-        self.mdp = mdp(self.setup, self.N, self.abstr)
+    #     # Initialize MDP object
+    #     self.mdp = mdp(self.setup, self.N, self.abstr)
         
-        if self.setup.mdp['prism_model_writer'] == 'explicit':
+    #     if self.setup.mdp['prism_model_writer'] == 'explicit':
             
-            # Create PRISM file (explicit way)
-            model_size, self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
-                self.mdp.writePRISM_explicit(self.abstr, self.trans, mode=self.setup.mdp['mode'])   
+    #         # Create PRISM file (explicit way)
+    #         model_size, self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
+    #             self.mdp.writePRISM_explicit(self.abstr, self.trans, mode=self.setup.mdp['mode'])   
         
-        else:
+    #     else:
         
-            # Create PRISM file (default way)
-            self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
-                self.mdp.writePRISM_scenario(self.abstr, self.trans, self.setup.mdp['mode'])  
+    #         # Create PRISM file (default way)
+    #         self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
+    #             self.mdp.writePRISM_scenario(self.abstr, self.trans, self.setup.mdp['mode'])  
               
-            model_size = {'States':None,'Choices':None,'Transitions':None}
+    #         model_size = {'States':None,'Choices':None,'Transitions':None}
 
-        self.time['4_MDPcreated'] = tocDiff(False)
-        print('MDP created - time:',self.time['4_MDPcreated'])
+    #     self.time['4_MDPcreated'] = tocDiff(False)
+    #     print('MDP created - time:',self.time['4_MDPcreated'])
         
-        return model_size
+    #     return model_size
             
-    def solveMDP(self):
-        '''
-        Solve the (i)MDP usign PRISM
+    # def solveMDP(self):
+    #     '''
+    #     Solve the (i)MDP usign PRISM
 
-        Returns
-        -------
-        None.
+    #     Returns
+    #     -------
+    #     None.
 
-        '''
+    #     '''
             
-        # Solve the MDP in PRISM (which is called via the terminal)
-        policy_file, vector_file = self._solveMDPviaPRISM()
+    #     # Solve the MDP in PRISM (which is called via the terminal)
+    #     policy_file, vector_file = self._solveMDPviaPRISM()
         
-        # Load PRISM results back into Python
-        self.loadPRISMresults(policy_file, vector_file)
+    #     # Load PRISM results back into Python
+    #     self.loadPRISMresults(policy_file, vector_file)
             
-        self.time['5_MDPsolved'] = tocDiff(False)
-        print('MDP solved in',self.time['5_MDPsolved'])
+    #     self.time['5_MDPsolved'] = tocDiff(False)
+    #     print('MDP solved in',self.time['5_MDPsolved'])
         
-    def preparePlots(self):
-        '''
-        Initializing function to prepare for plotting
+    # def preparePlots(self):
+    #     '''
+    #     Initializing function to prepare for plotting
 
-        Returns
-        -------
-        None.
+    #     Returns
+    #     -------
+    #     None.
 
-        '''
+    #     '''
         
-        # Process results
-        self.plot           = dict()
+    #     # Process results
+    #     self.plot           = dict()
     
-        for delta_idx, delta in enumerate(self.setup.deltas):
-            self.plot[delta] = dict()
-            self.plot[delta]['N'] = dict()
-            self.plot[delta]['T'] = dict()
+    #     for delta_idx, delta in enumerate(self.setup.deltas):
+    #         self.plot[delta] = dict()
+    #         self.plot[delta]['N'] = dict()
+    #         self.plot[delta]['T'] = dict()
             
-            self.plot[delta]['N']['start'] = 0
+    #         self.plot[delta]['N']['start'] = 0
             
-            # Convert index to absolute time (note: index 0 is time tau)
-            self.plot[delta]['T']['start'] = \
-                int(self.plot[delta]['N']['start'] * self.basemodel.tau)
+    #         # Convert index to absolute time (note: index 0 is time tau)
+    #         self.plot[delta]['T']['start'] = \
+    #             int(self.plot[delta]['N']['start'] * self.system.LTI['tau'])
         
-    def _solveMDPviaPRISM(self):
-        '''
-        Call PRISM to solve (i)MDP while executing the Python codes.
+    # def _solveMDPviaPRISM(self):
+    #     '''
+    #     Call PRISM to solve (i)MDP while executing the Python codes.
 
-        Returns
-        -------
-        policy_file : str
-            Name of the file in which the optimal policy is stored.
-        vector_file : str
-            Name of the file in which the optimal rewards are stored.
+    #     Returns
+    #     -------
+    #     policy_file : str
+    #         Name of the file in which the optimal policy is stored.
+    #     vector_file : str
+    #         Name of the file in which the optimal rewards are stored.
 
-        '''
+    #     '''
         
-        import subprocess
+    #     import subprocess
 
-        prism_folder = self.setup.mdp['prism_folder'] 
+    #     prism_folder = self.setup.mdp['prism_folder'] 
         
-        print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
+    #     print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
         
-        print('Starting PRISM...')
+    #     print('Starting PRISM...')
         
-        spec = self.mdp.specification
-        mode = self.setup.mdp['mode']
-        java_memory = self.setup.mdp['prism_java_memory']
+    #     spec = self.mdp.specification
+    #     mode = self.setup.mdp['mode']
+    #     java_memory = self.setup.mdp['prism_java_memory']
         
-        print(' -- Running PRISM with specification for mode',
-              mode.upper()+'...')
+    #     print(' -- Running PRISM with specification for mode',
+    #           mode.upper()+'...')
     
-        file_prefix = self.setup.directories['outputFcase'] + "PRISM_" + mode
-        policy_file = file_prefix + '_policy.csv'
-        vector_file = file_prefix + '_vector.csv'
+    #     file_prefix = self.setup.directories['outputFcase'] + "PRISM_" + mode
+    #     policy_file = file_prefix + '_policy.csv'
+    #     vector_file = file_prefix + '_vector.csv'
     
-        options = ' -ex -exportadv "'+policy_file+'"'+ \
-                  ' -exportvector "'+vector_file+'"'
+    #     options = ' -ex -exportadv "'+policy_file+'"'+ \
+    #               ' -exportvector "'+vector_file+'"'
     
-        # Switch between PRISM command for explicit model vs. default model
-        if self.setup.mdp['prism_model_writer'] == 'explicit':
+    #     # Switch between PRISM command for explicit model vs. default model
+    #     if self.setup.mdp['prism_model_writer'] == 'explicit':
     
-            print(' --- Execute PRISM command for EXPLICIT model description')        
+    #         print(' --- Execute PRISM command for EXPLICIT model description')        
     
-            model_file      = '"'+self.mdp.prism_file+'"'             
+    #         model_file      = '"'+self.mdp.prism_file+'"'             
         
-            # Explicit model
-            command = prism_folder+"bin/prism -javamaxmem "+str(java_memory)+"g "+ \
-                      "-importmodel "+model_file+" -pf '"+spec+"' "+options
-        else:
+    #         # Explicit model
+    #         command = prism_folder+"bin/prism -javamaxmem "+str(java_memory)+"g "+ \
+    #                   "-importmodel "+model_file+" -pf '"+spec+"' "+options
+    #     else:
             
-            print(' --- Execute PRISM command for DEFAULT model description')
+    #         print(' --- Execute PRISM command for DEFAULT model description')
             
-            model_file      = '"'+self.mdp.prism_file+'"'
+    #         model_file      = '"'+self.mdp.prism_file+'"'
             
-            # Default model
-            command = prism_folder+"bin/prism -javamaxmem "+str(java_memory)+"g "+ \
-                      model_file+" -pf '"+spec+"' "+options    
+    #         # Default model
+    #         command = prism_folder+"bin/prism -javamaxmem "+str(java_memory)+"g "+ \
+    #                   model_file+" -pf '"+spec+"' "+options    
         
-        subprocess.Popen(command, shell=True).wait()    
+    #     subprocess.Popen(command, shell=True).wait()    
         
-        return policy_file, vector_file
+    #     return policy_file, vector_file
         
-    def loadPRISMresults(self, policy_file, vector_file):
-        '''
-        Load results from existing PRISM output files.
+    # def loadPRISMresults(self, policy_file, vector_file):
+    #     '''
+    #     Load results from existing PRISM output files.
 
-        Parameters
-        ----------
-        policy_file : str
-            Name of the file to load the optimal policy from.
-        vector_file : str
-            Name of the file to load the optimal policy from.
+    #     Parameters
+    #     ----------
+    #     policy_file : str
+    #         Name of the file to load the optimal policy from.
+    #     vector_file : str
+    #         Name of the file to load the optimal policy from.
 
-        Returns
-        -------
-        None.
+    #     Returns
+    #     -------
+    #     None.
 
-        '''
+    #     '''
         
-        import pandas as pd
+    #     import pandas as pd
         
-        self.results = dict()
+    #     self.results = dict()
         
-        policy_all = pd.read_csv(policy_file, header=None).iloc[:, 1:].fillna(-1).to_numpy()
-        # Flip policy upside down (PRISM generates last time step at top!)
-        policy_all = np.flipud(policy_all)
+    #     policy_all = pd.read_csv(policy_file, header=None).iloc[:, 1:].fillna(-1).to_numpy()
+    #     # Flip policy upside down (PRISM generates last time step at top!)
+    #     policy_all = np.flipud(policy_all)
         
-        self.results['optimal_policy'] = np.zeros(np.shape(policy_all))
-        self.results['optimal_delta'] = np.zeros(np.shape(policy_all))
-        self.results['optimal_reward'] = np.zeros(np.shape(policy_all))
+    #     self.results['optimal_policy'] = np.zeros(np.shape(policy_all))
+    #     self.results['optimal_delta'] = np.zeros(np.shape(policy_all))
+    #     self.results['optimal_reward'] = np.zeros(np.shape(policy_all))
         
-        rewards_k0 = pd.read_csv(vector_file, header=None).iloc[1:].to_numpy()
-        self.results['optimal_reward'][0,:] = rewards_k0.flatten()
+    #     rewards_k0 = pd.read_csv(vector_file, header=None).iloc[1:].to_numpy()
+    #     self.results['optimal_reward'][0,:] = rewards_k0.flatten()
         
-        # Split the optimal policy between delta and action itself
-        for i,row in enumerate(policy_all):
+    #     # Split the optimal policy between delta and action itself
+    #     for i,row in enumerate(policy_all):
             
-            for j,value in enumerate(row):
+    #         for j,value in enumerate(row):
                 
-                # If value is not -1 (means no action defined)
-                if value != -1:
-                    # Split string
-                    value_split = value.split('_')
-                    # Store action and delta value separately
-                    self.results['optimal_policy'][i,j] = int(value_split[1])
-                    self.results['optimal_delta'][i,j] = int(value_split[3])
-                else:
-                    # If no policy is known, set to -1
-                    self.results['optimal_policy'][i,j] = int(value)
-                    self.results['optimal_delta'][i,j] = int(value) 
+    #             # If value is not -1 (means no action defined)
+    #             if value != -1:
+    #                 # Split string
+    #                 value_split = value.split('_')
+    #                 # Store action and delta value separately
+    #                 self.results['optimal_policy'][i,j] = int(value_split[1])
+    #                 self.results['optimal_delta'][i,j] = int(value_split[3])
+    #             else:
+    #                 # If no policy is known, set to -1
+    #                 self.results['optimal_policy'][i,j] = int(value)
+    #                 self.results['optimal_delta'][i,j] = int(value) 
         
-    def generatePlots(self, delta_value, max_delta):
-        '''
-        Generate (optimal reachability probability) plots
+    # def generatePlots(self, delta_value, max_delta):
+    #     '''
+    #     Generate (optimal reachability probability) plots
 
-        Parameters
-        ----------
-        delta_value : int
-            Value of delta for the model to plot for.
-        max_delta : int
-            Maximum value of delta used for any model.
+    #     Parameters
+    #     ----------
+    #     delta_value : int
+    #         Value of delta for the model to plot for.
+    #     max_delta : int
+    #         Maximum value of delta used for any model.
 
-        Returns
-        -------
-        None.
-        '''
+    #     Returns
+    #     -------
+    #     None.
+    #     '''
         
-        print('\nGenerate plots')
+    #     print('\nGenerate plots')
         
-        if len(self.abstr['P']) <= 1000:
+    #     if len(self.abstr['P']) <= 1000:
         
-            from .postprocessing.createPlots import createProbabilityPlots
+    #         from .postprocessing.createPlots import createProbabilityPlots
             
-            if self.setup.plotting['probabilityPlots']:
-                createProbabilityPlots(self.setup, self.plot[delta_value], 
-                                       self.N, self.model[delta_value],
-                                       self.results, self.abstr, self.mc)
+    #         if self.setup.plotting['probabilityPlots']:
+    #             createProbabilityPlots(self.setup, self.plot[delta_value], 
+    #                                    self.N, self.model[delta_value],
+    #                                    self.system.partition,
+    #                                    self.results, self.abstr, self.mc)
                     
-        else:
+    #     else:
             
-            printWarning("Omit probability plots (nr. of regions too large)")
+    #         printWarning("Omit probability plots (nr. of regions too large)")
             
     def monteCarlo(self, iterations='auto', init_states='auto', 
                    init_times='auto'):
@@ -510,7 +632,7 @@ class scenarioBasedAbstraction(Abstraction):
             w_array = dict()
             for delta in self.setup.deltas:
                 w_array[delta] = np.random.multivariate_normal(
-                    np.zeros(self.model[delta].n), self.model[delta].noise['w_cov'],
+                    np.zeros(self.model[delta]['n']), self.model[delta]['noise']['w_cov'],
                    ( len(n_list), len(init_state_idxs), self.setup.montecarlo['iterations'], self.N ))
         
         # For each starting time step in the list
@@ -568,7 +690,7 @@ class scenarioBasedAbstraction(Abstraction):
                                             
                         # Initialize the current simulation
                         
-                        x = np.zeros((self.N, self.basemodel.n))
+                        x = np.zeros((self.N, self.system.LTI['n']))
                         x_goal = [None]*self.N
                         x_region = np.zeros(self.N).astype(int)
                         u = [None]*self.N
@@ -595,7 +717,7 @@ class scenarioBasedAbstraction(Abstraction):
                             x_cubic = skew2cubic(x[k], self.abstr)
                             
                             cubic_center = computeRegionCenters(x_cubic, 
-                                                    self.basemodel.setup['partition']).flatten()
+                                                    self.system.partition).flatten()
                             
                             if tuple(cubic_center) in self.abstr['allCentersCubic']:
                                 # Save that state is currently in region ii
@@ -653,17 +775,17 @@ class scenarioBasedAbstraction(Abstraction):
         
                                 # Reconstruct the control input required to achieve this target point
                                 # Note that we do not constrain the control input; we already know that a suitable control exists!
-                                u[k] = np.array(self.model[delta].B_pinv @ ( x_goal[k+delta] - self.model[delta].A @ x[k] - self.model[delta].Q_flat ))
+                                u[k] = np.array(self.model[delta]['B_pinv'] @ ( x_goal[k+delta] - self.model[delta]['A'] @ x[k] - self.model[delta]['Q_flat'] ))
                                 
                                 # Implement the control into the physical (unobservable) system
-                                x_hat = self.model[delta].A @ x[k] + self.model[delta].B @ u[k] + self.model[delta].Q_flat
+                                x_hat = self.model[delta]['A'] @ x[k] + self.model[delta]['B'] @ u[k] + self.model[delta]['Q_flat']
                                 
                                 if self.setup.scenarios['gaussian'] is True:
                                     # Use Gaussian process noise
                                     x[k+delta] = x_hat + w_array[delta][n0id, i_abs, m, k]
                                 else:
                                     # Use generated samples                                    
-                                    disturbance = random.choice(self.model[delta].noise['samples'])
+                                    disturbance = random.choice(self.model[delta]['noise']['samples'])
                                     
                                     x[k+delta] = x_hat + disturbance
                                     

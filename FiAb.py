@@ -106,26 +106,9 @@ def filterBasedScheme(Ab, case_id):
     
     # Plot results
     Ab.generatePlots( delta_value = Ab.setup.deltas[0], 
-                       max_delta = max(Ab.setup.deltas) )
-    
-    # %%
-    
-    # The code below plots the trajectories for the UAV benchmark
-    if Ab.basemodel.name in ['UAV']:
-        
-        from core.postprocessing.createPlots import UAVplots
-    
-        # Create trajectory plot
-        _ = UAVplots(Ab, case_id, writer)
-        
-    # The code below plots the heat map for the BAS benchmark
-    if Ab.basemodel.name in ['building_1room','building_2room','robot','UAV'] or \
-        (Ab.basemodel.name == 'UAV' and Ab.basemodel.modelDim == 2):
-        
-        from core.postprocessing.createPlots import reachabilityHeatMap
-        
-        # Create heat map
-        reachabilityHeatMap(Ab)
+                       max_delta = max(Ab.setup.deltas),
+                       case_id = case_id,
+                       writer = writer)
     
     # %%
     

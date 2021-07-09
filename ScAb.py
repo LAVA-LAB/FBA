@@ -106,7 +106,7 @@ def iterativeScheme(Ab):
             # Load results from existing PRISM results files
             output_folder, policy_file, vector_file = load_PRISM_result_file(
                 Ab.setup.main['mode_prefix'], Ab.setup.directories['output'], 
-                Ab.basemodel.name, N)
+                Ab.system.name, N)
             
             # Retreive output folder
             Ab.setup.directories['outputFcase'] = output_folder
@@ -144,30 +144,9 @@ def iterativeScheme(Ab):
         
         # Plot results
         Ab.generatePlots( delta_value = Ab.setup.deltas[0], 
-                           max_delta = max(Ab.setup.deltas) )
-        
-        # %%
-        
-        # The code below plots the trajectories for the UAV benchmark
-        if Ab.basemodel.name in ['UAV']:
-            
-            from core.postprocessing.createPlots import UAVplots
-        
-            # Create trajectory plot
-            performance_df = UAVplots(Ab, case_id, writer)
-            
-            if Ab.setup.main['iterative'] is True:
-                performance = pd.concat(
-                    [iterative_results['performance'], performance_df], axis=0)
-    
-        # The code below plots the heat map for the BAS benchmark
-        if Ab.basemodel.name in ['building_1room','building_2room','robot','UAV'] or \
-            (Ab.basemodel.name == 'UAV' and Ab.basemodel.modelDim == 2):
-            
-            from core.postprocessing.createPlots import reachabilityHeatMap
-            
-            # Create heat map
-            reachabilityHeatMap(Ab)
+                           max_delta = max(Ab.setup.deltas),
+                           case_id = case_id,
+                           writer = writer)
         
         # %%
         

@@ -100,134 +100,6 @@ def computeRegionCenters(points, partition):
     # Add the origin again to obtain the absolute center coordinates
     return centers + originShift
 
-def computeScenarioBounds_sparse(setup, partition, abstr, trans, samples):
-    '''
-    Compute the transition probability intervals
-
-    Parameters
-    ----------
-    setup : dict
-        Setup dictionary.
-    partition : dict
-        Dictionary of the partition.
-    abstr : dict
-        Dictionay containing all information of the finite-state abstraction.
-    trans : dict
-        Dictionary with all data for the transition probabilities
-    samples : 2D Numpy array
-        Numpy array, with every row being a sample of the process noise.
-
-    Returns
-    -------
-    returnDict : dict
-        Dictionary with the computed (intervals of) transition probabilities.
-
-    '''
-    
-    # Number of decision variables always equal to one
-    d = 1
-    Nsamples = setup.scenarios['samples']
-    beta = setup.scenarios['confidence']
-    
-    # Initialize counts array
-    counts = dict()
-    
-    # Compute to which regions the samples belong
-    centers_cubic = computeRegionCenters(samples, partition)
-    
-    for s in range(Nsamples):
-        
-        key = tuple(centers_cubic[s])
-        
-        if key in abstr['allCentersCubic']:
-            
-            idx = abstr['allCentersCubic'][ key ]
-            
-            if idx in counts:
-                counts[idx] += 1
-            else:
-                counts[idx] = 1
-    
-    # Count number of samples not in any region (i.e. in absorbing state)
-    k = Nsamples - sum(counts.values()) + d
-
-    key_lb = tuple( [Nsamples, k, beta] )
-    key_ub = tuple( [Nsamples, k-1, beta] ) 
-    
-    deadlock_low = trans['memory'][key_ub][0]
-    if k > Nsamples:
-        deadlock_upp = 1
-    else:
-        deadlock_upp = trans['memory'][key_lb][1]
-
-    # Initialize vectors for probability bounds
-    probability_low = np.zeros(len(counts))
-    probability_upp = np.zeros(len(counts))
-    probability_approx = np.zeros(len(counts))
-    
-    interval_idxs = np.zeros(len(counts), dtype=int)
-    approx_idxs = np.zeros(len(counts), dtype=int)
-
-    # Enumerate over all the non-zero bins
-    for i, (region,count) in enumerate(counts.items()): #zip(np.arange(abstr['nr_regions'])[nonEmpty], counts[nonEmpty]):
-        
-        k = Nsamples - count + d
-        
-        key_lb = tuple( [Nsamples, k,   beta] )
-        key_ub = tuple( [Nsamples, k-1, beta] )
-        
-        if k > Nsamples:
-            probability_low[i] = 0                
-        else:
-            probability_low[i] = 1 - trans['memory'][key_lb][1]
-        probability_upp[i] = 1 - trans['memory'][key_ub][0]
-        
-        interval_idxs[i] = int(region)
-        
-        # Point estimate transition probability (count / total)
-        probability_approx[i] = count / Nsamples
-        approx_idxs[i] = int(region)
-    
-    nr_decimals = 5
-    
-    # PROBABILITY INTERVALS
-    probs_lb = floor_decimal(probability_low, nr_decimals)
-    probs_ub = floor_decimal(probability_upp, nr_decimals)
-    
-    # Create interval strings (only entries for prob > 0)
-    interval_strings = ["["+
-                      str(floor_decimal(max(1e-4, lb),nr_decimals))+","+
-                      str(floor_decimal(min(1,    ub),nr_decimals))+"]"
-                      for (lb, ub) in zip(probs_lb, probs_ub)]# if ub > 0]
-    
-    # Compute deadlock probability intervals
-    deadlock_lb = floor_decimal(deadlock_low, nr_decimals)
-    deadlock_ub = floor_decimal(deadlock_upp, nr_decimals)
-    
-    deadlock_string = '['+ \
-                       str(floor_decimal(max(1e-4, deadlock_lb),nr_decimals))+','+ \
-                       str(floor_decimal(min(1,    deadlock_ub),nr_decimals))+']'
-    
-    # POINT ESTIMATE PROBABILITIES
-    probability_approx = np.round(probability_approx, nr_decimals)
-    
-    # Create approximate prob. strings (only entries for prob > 0)
-    approx_strings = [str(p) for p in probability_approx]# if p > 0]
-    
-    # Compute approximate deadlock transition probabilities
-    deadlock_approx = np.round(1-sum(probability_approx), nr_decimals)
-    
-    returnDict = {
-        'interval_strings': interval_strings,
-        'interval_idxs': interval_idxs,
-        'approx_strings': approx_strings,
-        'approx_idxs': approx_idxs,
-        'deadlock_interval_string': deadlock_string,
-        'deadlock_approx': deadlock_approx,
-    }
-    
-    return returnDict
-
 def kalmanFilter(model, cov0):    
     '''
     For a given model in `model` and prior belief covariance `cov0`, perform
@@ -256,49 +128,54 @@ def kalmanFilter(model, cov0):
     '''
     
     # Predicted covariance of the belief
-    cov_pred = model.A @ cov0 @ model.A.T + model.noise['w_cov']
+    cov_pred = model['A'] @ cov0 @ model['A'].T + model['noise']['w_cov']
     
     # If matrix is invertible
-    if is_invertible(model.C @ cov_pred @ model.C.T + model.noise['v_cov']):
+    if is_invertible(model['C'] @ cov_pred @ model['C'].T + model['noise']['v_cov']):
         # Determine optimal Kalman gain
         
-        K_gain   = cov_pred @ model.C.T @ \
-            np.linalg.inv(model.C @ cov_pred @ model.C.T + model.noise['v_cov'])
+        K_gain   = cov_pred @ model['C'].T @ \
+            np.linalg.inv(model['C'] @ cov_pred @ model['C'].T + model['noise']['v_cov'])
         
     else:
         # If not invertible, set Kalman gain to zero
-        K_gain   = np.zeros((model.n, model.r))
+        K_gain   = np.zeros((model['n'], model['r']))
         
     # Covariance of the expected mean of the future belief
     cov_tilde = K_gain @ \
-    (model.C @ cov_pred @ model.C.T + model.noise['v_cov']) @ K_gain.T
+    (model['C'] @ cov_pred @ model['C'].T + model['noise']['v_cov']) @ K_gain.T
         
     # Covariance of the future belief
-    cov = (np.eye(model.n) - K_gain @ model.C) @ cov_pred
+    cov = (np.eye(model['n']) - K_gain @ model['C']) @ cov_pred
     
     # Calculate measure on the covariance matrix of the mean of the future belief
     cov_tilde_measure, _ = covarianceEllipseSize( cov_tilde )
     
-    hyperbox = True
+    max_error_bound = minimumEpsilon( cov, beta=0.05, stepSize=0.01, singleParam = True )
     
-    if not hyperbox:
+    return cov_pred, K_gain, cov_tilde, cov, cov_tilde_measure, max_error_bound
+
+def minimumEpsilon(cov, beta=0.05, stepSize=0.01, singleParam=True):
+    
+    n = np.shape(cov)[0]
+    
+    if not singleParam:
         ### Method with separated dimensions
         
         # Compute the maximum error between the mean of the belief, and the actual
         # state
-        beta = 0.05
-        cumprob = 0.5 * np.ones(model.n)
-        epsilon = np.zeros(model.n)
+        cumprob = 0.5 * np.ones(n)
+        epsilon = np.zeros(n)
         
-        origin = np.zeros(model.n)
+        origin = np.zeros(n)
         
-        for dim in range(model.n):
+        for dim in range(n):
             while cumprob[dim] > beta:
-                epsilon[dim] += 0.01
+                epsilon[dim] += stepSize
                 
                 
-                lower = [-100 for d in range(model.n)]
-                upper = [100 if d != dim else -epsilon[d] for d in range(model.n)]
+                lower = [-100 for d in range(n)]
+                upper = [100 if d != dim else -epsilon[d] for d in range(n)]
                 
                 cumprob[dim] = mvn.mvnun(lower=lower, upper=upper, means=origin, covar=cov)[0]
         
@@ -321,19 +198,19 @@ def kalmanFilter(model, cov0):
                 print(' -- Computing error bound aborted after',count_max,'iterations')
                 break
             
-            epsilon += 0.001
+            epsilon += stepSize
             
-            lower = [-epsilon if d not in inf_dims else -inf_lim for d in range(model.n)]
-            upper = [ epsilon if d not in inf_dims else  inf_lim for d in range(model.n)]
+            lower = [-epsilon if d not in inf_dims else -inf_lim for d in range(n)]
+            upper = [ epsilon if d not in inf_dims else  inf_lim for d in range(n)]
             
             cumprob = mvn.mvnun(lower=lower,
                                 upper=upper,
-                                means=np.zeros(model.n), covar=cov)[0]
+                                means=np.zeros(n), covar=cov)[0]
             
         max_error_bound = np.array([epsilon if d not in inf_dims else inf_lim 
-                                    for d in range(model.n)])
-    
-    return cov_pred, K_gain, cov_tilde, cov, cov_tilde_measure, max_error_bound
+                                    for d in range(n)])
+        
+    return max_error_bound
 
 def steadystateCovariance(covariances, verbose=False):
     '''
@@ -589,34 +466,34 @@ def makeModelFullyActuated(model, manualDimension='auto', observer=False):
     
     if manualDimension == 'auto':
         # Determine dimension for actuation transformation
-        dim    = int( np.size(model.A,1) / np.size(model.B,1) )
+        dim    = int( np.size(model['A'],1) / np.size(model['B'],1) )
     else:
         # Group a manual number of time steps
         dim    = int( manualDimension )
     
     # Determine fully actuated system matrices and parameters
-    A_hat  = np.linalg.matrix_power(model.A, (dim))
-    B_hat  = np.concatenate([ np.linalg.matrix_power(model.A, (dim-i)) \
-                                      @ model.B for i in range(1,dim+1) ], 1)
+    A_hat  = np.linalg.matrix_power(model['A'], (dim))
+    B_hat  = np.concatenate([ np.linalg.matrix_power(model['A'], (dim-i)) \
+                                      @ model['B'] for i in range(1,dim+1) ], 1)
     
-    Q_hat  = sum([ np.linalg.matrix_power(model.A, (dim-i)) @ model.Q
+    Q_hat  = sum([ np.linalg.matrix_power(model['A'], (dim-i)) @ model['Q']
                        for i in range(1,dim+1) ])
     
-    w_sigma_hat  = sum([ np.array( np.linalg.matrix_power(model.A, (dim-i) ) \
-                                      @ model.noise['w_cov'] @ \
-                                      np.linalg.matrix_power(model.A.T, (dim-i) ) \
+    w_sigma_hat  = sum([ np.array( np.linalg.matrix_power(model['A'], (dim-i) ) \
+                                      @ model['noise']['w_cov'] @ \
+                                      np.linalg.matrix_power(model['A'].T, (dim-i) ) \
                                     ) for i in range(1,dim+1) ])
     
     # Overwrite original system matrices
-    model.A               = A_hat
-    model.B               = B_hat
-    model.Q               = Q_hat
-    model.Q_flat          = Q_hat.flatten()
+    model['A']               = A_hat
+    model['B']               = B_hat
+    model['Q']               = Q_hat
+    model['Q_flat']          = Q_hat.flatten()
     
-    model.noise['w_cov']  = w_sigma_hat
+    model['noise']['w_cov']  = w_sigma_hat
     
     # Redefine sampling time of model
-    model.tau             *= (dim+1)
+    model['tau']             *= (dim+1)
     
     return model
 

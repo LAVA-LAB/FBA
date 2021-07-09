@@ -16,6 +16,7 @@ ______________________________________________________________________________
 """
 
 import numpy as np              # Import Numpy for computations
+import pandas as pd             # Import Pandas to store data in frames
 import itertools                # Import to crate iterators
 import copy                     # Import to copy variables in Python
 import sys                      # Allows to terminate the code at sorme point
@@ -24,8 +25,11 @@ from scipy.spatial.qhull import _Qhull
 
 from .mainFunctions import definePartitions, computeRegionOverlap, \
     in_hull, makeModelFullyActuated, cubic2skew, skew2cubic, point_in_hull
-from .commons import tocDiff, printWarning, findMinDiff
+from .commons import tocDiff, printWarning, findMinDiff, tic, ticDiff, \
+    extractRowBlockDiag
 from .postprocessing.createPlots import createPartitionPlot
+
+from .createMDP import mdp
 
 '''
 ------------------------------------------------------------------------------
@@ -37,6 +41,54 @@ class Abstraction(object):
     '''
     Main abstraction object    
     '''
+    
+    def __init__(self):
+        '''
+        Initialize the scenario-based abstraction object.
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        # Define empty dictionary for monte carlo sims. (even if not used)
+        self.mc = dict()   
+        
+        # Start timer
+        tic()
+        ticDiff()
+        self.time = dict()
+        
+        print('Base model loaded:')
+        print(' -- Dimension of the state:',self.system.LTI['n'])
+        print(' -- Dimension of the control input:',self.system.LTI['p'])
+        
+        # Simulation end time is the end time
+        self.T  = self.system.endTime
+        
+        # Number of simulation time steps
+        self.N = int(self.T) #/self.system.LTI['tau'])
+        
+        # Reduce step size as much as possible
+        min_delta = min(self.setup.deltas)
+        
+        for div in range(min_delta, 0, -1):
+            if all(np.array(self.setup.deltas) % div) == 0:
+                print('Simplify step size by factor:',div)
+                self.N = int(self.N / div)
+                self.setup.deltas = (np.array(self.setup.deltas) / div).astype(int)
+                
+                break
+        
+        self.model = dict()
+        for delta in self.setup.deltas:
+            
+            # Define model object for current delta value
+            self.model[delta] = self._defModel(int(delta*div))
+        
+        self.time['0_init'] = tocDiff(False)
+        print('Abstraction object initialized - time:',self.time['0_init'])
     
     def _defModel(self, delta):
         '''
@@ -55,43 +107,43 @@ class Abstraction(object):
         '''
         
         if delta == 0:
-            model = makeModelFullyActuated(copy.deepcopy(self.basemodel), 
+            model = makeModelFullyActuated(copy.deepcopy(self.system.LTI), 
                        manualDimension = 'auto', observer=False)
         else:
-            model = makeModelFullyActuated(copy.deepcopy(self.basemodel), 
+            model = makeModelFullyActuated(copy.deepcopy(self.system.LTI), 
                        manualDimension = delta, observer=False)
             
         # Determine inverse A matrix
-        model.A_inv  = np.linalg.inv(model.A)
+        model['A_inv']  = np.linalg.inv(model['A'])
         
         # Determine pseudo-inverse B matrix
-        model.B_pinv = np.linalg.pinv(model.B)
+        model['B_pinv'] = np.linalg.pinv(model['B'])
         
         # Retreive system dimensions
-        model.p      = np.size(model.B,1)   # Nr of inputs
+        model['p']      = np.size(model['B'],1)   # Nr of inputs
     
         # Control limitations
-        model.uMin   = np.array( model.setup['control']['limits']['uMin'] * \
-                                int(model.p/self.basemodel.p) )
-        model.uMax   = np.array( model.setup['control']['limits']['uMax'] * \
-                                int(model.p/self.basemodel.p) )
+        model['uMin']   = np.array( self.system.control['limits']['uMin'] * \
+                                int(model['p']/self.system.LTI['p']) )
+        model['uMax']   = np.array( self.system.control['limits']['uMax'] * \
+                                int(model['p']/self.system.LTI['p']) )
         
         # If noise samples are used, recompute them
         if self.setup.scenarios['gaussian'] is False:
             
-            model.noise['samples'] = np.vstack(
-                (2*model.noise['samples'][:,0],
-                 model.noise['samples'][:,0],
-                 2*model.noise['samples'][:,1],
-                 model.noise['samples'][:,1],
-                 2*model.noise['samples'][:,2],
-                 model.noise['samples'][:,2])).T
+            model['noise']['samples'] = np.vstack(
+                (2*model['noise']['samples'][:,0],
+                 model['noise']['samples'][:,0],
+                 2*model['noise']['samples'][:,1],
+                 model['noise']['samples'][:,1],
+                 2*model['noise']['samples'][:,2],
+                 model['noise']['samples'][:,2])).T
         
-        uAvg = (model.uMin + model.uMax) / 2
+        uAvg = (model['uMin'] + model['uMax']) / 2
         
-        if np.linalg.matrix_rank(np.eye(model.n) - model.A) == model.n:
-            model.equilibrium = np.linalg.inv(np.eye(model.n) - model.A) @ \
-                (model.B @ uAvg + model.Q_flat)
+        if np.linalg.matrix_rank(np.eye(model['n']) - model['A']) == model['n']:
+            model['equilibrium'] = np.linalg.inv(np.eye(model['n']) - model['A']) @ \
+                (model['B'] @ uAvg + model['Q_flat'])
         
         return model
     
@@ -100,14 +152,14 @@ class Abstraction(object):
         # Define partitioning of state-space
         abstr = dict()
         
-        abstr['P'] = definePartitions(self.basemodel.n,
-                            self.basemodel.setup['partition']['nrPerDim'],
-                            self.basemodel.setup['partition']['width'],
-                            self.basemodel.setup['partition']['origin'],
+        abstr['P'] = definePartitions(self.system.LTI['n'],
+                            self.system.partition['nrPerDim'],
+                            self.system.partition['width'],
+                            self.system.partition['origin'],
                             onlyCenter = False)
         
         abstr['nr_regions'] = len(abstr['P'])
-        abstr['origin'] = self.basemodel.setup['partition']['origin']
+        abstr['origin'] = self.system.partition['origin']
         
         centerTuples = [tuple(region['center']) for region in abstr['P'].values()] 
         
@@ -202,7 +254,7 @@ class Abstraction(object):
             
         # Create all combinations of n bits, to reflect combinations of all 
         # lower/upper bounds of partitions
-        bitCombinations = list(itertools.product([0, 1], repeat=self.basemodel.n))
+        bitCombinations = list(itertools.product([0, 1], repeat=self.system.LTI['n']))
         bitRelation     = ['low','upp']
         
         # Calculate all corner points of every partition.
@@ -249,20 +301,20 @@ class Abstraction(object):
         
         target = dict()
         
-        if self.basemodel.setup['targets']['nrPerDim'] != 'auto':
+        if self.system.targets['nrPerDim'] != 'auto':
 
             # Width (span) between target points in every dimension
-            if self.basemodel.setup['targets']['domain'] != 'auto':
-                targetWidth = np.array(self.basemodel.setup['targets']['domain'])*2 / (self.basemodel.setup['targets']['nrPerDim'])
+            if self.system.targets['domain'] != 'auto':
+                targetWidth = np.array(self.system.targets['domain'])*2 / (self.system.targets['nrPerDim'])
             else:
-                targetWidth = np.array(self.basemodel.setup['partition']['nrPerDim']) * \
-                    self.basemodel.setup['partition']['width'] / (self.basemodel.setup['targets']['nrPerDim'])
+                targetWidth = np.array(self.system.partition['nrPerDim']) * \
+                    self.system.partition['width'] / (self.system.targets['nrPerDim'])
         
             # Create target points (similar to a partition of the state space)
-            target['d'] = definePartitions(self.basemodel.n,
-                    self.basemodel.setup['targets']['nrPerDim'],
+            target['d'] = definePartitions(self.system.LTI['n'],
+                    self.system.targets['nrPerDim'],
                     targetWidth,
-                    self.basemodel.setup['partition']['origin'],
+                    self.system.partition['origin'],
                     onlyCenter = True)
             
             # Transformed from cubic to skewed
@@ -297,18 +349,18 @@ class Abstraction(object):
         '''
         
         # Determine the set of extremal control inputs
-        u = [[self.model[delta].uMin[i], self.model[delta].uMax[i]] for i in 
-              range(self.model[delta].p)]
+        u = [[self.model[delta]['uMin'][i], self.model[delta]['uMax'][i]] for i in 
+              range(self.model[delta]['p'])]
         
         # Determine the inverse image of the extreme control inputs
-        x_inv_area = np.zeros((2**self.model[delta].p, self.model[delta].n))
+        x_inv_area = np.zeros((2**self.model[delta]['p'], self.model[delta]['n']))
         for i,elem in enumerate(itertools.product(*u)):
             list_elem = list(elem)
             
             # Calculate inverse image of the current extreme control input
-            x_inv_area[i,:] = self.model[delta].A_inv @ \
-                (self.model[delta].B @ np.array(list_elem).T + 
-                 self.model[delta].Q_flat)  
+            x_inv_area[i,:] = self.model[delta]['A_inv'] @ \
+                (self.model[delta]['B'] @ np.array(list_elem).T + 
+                 self.model[delta]['Q_flat'])  
     
         return x_inv_area
     
@@ -351,22 +403,22 @@ class Abstraction(object):
 
         '''
         
-        u_avg = np.array(self.model[delta].uMax + self.model[delta].uMin)/2    
+        u_avg = np.array(self.model[delta]['uMax'] + self.model[delta]['uMin'])/2    
 
         # Compute basis vectors (with average of all controls as origin)
-        u = np.tile(u_avg, (self.basemodel.n,1)) + \
-            np.diag(self.model[delta].uMax - u_avg)
+        u = np.tile(u_avg, (self.system.LTI['n'],1)) + \
+            np.diag(self.model[delta]['uMax'] - u_avg)
         
-        origin = self.model[delta].A_inv @ \
-                (self.model[delta].B @ np.array(u_avg).T)   
+        origin = self.model[delta]['A_inv'] @ \
+                (self.model[delta]['B'] @ np.array(u_avg).T)   
                 
-        basis_vectors = np.zeros((self.basemodel.n, self.basemodel.n))
+        basis_vectors = np.zeros((self.system.LTI['n'], self.system.LTI['n']))
         
         for i,elem in enumerate(u):
             
             # Calculate inverse image of the current extreme control input
-            point = self.model[delta].A_inv @ \
-                (self.model[delta].B @ elem.T)    
+            point = self.model[delta]['A_inv'] @ \
+                (self.model[delta]['B'] @ elem.T)    
             
             basis_vectors[i,:] = point - origin
         
@@ -413,12 +465,12 @@ class Abstraction(object):
         enabled_in_states = [[] for i in range(self.abstr['nr_actions'])]
         enabled_actions   = [[] for i in range(self.abstr['nr_regions'])]
         
-        nr_corners = 2**self.basemodel.n
+        nr_corners = 2**self.system.LTI['n']
         
         printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
         
         # Check if dimension of control area equals that if the state vector
-        dimEqual = self.model[delta].p == self.basemodel.n
+        dimEqual = self.model[delta]['p'] == self.system.LTI['n']
         
         if dimEqual:
             
@@ -465,8 +517,6 @@ class Abstraction(object):
                   incremental=False, 
                   interior_point=None)
             
-            print(x_inv_qHull)
-            
             print('Normal inverse area:',x_inv_area)
         
             allRegionVertices = self.abstr['allVerticesFlat'] 
@@ -486,7 +536,7 @@ class Abstraction(object):
             if dimEqual:
             
                 # Shift the origin points (instead of the target point)
-                A_inv_d = self.model[delta].A_inv @ np.array(targetPoint)
+                A_inv_d = self.model[delta]['A_inv'] @ np.array(targetPoint)
                 
                 # Python implementation
                 allVerticesNormalized = (A_inv_d @ parralelo2cube) - \
@@ -495,7 +545,7 @@ class Abstraction(object):
                 # Reshape the whole matrix that we obtain
                 poly_reshape = np.reshape( allVerticesNormalized,
                                 (self.abstr['nr_regions'], 
-                                 nr_corners*self.basemodel.n))
+                                 nr_corners*self.system.LTI['n']))
                 
                 # Enabled actions are ones that have all corner points within
                 # the origin-centered hypercube with unit length
@@ -505,7 +555,7 @@ class Abstraction(object):
             else:
                 
                 # Shift the origin points (instead of the target point)
-                A_inv_d = self.model[delta].A_inv @ np.array(targetPoint)
+                A_inv_d = self.model[delta]['A_inv'] @ np.array(targetPoint)
             
                 # Subtract the shift from all corner points
                 allVertices = A_inv_d - allRegionVertices
@@ -531,7 +581,7 @@ class Abstraction(object):
                 # print('x_inv_area:',x_inv_area)
                 # print('origin shift:',A_inv_d)       
                 # print('targetPoint:',targetPoint,' - drift:',
-                #       self.model[delta].Q_flat)
+                #       self.model[delta]['Q_flat'])
                 
                 predecessor_set = A_inv_d - x_inv_area
                 
@@ -539,7 +589,7 @@ class Abstraction(object):
                 print('Create partition plot...')
                     
                 createPartitionPlot((0,1), (2,3), self.abstr['goal'][0], 
-                    delta, self.setup, self.model[delta], self.abstr, 
+                    delta, self.setup, self.model[delta], self.system.partition, self.abstr, 
                     self.abstr['allVertices'], predecessor_set)
             
             # Retreive the ID's of all states in which the action is enabled
@@ -581,44 +631,6 @@ class Abstraction(object):
                               for i in range(self.abstr['nr_actions'])]
         
         return total_actions_enabled, enabled_actions, enabledActions_inv
-                
-    def __init__(self):
-        '''
-        Initialize the scenario-based abstraction object.
-
-        Returns
-        -------
-        None.
-
-        '''
-        
-        print('Base model loaded:')
-        print(' -- Dimension of the state:',self.basemodel.n)
-        print(' -- Dimension of the control input:',self.basemodel.p)
-        
-        # Simulation end time is the end time
-        self.T  = self.basemodel.setup['endTime']
-        
-        # Number of simulation time steps
-        self.N = int(self.T) #/self.basemodel.tau)
-        
-        # Reduce step size as much as possible
-        min_delta = min(self.setup.deltas)
-        
-        for div in range(min_delta, 0, -1):
-            if all(np.array(self.setup.deltas) % div) == 0:
-                print('Simplify step size by factor:',div)
-                self.N = int(self.N / div)
-                self.setup.deltas = (np.array(self.setup.deltas) / div).astype(int)
-        
-        self.model = dict()
-        for delta in self.setup.deltas:
-            
-            # Define model object for current delta value
-            self.model[delta] = self._defModel(int(delta*div))
-        
-        self.time['0_init'] = tocDiff(False)
-        print('Abstraction object initialized - time:',self.time['0_init'])
         
     def definePartition(self):
         ''' 
@@ -649,7 +661,7 @@ class Abstraction(object):
             basis_vectors = self._defBasisVectors(max(self.setup.deltas)) * 2
             
             length = np.linalg.norm(basis_vectors, axis=1)
-            normalization_factor = min(self.basemodel.setup['partition']['width'] / length)
+            normalization_factor = min(self.system.partition['width'] / length)
             
             # Normalize basis vectors
             self.abstr['basis_vectors'] = normalization_factor * basis_vectors
@@ -666,13 +678,13 @@ class Abstraction(object):
         else:
             
             # If skewed partition disabled, just define identity matrix
-            self.abstr['basis_vectors'] = np.eye(self.basemodel.n)
+            self.abstr['basis_vectors'] = np.eye(self.system.LTI['n'])
             
         self.abstr['basis_vectors_inv'] = np.linalg.inv( self.abstr['basis_vectors'] )
         
         # Find biggest cube that fits within a skewed region
         self.abstr['biggest_cube'] = np.array([findMinDiff(self.abstr['allVertices'][0][:,dim]) 
-                                               for dim in range(self.basemodel.n)])
+                                               for dim in range(self.system.LTI['n'])])
         
         ##########
         
@@ -687,27 +699,27 @@ class Abstraction(object):
             if self.setup.main['mode'] == 'Filter':
                 epsilon = self.km['max_error_bound'][k]
             else:
-                epsilon = np.zeros(self.basemodel.n)
+                epsilon = np.zeros(self.system.LTI['n'])
         
             # Determine goal regions
             self.abstr['goal'][k] = self._defStateLabelSet(
                 self.abstr['allVertices'],
-                self.basemodel.setup['specification']['goal'], typ="goal", epsilon=epsilon)
+                self.system.spec['goal'], typ="goal", epsilon=epsilon)
             
             # Determine critical regions
             self.abstr['critical'][k] = self._defStateLabelSet(
                 self.abstr['allVertices'],
-                self.basemodel.setup['specification']['critical'], typ="critical", epsilon=epsilon)
+                self.system.spec['critical'], typ="critical", epsilon=epsilon)
     
         self.abstr['goal'][0] = self.abstr['goal'][1]
         self.abstr['critical'][0] = self.abstr['critical'][1]
             
         self.abstr['goal']['zero_bound'] = self._defStateLabelSet(
                 self.abstr['allVertices'],
-                self.basemodel.setup['specification']['goal'], typ="goal", epsilon=0)
+                self.system.spec['goal'], typ="goal", epsilon=0)
         self.abstr['critical']['zero_bound'] = self._defStateLabelSet(
                 self.abstr['allVertices'],
-                self.basemodel.setup['specification']['critical'], typ="critical", epsilon=0)
+                self.system.spec['critical'], typ="critical", epsilon=0)
         
         print(' -- Number of regions:',self.abstr['nr_regions'])
         print(' -- Number of goal regions:',len(self.abstr['goal']['zero_bound']))
@@ -747,3 +759,250 @@ class Abstraction(object):
         self.time['2_enabledActions'] = tocDiff(False)
         print('Enabled actions define - time:',self.time['2_enabledActions'])
         
+    def buildMDP(self):
+        '''
+        Build the (i)MDP and create all respective PRISM files.
+
+        Returns
+        -------
+        model_size : dict
+            Dictionary describing the number of states, choices, and 
+            transitions.
+
+        '''
+        
+        # Initialize MDP object
+        self.mdp = mdp(self.setup, self.N, self.abstr)
+        
+        if self.setup.mdp['prism_model_writer'] == 'explicit':
+            
+            # Create PRISM file (explicit way)
+            model_size, self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
+                self.mdp.writePRISM_explicit(self.abstr, self.trans, mode=self.setup.mdp['mode'], km=self.km)   
+        
+        else:
+        
+            # Create PRISM file (default way)
+            self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
+                self.mdp.writePRISM_scenario(self.abstr, self.trans, self.setup.mdp['mode'])  
+              
+            model_size = {'States':None,'Choices':None,'Transitions':None}
+
+        self.time['4_MDPcreated'] = tocDiff(False)
+        print('MDP created - time:',self.time['4_MDPcreated'])
+        
+        return model_size
+        
+    def solveMDP(self):
+        '''
+        Solve the (i)MDP usign PRISM
+
+        Returns
+        -------
+        None.
+
+        '''
+            
+        # Solve the MDP in PRISM (which is called via the terminal)
+        policy_file, vector_file = self._solveMDPviaPRISM()
+        
+        # Load PRISM results back into Python
+        self.loadPRISMresults(policy_file, vector_file)
+            
+        self.time['5_MDPsolved'] = tocDiff(False)
+        print('MDP solved in',self.time['5_MDPsolved'])
+        
+    def _solveMDPviaPRISM(self):
+        '''
+        Call PRISM to solve (i)MDP while executing the Python codes.
+
+        Returns
+        -------
+        policy_file : str
+            Name of the file in which the optimal policy is stored.
+        vector_file : str
+            Name of the file in which the optimal rewards are stored.
+
+        '''
+        
+        import subprocess
+
+        prism_folder = self.setup.mdp['prism_folder'] 
+        
+        print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
+        
+        print('Starting PRISM...')
+        
+        spec = self.mdp.specification
+        mode = self.setup.mdp['mode']
+        java_memory = self.setup.mdp['prism_java_memory']
+        
+        print(' -- Running PRISM with specification for mode',
+              mode.upper()+'...')
+    
+        file_prefix = self.setup.directories['outputFcase'] + "PRISM_" + mode
+        policy_file = file_prefix + '_policy.csv'
+        vector_file = file_prefix + '_vector.csv'
+    
+        options = ' -ex -exportadv "'+policy_file+'"'+ \
+                  ' -exportvector "'+vector_file+'"'
+    
+        # Switch between PRISM command for explicit model vs. default model
+        if self.setup.mdp['prism_model_writer'] == 'explicit':
+    
+            print(' --- Execute PRISM command for EXPLICIT model description')        
+    
+            model_file      = '"'+self.mdp.prism_file+'"'             
+        
+            # Explicit model
+            command = prism_folder+"bin/prism -javamaxmem "+str(java_memory)+"g "+ \
+                      "-importmodel "+model_file+" -pf '"+spec+"' "+options
+        else:
+            
+            print(' --- Execute PRISM command for DEFAULT model description')
+            
+            model_file      = '"'+self.mdp.prism_file+'"'
+            
+            # Default model
+            command = prism_folder+"bin/prism -javamaxmem "+str(java_memory)+"g "+ \
+                      model_file+" -pf '"+spec+"' "+options    
+        
+        subprocess.Popen(command, shell=True).wait()    
+        
+        return policy_file, vector_file
+    
+    def preparePlots(self):
+        '''
+        Initializing function to prepare for plotting
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        # Process results
+        self.plot           = dict()
+    
+        for delta_idx, delta in enumerate(self.setup.deltas):
+            self.plot[delta] = dict()
+            self.plot[delta]['N'] = dict()
+            self.plot[delta]['T'] = dict()
+            
+            self.plot[delta]['N']['start'] = 0
+            
+            # Convert index to absolute time (note: index 0 is time tau)
+            self.plot[delta]['T']['start'] = \
+                int(self.plot[delta]['N']['start'] * self.system.LTI['tau'])
+                
+    def loadPRISMresults(self, policy_file, vector_file):
+        '''
+        Load results from existing PRISM output files.
+
+        Parameters
+        ----------
+        policy_file : str
+            Name of the file to load the optimal policy from.
+        vector_file : str
+            Name of the file to load the optimal policy from.
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        import pandas as pd
+        
+        self.results = dict()
+        
+        policy_all = pd.read_csv(policy_file, header=None).iloc[:, 3:].fillna(-1).to_numpy()
+        # Flip policy upside down (PRISM generates last time step at top!)
+        policy_all = np.flipud(policy_all)
+        policy_all = extractRowBlockDiag(policy_all, len(self.abstr['P']))
+        
+        self.results['optimal_policy'] = np.zeros(np.shape(policy_all))
+        self.results['optimal_delta'] = np.zeros(np.shape(policy_all))
+        self.results['optimal_reward'] = np.zeros(np.shape(policy_all))
+        
+        rewards_k0 = pd.read_csv(vector_file, header=None).iloc[3:].to_numpy()
+        
+        reward_rows = int((len(rewards_k0)-1)/len(self.abstr['P']) + 1)
+        
+        self.results['optimal_reward'][0:reward_rows, :] = \
+            np.reshape(rewards_k0, (reward_rows, len(self.abstr['P'])))
+        
+        # Split the optimal policy between delta and action itself
+        for i,row in enumerate(policy_all):
+            
+            for j,value in enumerate(row):
+                
+                # If value is not -1 (means no action defined)
+                if value != -1:
+                    # Split string
+                    value_split = value.split('_')
+                    # Store action and delta value separately
+                    self.results['optimal_policy'][i,j] = int(value_split[1])
+                    self.results['optimal_delta'][i,j] = int(value_split[3])
+                else:
+                    # If no policy is known, set to -1
+                    self.results['optimal_policy'][i,j] = int(value)
+                    self.results['optimal_delta'][i,j] = int(value) 
+                    
+    def generatePlots(self, delta_value, max_delta, case_id, writer,
+                      iterative_results=None):
+        '''
+        Generate (optimal reachability probability) plots
+
+        Parameters
+        ----------
+        delta_value : int
+            Value of delta for the model to plot for.
+        max_delta : int
+            Maximum value of delta used for any model.
+
+        Returns
+        -------
+        None.
+        '''
+        
+        print('\nGenerate plots')
+        
+        if len(self.abstr['P']) <= 1000:
+        
+            from .postprocessing.createPlots import createProbabilityPlots
+            
+            if self.setup.plotting['probabilityPlots']:
+                createProbabilityPlots(self.setup, self.plot[delta_value], 
+                                       self.N, self.model[delta_value],
+                                       self.system.partition,
+                                       self.results, self.abstr, self.mc)
+                    
+        else:
+            
+            printWarning("Omit probability plots (nr. of regions too large)")
+            
+        # The code below plots the trajectories
+        if self.system.name in ['UAV']:
+            
+            from core.postprocessing.createPlots import trajectoryPlot
+        
+            # Create trajectory plot
+            performance_df = trajectoryPlot(self, case_id, writer)
+            
+            if self.setup.main['iterative'] is True and iterative_results != None:
+                performance = pd.concat(
+                    [iterative_results['performance'], performance_df], axis=0)
+            else:
+                performance = None
+    
+        # The code below plots the heat map
+        if self.system.name in ['building_1room','building_2room','robot','UAV'] or \
+            (self.system.name == 'UAV' and self.system.modelDim == 2):
+            
+            from core.postprocessing.createPlots import reachabilityHeatMap
+            
+            # Create heat map
+            reachabilityHeatMap(self)
+            
+        return performance

@@ -317,12 +317,20 @@ def cm2inch(*tupl):
     else:
         return tuple(i/inch for i in tupl)
             
+# def floor_decimal(a, precision=0):
+#     '''
+#     Floor function, but than with a specific precision
+#     '''
+    
+#     return np.round(a - 0.5 * 10**(-precision), precision)
+
 def floor_decimal(a, precision=0):
     '''
     Floor function, but than with a specific precision
     '''
+    d = 1/(10**precision)
     
-    return np.round(a - 0.5 * 10**(-precision), precision)
+    return a // d * d
 
 def writeFile(file, operation="w", content=[""]):
     '''
@@ -418,9 +426,9 @@ def defSpecBlock(partition, **kwargs):
     
     vertices = np.array(list(itertools.product(*limits)))
     
-    # hull = Delaunay(vertices, qhull_options='QJ')
+    hull = Delaunay(vertices, qhull_options='QJ')
     
-    return {'vertices': vertices, 'limits': limits} #, 'hull': hull}
+    return {'vertices': vertices, 'limits': limits, 'hull': hull}
 
 def unit_vector(vector):
     """ Returns the unit vector of the vector.  """

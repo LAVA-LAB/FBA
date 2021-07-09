@@ -45,15 +45,15 @@ np.random.seed(10)
 #-----------------------------------------------------------------------------
 
 # Create model object
-model = modelClasses[application_id, 1]()
+system = modelClasses[application_id, 1]()
 
 #-----------------------------------------------------------------------------
 # Create settings object + change manual settings
 #-----------------------------------------------------------------------------
 
 # Create settings object
-setup = settings(application=model.name)
-setup.deltas = model.setup['deltas']
+setup = settings(application=system.name)
+setup.deltas = system.deltas
 
 loadOptions('options.txt', setup)
 
@@ -111,9 +111,9 @@ Ab = dict()
 
 # Set LTI model in main object
 if setup.main['mode'] == 'Filter':
-    model.setModel(observer=True)
+    system.setModel(observer=True)
 else:
-    model.setModel(observer=False)
+    system.setModel(observer=False)
     
     
 setup.lic = {'enabled': False, 'LICMaxA': 1.5, 'LICMinA': 1.5}
@@ -129,9 +129,9 @@ setup.main['newRun'] = not choice
 
 if setup.main['newRun'] is True:
     # Create noise samples
-    if model.name in ['UAV'] and model.modelDim == 3:
+    if system.name in ['UAV'] and system.modelDim == 3:
         setup.setOptions(category='scenarios', gaussian=False)
-        model.setTurbulenceNoise(setup.scenarios['samples_max'])
+        system.setTurbulenceNoise(setup.scenarios['samples_max'])
 
 if setup.main['iterative'] is True and setup.main['newRun'] is False:
     printWarning("Iterative scheme cannot be combined with loading existing "+
@@ -141,13 +141,13 @@ if setup.main['iterative'] is True and setup.main['newRun'] is False:
 
 # Create the main object for the current instance
 if setup.main['mode'] == 'Filter':
-    Ab = filterBasedAbstraction(setup=setup, basemodel=model)
+    Ab = filterBasedAbstraction(setup=setup, system=system)
 else:
-    Ab = scenarioBasedAbstraction(setup=setup, basemodel=model)
+    Ab = scenarioBasedAbstraction(setup=setup, system=system)
 
 # Remove initial variable dictionaries (reducing data usage)
 del setup
-del model
+del system
 
 #-----------------------------------------------------------------------------
 # Define actions (only required once outside iterative scheme)
@@ -159,7 +159,7 @@ if Ab.setup.main['newRun'] is True:
     createDirectory(Ab.setup.directories['outputF'])    
 
     # Create actions and determine which ones are enabled
-    Ab.defActions()
+    Ab.defineActions()
 
 #-----------------------------------------------------------------------------
 
@@ -221,15 +221,15 @@ from scipy.stats import mvn
 cov = Ab.km[1]['cov'][2]
 
 beta = 0.2
-cumprob = 0.5 * np.ones(Ab.basemodel.n)
+cumprob = 0.5 * np.ones(Ab.system.LTI['n'])
 epsilon = 0
 
 while any(cumprob > beta):
     epsilon += 0.01
     
-    for dim in range(Ab.basemodel.n):
+    for dim in range(Ab.system.LTI['n']):
         lower = [-100,-100]
-        upper = [100 if d != dim else -epsilon for d in range(Ab.basemodel.n)]
+        upper = [100 if d != dim else -epsilon for d in range(Ab.system.LTI['n'])]
         
         cumprob[dim] = mvn.mvnun(lower=lower, upper=upper, means=[0,0], covar=cov)[0]
 

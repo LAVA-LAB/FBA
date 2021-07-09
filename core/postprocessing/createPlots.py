@@ -27,7 +27,7 @@ from matplotlib.patches import Rectangle
 from ..commons import printWarning, mat_to_vec, cm2inch, confidence_ellipse
 
 
-def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
+def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, partition, \
                         abstr, allVerticesNested, predecessor_set):
     
     '''
@@ -64,7 +64,7 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
     ax = fig.add_subplot(111)
     
     # If number of dimensions is 2, create 2D plot
-    if model.n <= 2:        
+    if model['n'] <= 2:        
         plt.xlabel('$x_1$', labelpad=0)
         plt.ylabel('$x_2$', labelpad=-10)
         
@@ -80,9 +80,9 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
     
     for k,poly in enumerate(allVerticesNested):
 
-        if model.n <= 2 or ( \
-            abstr['P'][k]['center'][j0] == model.setup['partition']['origin'][j0] and \
-            abstr['P'][k]['center'][j1] == model.setup['partition']['origin'][j1]):
+        if model['n'] <= 2 or ( \
+            abstr['P'][k]['center'][j0] == partition['origin'][j0] and \
+            abstr['P'][k]['center'][j1] == partition['origin'][j1]):
 
             # Convert poly list to numpy array            
             polyMat = np.array(poly)
@@ -98,9 +98,9 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
         
     for k,target_point in enumerate(abstr['target']['d']):
           
-        if model.n <= 2 or ( \
-            abstr['P'][k]['center'][j0] == model.setup['partition']['origin'][j0] and \
-            abstr['P'][k]['center'][j1] == model.setup['partition']['origin'][j1]):
+        if model['n'] <= 2 or ( \
+            abstr['P'][k]['center'][j0] == partition['origin'][j0] and \
+            abstr['P'][k]['center'][j1] == partition['origin'][j1]):
         
             # Plot target point
             plt.scatter(target_point[i0], target_point[i1], c='k', s=6)
@@ -121,7 +121,7 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
     
     # If number of dimensions is 3, create 3D plot
-    if model.n == 3:
+    if model['n'] == 3:
         
         fig = plt.figure(figsize=cm2inch(5.33, 4))
         ax = fig.add_subplot(111, projection="3d")
@@ -135,7 +135,7 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, \
             hull = ConvexHull(poly)
             
             # Plot defining corner points
-            for t in range(2**model.n):
+            for t in range(2**model['n']):
                 # If contained in the inverse image, plot green. blue otherwise
                 '''
                 if enabledPolypoints[j][k, t]:
@@ -185,7 +185,7 @@ def _set_axes_radius(ax, origin, radius):
     ax.set_ylim3d([y - radius, y + radius])
     # ax.set_zlim3d([z - radius, z + radius])
 
-def createProbabilityPlots(setup, plot, N, model, results, abstr, mc):
+def createProbabilityPlots(setup, plot, N, model, partition, results, abstr, mc):
     '''
     Create the result plots for the abstraction instance.
 
@@ -264,10 +264,10 @@ def createProbabilityPlots(setup, plot, N, model, results, abstr, mc):
     
     ######################
     # Determine dimension of model
-    m = model.setup['partition']['nrPerDim']
+    m = partition['nrPerDim']
     
     # Plot 3D probability plot for selected time steps
-    if model.n > 2:
+    if model['n'] > 2:
         printWarning('Number of dimensions is larger than 2, so 3D reachability plot omitted')
     
     else:
@@ -396,7 +396,7 @@ def createProbabilityPlots(setup, plot, N, model, results, abstr, mc):
     for form in setup.plotting['exportFormats']:
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
     
-def policyPlot(setup, model, results, abstr):
+def policyPlot(setup, model, partition, results, abstr):
     '''
     Create the policy plot for the current abstraction instance
 
@@ -425,11 +425,11 @@ def policyPlot(setup, model, results, abstr):
     plt.xlabel('Zone temp.', labelpad=0)
     plt.ylabel('Radiator temp.', labelpad=0)
 
-    width = np.array(model.setup['partition']['width'])
-    domainMax = width * np.array(model.setup['partition']['nrPerDim']) / 2
+    width = np.array(partition['width'])
+    domainMax = width * np.array(partition['nrPerDim']) / 2
     
-    min_xy = model.setup['partition']['origin'] - domainMax
-    max_xy = model.setup['partition']['origin'] + domainMax
+    min_xy = partition['origin'] - domainMax
+    max_xy = partition['origin'] + domainMax
     
     major_ticks_x = np.arange(min_xy[ix]+1, max_xy[ix]+1, 4*width[ix])
     major_ticks_y = np.arange(min_xy[iy]+1, max_xy[iy]+1, 4*width[iy])
@@ -497,7 +497,7 @@ def policyPlot(setup, model, results, abstr):
         
     plt.show()
         
-def UAVplots(Ab, case_id, writer = None):
+def trajectoryPlot(Ab, case_id, writer = None):
     '''
     Create the trajectory plots for the UAV benchmarks
 
@@ -521,29 +521,29 @@ def UAVplots(Ab, case_id, writer = None):
     from core.commons import setStateBlock
     
     # Determine desired state IDs
-    if Ab.basemodel.name == 'UAV':
-        if Ab.basemodel.modelDim == 2:
-            x_init = setStateBlock(Ab.basemodel.setup['partition'], a=[-2], b=[0], c=[-6], d=[0])
+    if Ab.system.name == 'UAV':
+        if Ab.system.modelDim == 2:
+            x_init = setStateBlock(Ab.system.partition, a=[-2], b=[0], c=[-6], d=[0])
             
             cut_value = np.zeros(2)
-            for i,d in enumerate(range(1, Ab.basemodel.n, 2)):
-                if Ab.basemodel.setup['partition']['nrPerDim'][d]/2 != round( Ab.basemodel.setup['partition']['nrPerDim'][d]/2 ):
+            for i,d in enumerate(range(1, Ab.system.LTI['n'], 2)):
+                if Ab.system.partition['nrPerDim'][d]/2 != round( Ab.system.partition['nrPerDim'][d]/2 ):
                     cut_value[i] = 0
                 else:
-                    cut_value[i] = Ab.basemodel.setup['partition']['width'][d] / 2                
+                    cut_value[i] = Ab.system.partition['width'][d] / 2                
             
-        elif Ab.basemodel.modelDim == 3:
-            x_init = setStateBlock(Ab.basemodel.setup['partition'], a=[-6], b=[0], c=[6], d=[0], e=[-6], f=[0])
+        elif Ab.system.modelDim == 3:
+            x_init = setStateBlock(Ab.system.partition, a=[-6], b=[0], c=[6], d=[0], e=[-6], f=[0])
             
             cut_value = np.zeros(3)
-            for i,d in enumerate(range(1, Ab.basemodel.n, 2)):
-                if Ab.basemodel.setup['partition']['nrPerDim'][d]/2 != round( Ab.basemodel.setup['partition']['nrPerDim'][d]/2 ):
+            for i,d in enumerate(range(1, Ab.system.LTI['n'], 2)):
+                if Ab.system.partition['nrPerDim'][d]/2 != round( Ab.system.partition['nrPerDim'][d]/2 ):
                     cut_value[i] = 0
                 else:
-                    cut_value[i] = Ab.basemodel.setup['partition']['width'][d] / 2          
+                    cut_value[i] = Ab.system.partition['width'][d] / 2          
             
     # Compute all centers of regions associated with points
-    x_init_centers = computeRegionCenters(np.array(x_init), Ab.basemodel.setup['partition'])
+    x_init_centers = computeRegionCenters(np.array(x_init), Ab.system.partition)
     
     # Filter to only keep unique centers
     x_init_unique = np.unique(x_init_centers, axis=0)
@@ -588,7 +588,7 @@ def UAVplots(Ab, case_id, writer = None):
     
     min_delta = int(min(Ab.setup.deltas))
     
-    if Ab.basemodel.modelDim == 2:
+    if Ab.system.modelDim == 2:
         
         animate = True
         
@@ -600,9 +600,10 @@ def UAVplots(Ab, case_id, writer = None):
         filenames = ['' for i in range(len(plot_times))]
             
         for i,plot_time in enumerate(plot_times):
-            filenames[i] = UAVplot2D(plot_time, Ab.N, Ab.setup, 
-                Ab.model[min_delta], Ab.abstr, Ab.km['max_error_bound'],
-                cut_value, traces, belief_traces)
+            filenames[i] = trajectoryPlot2D(plot_time, Ab.N, Ab.setup, 
+                Ab.model[min_delta], Ab.system.partition,
+                Ab.system.spec, Ab.abstr, 
+                Ab.km['max_error_bound'], cut_value, traces, belief_traces)
 
         if animate:
     
@@ -624,16 +625,17 @@ def UAVplots(Ab, case_id, writer = None):
                 out.write(img_array[i])
             out.release()
             
-    elif Ab.basemodel.modelDim == 3:
+    elif Ab.system.modelDim == 3:
         if Ab.setup.main['iterative'] is False or Ab.setup.plotting['3D_UAV']:
         
             # Only plot trajectory plot in non-iterative mode (because it pauses the script)
-            UAVplot3d_visvis( Ab.setup, Ab.model[min_delta], Ab.abstr, traces, cut_value ) 
+            UAVplot3d_visvis( Ab.setup, Ab.model[min_delta], 
+                 Ab.system.partition, Ab.abstr, traces, cut_value ) 
     
     return performance_df
     
-def UAVplot2D(plot_time, N, setup, model, abstr, max_error_bound, cut_value, 
-              traces, belief_traces = None):
+def trajectoryPlot2D(plot_time, N, setup, model, partition, spec, abstr, max_error_bound, 
+              cut_value, traces, belief_traces = None):
     '''
     Create 2D trajectory plots for the 2D UAV benchmark
 
@@ -666,11 +668,11 @@ def UAVplot2D(plot_time, N, setup, model, abstr, max_error_bound, cut_value,
     plt.xlabel('$x$', labelpad=0)
     plt.ylabel('$y$', labelpad=0)
 
-    width = np.array(model.setup['partition']['width'])
-    domainMax = width * np.array(model.setup['partition']['nrPerDim']) / 2
+    width = np.array(partition['width'])
+    domainMax = width * np.array(partition['nrPerDim']) / 2
     
-    min_xy = model.setup['partition']['origin'] - domainMax
-    max_xy = model.setup['partition']['origin'] + domainMax
+    min_xy = partition['origin'] - domainMax
+    max_xy = partition['origin'] + domainMax
     
     major_ticks_x = np.arange(min_xy[ix]+1, max_xy[ix]+1, 4*width[ix])
     major_ticks_y = np.arange(min_xy[iy]+1, max_xy[iy]+1, 4*width[iy])
@@ -696,7 +698,7 @@ def UAVplot2D(plot_time, N, setup, model, abstr, max_error_bound, cut_value,
     ax.set_ylim(min_xy[iy], max_xy[iy])
     
     # Draw goal regions
-    for region in model.setup['specification']['goal'].values():
+    for region in spec['goal'].values():
         
         lower  = region['limits'][:,0]
         size   = region['limits'][:,1] - region['limits'][:,0]
@@ -714,7 +716,7 @@ def UAVplot2D(plot_time, N, setup, model, abstr, max_error_bound, cut_value,
         
         
     # Draw critical regions
-    for region in model.setup['specification']['critical'].values():
+    for region in spec['critical'].values():
         
         lower  = region['limits'][:,0]
         size   = region['limits'][:,1] - region['limits'][:,0]
@@ -814,7 +816,7 @@ def UAVplot2D(plot_time, N, setup, model, abstr, max_error_bound, cut_value,
     
     return filename+'.png'
     
-def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
+def UAVplot3d_visvis(setup, model, partition, abstr, traces, cut_value):
     '''
     Create 3D trajectory plots for the 3D UAV benchmark
 
@@ -850,9 +852,9 @@ def UAVplot3d_visvis(setup, model, abstr, traces, cut_value):
     iy = 2
     iz = 4
     
-    regionWidth_xyz = np.array([model.setup['partition']['width'][0], 
-                                model.setup['partition']['width'][2], 
-                                model.setup['partition']['width'][4]])    
+    regionWidth_xyz = np.array([partition['width'][0], 
+                                partition['width'][2], 
+                                partition['width'][4]])    
     
     # Draw goal states
     for goal in abstr['goal']['zero_bound']:
@@ -952,32 +954,32 @@ def reachabilityHeatMap(Ab):
     import seaborn as sns
     from ..mainFunctions import definePartitions
 
-    if Ab.basemodel.n == 2:
+    if Ab.system.LTI['n'] == 2:
 
-        x_nr = Ab.basemodel.setup['partition']['nrPerDim'][0]
-        y_nr = Ab.basemodel.setup['partition']['nrPerDim'][1]
+        x_nr = Ab.system.partition['nrPerDim'][0]
+        y_nr = Ab.system.partition['nrPerDim'][1]
         
-        cut_centers = definePartitions(Ab.basemodel.n, [x_nr, y_nr], 
-               Ab.basemodel.setup['partition']['width'], 
-               Ab.basemodel.setup['partition']['origin'], onlyCenter=True)        
+        cut_centers = definePartitions(Ab.system.LTI['n'], [x_nr, y_nr], 
+               Ab.system.partition['width'], 
+               Ab.system.partition['origin'], onlyCenter=True)        
 
-    elif Ab.basemodel.name == 'building_2room':
+    elif Ab.system.name == 'building_2room':
     
-        x_nr = Ab.basemodel.setup['partition']['nrPerDim'][0]
-        y_nr = Ab.basemodel.setup['partition']['nrPerDim'][1]
+        x_nr = Ab.system.partition['nrPerDim'][0]
+        y_nr = Ab.system.partition['nrPerDim'][1]
         
-        cut_centers = definePartitions(Ab.basemodel.n, [x_nr, y_nr, 1, 1], 
-               Ab.basemodel.setup['partition']['width'], 
-               Ab.basemodel.setup['partition']['origin'], onlyCenter=True)
+        cut_centers = definePartitions(Ab.system.LTI['n'], [x_nr, y_nr, 1, 1], 
+               Ab.system.partition['width'], 
+               Ab.system.partition['origin'], onlyCenter=True)
         
-    elif Ab.basemodel.name == 'UAV':
+    elif Ab.system.name == 'UAV':
         
-        x_nr = Ab.basemodel.setup['partition']['nrPerDim'][0]
-        y_nr = Ab.basemodel.setup['partition']['nrPerDim'][2]
+        x_nr = Ab.system.partition['nrPerDim'][0]
+        y_nr = Ab.system.partition['nrPerDim'][2]
         
-        cut_centers = definePartitions(Ab.basemodel.n, [x_nr, 1, y_nr, 1], 
-               Ab.basemodel.setup['partition']['width'], 
-               Ab.basemodel.setup['partition']['origin'], onlyCenter=True)
+        cut_centers = definePartitions(Ab.system.LTI['n'], [x_nr, 1, y_nr, 1], 
+               Ab.system.partition['width'], 
+               Ab.system.partition['origin'], onlyCenter=True)
         
     else:
         
@@ -985,7 +987,7 @@ def reachabilityHeatMap(Ab):
         return
           
     cut_values = np.zeros((x_nr, y_nr))
-    cut_coords = np.zeros((x_nr, y_nr, Ab.basemodel.n))
+    cut_coords = np.zeros((x_nr, y_nr, Ab.system.LTI['n']))
     
     cut_idxs = [Ab.abstr['allCentersCubic'][tuple(c)] for c in cut_centers 
                                    if tuple(c) in Ab.abstr['allCentersCubic']]              
@@ -998,7 +1000,7 @@ def reachabilityHeatMap(Ab):
         cut_values[k,j] = Ab.results['optimal_reward'][0,idx]
         cut_coords[k,j,:] = center
     
-    if Ab.basemodel.name == 'UAV':
+    if Ab.system.name == 'UAV':
         cut_df = pd.DataFrame( cut_values, index=cut_coords[:,0,0], columns=cut_coords[0,:,2] )
     else:
         cut_df = pd.DataFrame( cut_values, index=cut_coords[:,0,0], columns=cut_coords[0,:,1] )
@@ -1014,7 +1016,7 @@ def reachabilityHeatMap(Ab):
         ax.invert_yaxis()
         ax.figure.axes[-1].yaxis.label.set_size(20)
     
-    elif Ab.basemodel.n == 2 or True:
+    elif Ab.system.LTI['n'] == 2 or True:
         ax  = plt.axes()
     
         # Create heatmap values for probabilities
@@ -1032,7 +1034,7 @@ def reachabilityHeatMap(Ab):
                 # Plot heamap based on skewed region
                 ax.fill(vertices[hull.vertices,0], vertices[hull.vertices,1], color=color, lw=0)
         
-        if Ab.basemodel.name == 'UAV':
+        if Ab.system.name == 'UAV':
             # Set aspect ratio
             ax.set_aspect(aspect='equal')
             
