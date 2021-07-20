@@ -16,12 +16,10 @@ ______________________________________________________________________________
 """
 
 import numpy as np              # Import Numpy for computations
-import csv                      # Import to create/load CSV files
-import sys                      # Allows to terminate the code at some point
-import os                       # Import OS to allow creationg of folders
 import random                   # Import to use random variables
 
-from .mainFunctions import computeRegionCenters, cubic2skew, skew2cubic
+from .mainFunctions import computeRegionCenters, cubic2skew, skew2cubic, \
+    loadScenarioTable
 from .commons import tic, ticDiff, tocDiff, table, printWarning, floor_decimal
 
 from .createMDP import mdp
@@ -55,43 +53,6 @@ class scenarioBasedAbstraction(Abstraction):
         
         # Define state space partition
         Abstraction.definePartition(self)
-        
-    def _loadScenarioTable(self, tableFile):
-        '''
-        Load tabulated bounds on the transition probabilities (computed using
-        the scenario approach).
-
-        Parameters
-        ----------
-        tableFile : str
-            File from which to load the table.
-
-        Returns
-        -------
-        memory : dict
-            Dictionary containing all loaded probability bounds / intervals.
-
-        '''
-        
-        memory = dict()
-        
-        if not os.path.isfile(tableFile):
-            sys.exit('ERROR: the following table file does not exist:'+
-                     str(tableFile))
-        
-        with open(tableFile, newline='') as csvfile:
-            reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
-            for i,row in enumerate(reader):
-                
-                strSplit = row[0].split(',')
-                
-                key = tuple( [int(float(i)) for i in strSplit[0:2]] + 
-                             [float(strSplit[2])] )
-                
-                value = [float(i) for i in strSplit[-2:]]
-                memory[key] = value
-                    
-        return memory
         
     def _computeProbabilityBounds(self, tab, k, delta):
         '''
@@ -284,19 +245,6 @@ class scenarioBasedAbstraction(Abstraction):
         
         return returnDict
     
-    # def defActions(self):
-    #     '''
-    #     Define the actions of the finite-state abstraction (performed once,
-    #     outside the iterative scheme).
-
-    #     Returns
-    #     -------
-    #     None.
-
-    #     '''
-        
-    #     Abstraction.defineActions(self)
-    
     def defTransitions(self):
         '''
         Define the transition probabilities of the finite-state abstraction 
@@ -321,7 +269,7 @@ class scenarioBasedAbstraction(Abstraction):
                         str(self.setup.scenarios['confidence'])+'.csv'
         
         # Load scenario approach table
-        self.trans['memory'] = self._loadScenarioTable(tableFile = tableFile)
+        self.trans['memory'] = loadScenarioTable(tableFile = tableFile)
         
         # Retreive type of horizon
         k_range = [0]
@@ -353,223 +301,6 @@ class scenarioBasedAbstraction(Abstraction):
         print('Transition probabilities calculated - time:',
               self.time['3_probabilities'])
 
-    # def buildMDP(self):
-    #     '''
-    #     Build the (i)MDP and create all respective PRISM files.
-
-    #     Returns
-    #     -------
-    #     model_size : dict
-    #         Dictionary describing the number of states, choices, and 
-    #         transitions.
-
-    #     '''
-        
-    #     # Initialize MDP object
-    #     self.mdp = mdp(self.setup, self.N, self.abstr)
-        
-    #     if self.setup.mdp['prism_model_writer'] == 'explicit':
-            
-    #         # Create PRISM file (explicit way)
-    #         model_size, self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
-    #             self.mdp.writePRISM_explicit(self.abstr, self.trans, mode=self.setup.mdp['mode'])   
-        
-    #     else:
-        
-    #         # Create PRISM file (default way)
-    #         self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
-    #             self.mdp.writePRISM_scenario(self.abstr, self.trans, self.setup.mdp['mode'])  
-              
-    #         model_size = {'States':None,'Choices':None,'Transitions':None}
-
-    #     self.time['4_MDPcreated'] = tocDiff(False)
-    #     print('MDP created - time:',self.time['4_MDPcreated'])
-        
-    #     return model_size
-            
-    # def solveMDP(self):
-    #     '''
-    #     Solve the (i)MDP usign PRISM
-
-    #     Returns
-    #     -------
-    #     None.
-
-    #     '''
-            
-    #     # Solve the MDP in PRISM (which is called via the terminal)
-    #     policy_file, vector_file = self._solveMDPviaPRISM()
-        
-    #     # Load PRISM results back into Python
-    #     self.loadPRISMresults(policy_file, vector_file)
-            
-    #     self.time['5_MDPsolved'] = tocDiff(False)
-    #     print('MDP solved in',self.time['5_MDPsolved'])
-        
-    # def preparePlots(self):
-    #     '''
-    #     Initializing function to prepare for plotting
-
-    #     Returns
-    #     -------
-    #     None.
-
-    #     '''
-        
-    #     # Process results
-    #     self.plot           = dict()
-    
-    #     for delta_idx, delta in enumerate(self.setup.deltas):
-    #         self.plot[delta] = dict()
-    #         self.plot[delta]['N'] = dict()
-    #         self.plot[delta]['T'] = dict()
-            
-    #         self.plot[delta]['N']['start'] = 0
-            
-    #         # Convert index to absolute time (note: index 0 is time tau)
-    #         self.plot[delta]['T']['start'] = \
-    #             int(self.plot[delta]['N']['start'] * self.system.LTI['tau'])
-        
-    # def _solveMDPviaPRISM(self):
-    #     '''
-    #     Call PRISM to solve (i)MDP while executing the Python codes.
-
-    #     Returns
-    #     -------
-    #     policy_file : str
-    #         Name of the file in which the optimal policy is stored.
-    #     vector_file : str
-    #         Name of the file in which the optimal rewards are stored.
-
-    #     '''
-        
-    #     import subprocess
-
-    #     prism_folder = self.setup.mdp['prism_folder'] 
-        
-    #     print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
-        
-    #     print('Starting PRISM...')
-        
-    #     spec = self.mdp.specification
-    #     mode = self.setup.mdp['mode']
-    #     java_memory = self.setup.mdp['prism_java_memory']
-        
-    #     print(' -- Running PRISM with specification for mode',
-    #           mode.upper()+'...')
-    
-    #     file_prefix = self.setup.directories['outputFcase'] + "PRISM_" + mode
-    #     policy_file = file_prefix + '_policy.csv'
-    #     vector_file = file_prefix + '_vector.csv'
-    
-    #     options = ' -ex -exportadv "'+policy_file+'"'+ \
-    #               ' -exportvector "'+vector_file+'"'
-    
-    #     # Switch between PRISM command for explicit model vs. default model
-    #     if self.setup.mdp['prism_model_writer'] == 'explicit':
-    
-    #         print(' --- Execute PRISM command for EXPLICIT model description')        
-    
-    #         model_file      = '"'+self.mdp.prism_file+'"'             
-        
-    #         # Explicit model
-    #         command = prism_folder+"bin/prism -javamaxmem "+str(java_memory)+"g "+ \
-    #                   "-importmodel "+model_file+" -pf '"+spec+"' "+options
-    #     else:
-            
-    #         print(' --- Execute PRISM command for DEFAULT model description')
-            
-    #         model_file      = '"'+self.mdp.prism_file+'"'
-            
-    #         # Default model
-    #         command = prism_folder+"bin/prism -javamaxmem "+str(java_memory)+"g "+ \
-    #                   model_file+" -pf '"+spec+"' "+options    
-        
-    #     subprocess.Popen(command, shell=True).wait()    
-        
-    #     return policy_file, vector_file
-        
-    # def loadPRISMresults(self, policy_file, vector_file):
-    #     '''
-    #     Load results from existing PRISM output files.
-
-    #     Parameters
-    #     ----------
-    #     policy_file : str
-    #         Name of the file to load the optimal policy from.
-    #     vector_file : str
-    #         Name of the file to load the optimal policy from.
-
-    #     Returns
-    #     -------
-    #     None.
-
-    #     '''
-        
-    #     import pandas as pd
-        
-    #     self.results = dict()
-        
-    #     policy_all = pd.read_csv(policy_file, header=None).iloc[:, 1:].fillna(-1).to_numpy()
-    #     # Flip policy upside down (PRISM generates last time step at top!)
-    #     policy_all = np.flipud(policy_all)
-        
-    #     self.results['optimal_policy'] = np.zeros(np.shape(policy_all))
-    #     self.results['optimal_delta'] = np.zeros(np.shape(policy_all))
-    #     self.results['optimal_reward'] = np.zeros(np.shape(policy_all))
-        
-    #     rewards_k0 = pd.read_csv(vector_file, header=None).iloc[1:].to_numpy()
-    #     self.results['optimal_reward'][0,:] = rewards_k0.flatten()
-        
-    #     # Split the optimal policy between delta and action itself
-    #     for i,row in enumerate(policy_all):
-            
-    #         for j,value in enumerate(row):
-                
-    #             # If value is not -1 (means no action defined)
-    #             if value != -1:
-    #                 # Split string
-    #                 value_split = value.split('_')
-    #                 # Store action and delta value separately
-    #                 self.results['optimal_policy'][i,j] = int(value_split[1])
-    #                 self.results['optimal_delta'][i,j] = int(value_split[3])
-    #             else:
-    #                 # If no policy is known, set to -1
-    #                 self.results['optimal_policy'][i,j] = int(value)
-    #                 self.results['optimal_delta'][i,j] = int(value) 
-        
-    # def generatePlots(self, delta_value, max_delta):
-    #     '''
-    #     Generate (optimal reachability probability) plots
-
-    #     Parameters
-    #     ----------
-    #     delta_value : int
-    #         Value of delta for the model to plot for.
-    #     max_delta : int
-    #         Maximum value of delta used for any model.
-
-    #     Returns
-    #     -------
-    #     None.
-    #     '''
-        
-    #     print('\nGenerate plots')
-        
-    #     if len(self.abstr['P']) <= 1000:
-        
-    #         from .postprocessing.createPlots import createProbabilityPlots
-            
-    #         if self.setup.plotting['probabilityPlots']:
-    #             createProbabilityPlots(self.setup, self.plot[delta_value], 
-    #                                    self.N, self.model[delta_value],
-    #                                    self.system.partition,
-    #                                    self.results, self.abstr, self.mc)
-                    
-    #     else:
-            
-    #         printWarning("Omit probability plots (nr. of regions too large)")
-            
     def monteCarlo(self, iterations='auto', init_states='auto', 
                    init_times='auto'):
         '''

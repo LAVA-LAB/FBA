@@ -41,7 +41,7 @@ class robot(master.LTI_master):
         
         # Set value of delta (how many time steps are grouped together)
         # Used to make the model fully actuated
-        self.deltas = [2] #[2,4,8]
+        self.deltas = [2,4]
         
         # Authority limit for the control u, both positive and negative
         self.control['limits']['uMin'] =  [-5]
@@ -131,7 +131,7 @@ class UAV(master.LTI_master):
         
         # Set value of delta (how many time steps are grouped together)
         # Used to make the model fully actuated
-        self.deltas = [2]#,4]
+        self.deltas = [2,3]#,4]
         
         # Let the user make a choice for the model dimension
         self.modelDim, _  = ui.user_choice('model dimension',[2,3])
@@ -143,7 +143,7 @@ class UAV(master.LTI_master):
             self.control['limits']['uMax'] = [4, 4]        
     
             # Partition size
-            self.partition['nrPerDim']  = [11,5,11,5]
+            self.partition['nrPerDim']  = [9,5,9,5]
             self.partition['width']     = [2, 1.5, 2, 1.5]
             self.partition['origin']    = [0, 0, 0, 0]
             
@@ -190,7 +190,7 @@ class UAV(master.LTI_master):
             sys.exit()
         
         # Step-bound on property
-        self.endTime = 32
+        self.endTime = 16
 
     def setModel(self, observer):
         '''
@@ -244,14 +244,14 @@ class UAV(master.LTI_master):
             self.LTI['Q']  = np.array([[0],[0],[0],[0]])
         
             # Covariance of the process noise
-            self.LTI['noise']['w_cov'] = np.diag([0.10, 0.02, 0.10, 0.02])
+            self.LTI['noise']['w_cov'] = 1*np.diag([0.10, 0.02, 0.10, 0.02])
         
             if observer:
                 # Observation matrix
                 self.LTI['C']          = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
                 self.LTI['r']          = len(self.LTI['C'])
                 
-                self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.2
+                self.LTI['noise']['v_cov'] = 1*np.eye(np.size(self.LTI['C'],0))*0.2
                 
         if observer:
             self.filter = {'cov0': np.diag([8, .01, 4, .01])}
@@ -311,7 +311,7 @@ class building_2room(master.LTI_master):
         self.control['limits']['uMax'] = [26, 26, T_boiler+10, T_boiler+10]
             
         # Partition size
-        self.partition['nrPerDim']  = [21,21,9,9]
+        self.partition['nrPerDim']  = [11,11,7,7] #[21,21,9,9]
         self.partition['width']     = [0.2, 0.2, 0.2, 0.2]
         self.partition['origin']    = [20, 20, 38.3, 38.3]
         
@@ -320,12 +320,17 @@ class building_2room(master.LTI_master):
         self.targets['domain']      = 'auto'
         
         # Specification information
-        self.spec['goal'] = setStateBlock(self.partition, 
-                                    a=[20], 
-                                    b=[20], 
-                                    c=[None], d=[None])
+        self.spec['goal'] = {1: defSpecBlock(self.partition, 
+                                             a=[19.5, 20.5], 
+                                             b=[19.5, 20.5], 
+                                             c = None,
+                                             d = None)}
+        # setStateBlock(self.partition, 
+        #                             a=[20], 
+        #                             b=[20], 
+        #                             c=[None], d=[None])
         
-        self.spec['critical'] = [[]]
+        self.spec['critical'] = {}
         
         # Step-bound on property
         self.endTime = 32
@@ -417,6 +422,17 @@ class building_2room(master.LTI_master):
                 [ 0 ]
                 ])
         
+        self.LTI['noise'] = dict()
+        
+        if observer:
+            # Observation matrix
+            self.LTI['C']          = np.array([[1,0,0,0]]) #np.array([[1,0,0,0],[0,1,0,0]]) #np.eye(4) #np.array([[1, 0]])
+            self.LTI['r']          = len(self.LTI['C'])
+            
+            self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.2
+            
+            self.filter = {'cov0': np.diag([0.05, 0.05, 0.05, 0.05])}
+        
         # Discretize model with respect to time
         # self.LTI['A'], self.LTI['B'], self.LTI['Q'] = discretizeGearsMethod(A_cont, B_cont, W_cont, self.LTI['tau'])
         
@@ -427,8 +443,7 @@ class building_2room(master.LTI_master):
         # Determine system dimensions
         self.LTI['n'] = np.size(self.LTI['A'],1)
         self.LTI['p'] = np.size(self.LTI['B'],1)
-
-        self.LTI['noise'] = dict()
+        
         self.LTI['noise']['w_cov'] = 0.05*np.diag([0.2, 0.2, 0.2, 0.2])
                 
         self.LTI['A_cont'] = A_cont

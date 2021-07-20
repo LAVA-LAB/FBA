@@ -47,8 +47,10 @@ def filterBasedScheme(Ab, case_id):
             else:
                 func = steadystateCovariance
             
-            Ab.km[delta]['steady'] = func(Ab.km[delta]['cov_tilde'][k_stst:], 
-                                          verbose=True)
+            Ab.km[delta]['steady'] = func(
+                [ Ab.km[delta]['F'][k]['cov_tilde'] 
+                  for k in range(k_stst, len(Ab.km[delta]['F'])) ], 
+                                          verbose=False)
         
         # Calculate transition probabilities
         Ab.defTransitions()

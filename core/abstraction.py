@@ -72,12 +72,15 @@ class Abstraction(object):
         
         # Reduce step size as much as possible
         min_delta = min(self.setup.deltas)
+        self.setup.divide = 1
         
         for div in range(min_delta, 0, -1):
-            if all(np.array(self.setup.deltas) % div) == 0:
+            if all(np.array(self.setup.deltas) % div):
+                
                 print('Simplify step size by factor:',div)
                 self.N = int(self.N / div)
                 self.setup.deltas = (np.array(self.setup.deltas) / div).astype(int)
+                self.setup.divide = div
                 
                 break
         
@@ -467,7 +470,7 @@ class Abstraction(object):
         
         nr_corners = 2**self.system.LTI['n']
         
-        printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
+        printEvery = 1 #min(100, max(1, int(self.abstr['nr_actions']/10)))
         
         # Check if dimension of control area equals that if the state vector
         dimEqual = self.model[delta]['p'] == self.system.LTI['n']
@@ -490,16 +493,16 @@ class Abstraction(object):
             parralelo2cube = np.linalg.inv( basis_vectors )
             print('Transformation:',parralelo2cube)
             
-            print('Normal inverse area:',x_inv_area)
+            # print('Normal inverse area:',x_inv_area)
             
             x_inv_area_normalized = x_inv_area @ parralelo2cube
-            print('Normalized hypercube:',x_inv_area_normalized)
+            # print('Normalized hypercube:',x_inv_area_normalized)
             
             predSet_originShift = -np.average(x_inv_area_normalized, axis=0)
             print('Off origin:',predSet_originShift)
             
-            print('Shifted normalized hypercube:',x_inv_area @ parralelo2cube
-                    + predSet_originShift)
+            # print('Shifted normalized hypercube:',x_inv_area @ parralelo2cube
+            #         + predSet_originShift)
             
             allRegionVertices = self.abstr['allVerticesFlat'] @ parralelo2cube \
                     - predSet_originShift
@@ -517,7 +520,7 @@ class Abstraction(object):
                   incremental=False, 
                   interior_point=None)
             
-            print('Normal inverse area:',x_inv_area)
+            # print('Normal inverse area:',x_inv_area)
         
             allRegionVertices = self.abstr['allVerticesFlat'] 
         
@@ -532,6 +535,15 @@ class Abstraction(object):
         for action_id in action_range:
             
             targetPoint = self.abstr['target']['d'][action_id]
+            
+            # If system is UAV and local information controllers are enabled
+            if self.system.name == 'UAV' and self.setup.lic['enabled'] and \
+                delta != min(self.setup.deltas):
+                # Skip if any velocity component is notzero (because the 
+                # required waiting will not be enabled anyways)
+                if self.system.LTI['n'] == 4 and any(targetPoint[[1,3]] != 0) or \
+                   self.system.LTI['n'] == 6 and any(targetPoint[[1,3,5]] != 0):
+                       continue
             
             if dimEqual:
             
@@ -607,6 +619,8 @@ class Abstraction(object):
                 elif delta != min_delta and action_id not in self.abstr['actions'][min_delta][action_id]:
                     # print(' >> ACTION',action_id,'DOES NOT EXIST IN ITSELF disable for delta',delta)
                     enabled_in_states[action_id] = np.array([])
+                # else:
+                    # print(' !! Waiting possible for action',str(action_id),'; ',str(targetPoint))
                 
             if action_id % printEvery == 0:
                 if action_id in self.abstr['goal'][0]:
@@ -968,6 +982,8 @@ class Abstraction(object):
         
         print('\nGenerate plots')
         
+        performance = None
+        
         if len(self.abstr['P']) <= 1000:
         
             from .postprocessing.createPlots import createProbabilityPlots
@@ -993,8 +1009,6 @@ class Abstraction(object):
             if self.setup.main['iterative'] is True and iterative_results != None:
                 performance = pd.concat(
                     [iterative_results['performance'], performance_df], axis=0)
-            else:
-                performance = None
     
         # The code below plots the heat map
         if self.system.name in ['building_1room','building_2room','robot','UAV'] or \

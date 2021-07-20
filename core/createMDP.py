@@ -76,9 +76,10 @@ class mdp(object):
         '''
     
         if horizon == 'infinite':
-            min_delta = self.N
+            time_step = self.N
         else:
-            min_delta = min(self.setup.deltas)                
+            # min_delta = min(self.setup.deltas)   
+            time_step = self.setup.divide
     
         # Define PRISM filename
         PRISM_file = self.setup.directories['outputFcase']+ \
@@ -110,7 +111,7 @@ class mdp(object):
                 "// "+modeltype+" created by the filter-based abstraction method \n\n",
                 "mdp \n\n",
                 # "const int xInit; \n\n",
-                "const int Nhor = "+str(int(self.N / min_delta))+"; \n",
+                "const int Nhor = "+str(int(self.N / time_step))+"; \n",
                 "const int regions = "+str(int(self.nr_regions-1))+"; \n\n",
                 "module iMDP \n\n",
                 ]
@@ -127,7 +128,7 @@ class mdp(object):
         #########
         
         # Define actions
-        for k in range(0, self.N, min_delta):
+        for k in range(0, self.N, time_step):
             
             # Add comment to list
             if horizon == 'finite':
@@ -177,10 +178,10 @@ class mdp(object):
                                 guardStates = sep.join(guardPieces)
                                 
                                 # Write full guard
-                                guard = "k="+str(int(k/min_delta))+" & ("+guardStates+")"
+                                guard = "k="+str(int(k/time_step))+" & ("+guardStates+")"
                                 
                                 # Compute successor state time step
-                                kprime = "&(k'=k+"+str(int(delta/min_delta))+")"
+                                kprime = "&(k'=k+"+str(int(delta/time_step))+")"
                             
                             if mode == 'interval':
                                 
@@ -282,14 +283,14 @@ class mdp(object):
         
         if horizon == 'infinite':
             # Infer number of time steps in horizon (at minimum delta value)
-            self.horizonLen = int(self.N/min(self.setup.deltas))
+            self.horizonLen = int(self.N/self.setup.divide) #min(self.setup.deltas))
         elif horizon == 'steadystate':
             # Infer number of time steps in horizon (at minimum delta value)
-            self.horizonLen = int(self.N/min(self.setup.deltas))
+            self.horizonLen = int(self.N/self.setup.divide) #min(self.setup.deltas))
         else:
             # We always need to provide a maximum nr. of steps, so make equal
             # to time horizon (even though horizon is also in the state space.)
-            self.horizonLen = int(self.N/min(self.setup.deltas))
+            self.horizonLen = int(self.N/self.setup.divide) #min(self.setup.deltas))
             
         if mode == 'estimate':
             # If mode is default, set maximum probability as specification
@@ -436,7 +437,7 @@ class mdp(object):
                         gamma = 0
                     else:
                         # Retreive waiting time
-                        gamma = km[delta]['waiting_time'][k]
+                        gamma = km[delta]['F'][k]['waiting_time']
                     
                     if horizon == 'infinite':
                         add_succ = add

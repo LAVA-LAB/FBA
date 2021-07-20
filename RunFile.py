@@ -116,8 +116,8 @@ else:
     system.setModel(observer=False)
     
     
-setup.lic = {'enabled': False, 'LICMaxA': 1.5, 'LICMinA': 1.5}
-setup.mdp['k_steady_state'] = 5
+setup.lic = {'enabled': True, 'LICMaxA': 1, 'LICMinA': 1}
+setup.mdp['k_steady_state'] = None #5
 setup.main['covarianceMode'] = ['SDP','iterative'][0]
 setup.main['interval_margin'] = 0.001
 

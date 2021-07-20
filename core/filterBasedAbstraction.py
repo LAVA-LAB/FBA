@@ -16,6 +16,7 @@ ______________________________________________________________________________
 """
 
 import numpy as np              # Import Numpy for computations
+import pandas as pd             # Import Pandas to store data in frames
 import csv                      # Import to create/load CSV files
 import sys                      # Allows to terminate the code at some point
 import os                       # Import OS to allow creationg of folders
@@ -93,8 +94,8 @@ class filterBasedAbstraction(Abstraction):
 
         printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
 
-        nr_decimals = 5
-        threshold_decimals = 4
+        nr_decimals = 5 # Number of decimals to round off on
+        threshold_decimals = 4 # Minimum probability to model
 
         # Determine minimum action time step width
         min_delta = min(self.setup.deltas)
@@ -117,16 +118,16 @@ class filterBasedAbstraction(Abstraction):
                 
             elif self.setup.lic['enabled']:
                 # Retreive waiting time
-                gamma = self.km[delta]['waiting_time'][k]
+                gamma = self.km[delta]['F'][k]['waiting_time']
                 
-                Sigma_worst = self.km[delta]['cov_tilde'][k+delta+gamma]
+                Sigma_worst = self.km[delta]['F'][k+delta+gamma]['cov_tilde']
                 Sigma_best  = self.km['cov_tilde_min']
                 
                 SigmaEqual = False
                 
             else:
-                Sigma_worst = self.km[delta]['cov_tilde'][k+delta]
-                Sigma_best  = self.km[delta]['cov_tilde'][k+delta]
+                Sigma_worst = self.km[delta]['F'][k+delta]['cov_tilde']
+                Sigma_best  = self.km[delta]['F'][k+delta]['cov_tilde']
                 
                 SigmaEqual = True
                 
@@ -145,7 +146,7 @@ class filterBasedAbstraction(Abstraction):
             else:
                 func = steadystateCovariance
             
-            maxCov = func([SigmaCubic_worst, SigmaCubic_best], verbose=True)['worst']            
+            maxCov = func([SigmaCubic_worst, SigmaCubic_best], verbose=False)['worst']            
             beta = 10**-(threshold_decimals+1)
             
             limit_norm = minimumEpsilon( cov=maxCov, beta=beta, stepSize=0.1, singleParam = False ) + \
@@ -423,58 +424,51 @@ class filterBasedAbstraction(Abstraction):
                 tab.print_row(['DELTA','K','STATUS'], head=True)
             
             # Kalman filter list definitions
-            self.km[delta]                      = dict()
-            self.km[delta]['waiting_time']      = dict()
-            self.km[delta]['cov_pred']          = [None] * (self.N+delta)
-            self.km[delta]['cov']               = [None] * (self.N+delta)
-            self.km[delta]['cov_tilde']         = [None] * (self.N+delta)
-            self.km[delta]['cov_tilde_measure'] = [None] * (self.N+delta)
-            self.km[delta]['K_gain']            = [None] * (self.N+delta)
+            self.km[delta] = dict()
+            self.km[delta]['F'] = [dict() for i in range(self.N+delta)]
             
             # Initial belief of Kalman filter
             for i in range(delta):
-                self.km[delta]['cov'][i] = np.eye(self.system.LTI['n'])*self.system.filter['cov0']
+                self.km[delta]['F'][i]['cov'] = np.eye(self.system.LTI['n'])*self.system.filter['cov0']
             
             # For every time step in the finite horizon
             for k in range(self.N):
                 
-                # Set waiting time to zeor by default
-                self.km[delta]['waiting_time'][k]  = 0
-                
                 # Perform Kalman filter prediction at current time k for delta-type action
-                self.km[delta]['cov_pred'][k+delta], self.km[delta]['K_gain'][k+delta], \
-                self.km[delta]['cov_tilde'][k+delta], self.km[delta]['cov'][k+delta], \
-                self.km[delta]['cov_tilde_measure'][k+delta], max_error_bound[delta_idx,k+delta, :] = \
-                    kalmanFilter(self.model[delta], self.km[delta]['cov'][k])
+                self.km[delta]['F'][k+delta], max_error_bound[delta_idx,k+delta, :] = \
+                    kalmanFilter(self.model[delta], self.km[delta]['F'][k]['cov'])
+                
+                # Set waiting time to zeor by default
+                self.km[delta]['F'][k]['waiting_time']  = 0
                 
                 # If local information controller is active
                 if self.setup.lic['enabled']:
                     
-                    covTildeAll += [np.copy(self.km[delta]['cov_tilde'][k+delta])]
+                    covTildeAll += [np.copy(self.km[delta]['F'][k+delta]['cov_tilde'])]
                     
                     # Then, a best/worst-case covariance matrix is used, and
                     # we force the actual covariance always to below this
                     
                     # Set the worst-case covariance matrix to the circle with  
                     # radius equal to the maximum measure (i.e. threshold)
-                    self.km[delta]['cov_tilde'][k+delta] = \
+                    self.km[delta]['F'][k+delta]['cov_tilde'] = \
                         np.eye(self.system.LTI['n']) * self.km['maxEllipseSize'][k]**2
                     
                     # If the actual measure if above the threshold, perform a
                     # "wait action" (if possible) to reduce it
-                    if self.km[delta]['cov_tilde_measure'][k+delta] > self.km['maxEllipseSize'][k]:
+                    if self.km[delta]['F'][k+delta]['cov_tilde_measure'] > self.km['maxEllipseSize'][k]:
                         # Reduce the uncertainty after taking the action, until it's below the threshold
                         
                         # Set waiting time equal to the worst-case possible
-                        self.km[delta]['waiting_time'][k] = self.N
+                        self.km[delta]['F'][k+delta]['waiting_time'] = self.N
                         
                         # Determine how much stabilization time is needed to steer below the threshold
                         gamma = 0
                         delta_lowest = min(self.setup.deltas)
                                                 
                         # Copy the measure on the covariance matrix
-                        covStabilize = self.km[delta]['cov'][k+delta]
-                        covMeasure = self.km[delta]['cov_tilde_measure'][k+delta]
+                        covStabilize = self.km[delta]['F'][k+delta]['cov']
+                        covMeasure = self.km[delta]['F'][k+delta]['cov_tilde_measure']
                         
                         flag = False
                         
@@ -487,7 +481,7 @@ class filterBasedAbstraction(Abstraction):
                                     print('Measure is reduced to',covMeasure)
                                 
                                 # Store how long we must wait to reduce uncertainty
-                                self.km[delta]['waiting_time'][k] = np.copy(gamma)
+                                self.km[delta]['F'][k]['waiting_time'] = np.copy(gamma)
                                 
                             else:
                                 if self.setup.main['verbose']:
@@ -497,13 +491,17 @@ class filterBasedAbstraction(Abstraction):
                                 gamma += 1
                                 
                                 # Determine resulting covariance after wait
-                                _, _, _, covStabilize, covMeasure, _ = \
+                                #_, _, _, covStabilize, covMeasure, _ = \
+                                out, _ = \
                                     kalmanFilter(self.model[delta_lowest], covStabilize)                            
+                                
+                                covStabilize = out['cov']
+                                covMeasure   = out['cov_tilde_measure']
                     
                 # Print normal row in table
                 if self.setup.main['verbose']:
                     tab.print_row([delta, k, 'Measure: '+
-                       str(np.round(self.km[delta]['cov_tilde_measure'][k+delta], decimals=3))])
+                       str(np.round(self.km[delta]['F'][k+delta]['cov_tilde_measure'], decimals=3))])
                     tab.print_row([delta, k, 'Error bound (epsilon): '+
                        str(np.round(max_error_bound[delta_idx, k+delta], decimals=3))])
                 
@@ -521,20 +519,7 @@ class filterBasedAbstraction(Abstraction):
             else:
                 func = steadystateCovariance
             
-            self.km['cov_tilde_min'] = func(covTildeAll, verbose=True)['best']
-    
-    # def defActions(self):
-    #     '''
-    #     Define the actions of the finite-state abstraction (performed once,
-    #     outside the iterative scheme).
-
-    #     Returns
-    #     -------
-    #     None.
-
-    #     '''
-        
-    #     Abstraction.defineActions(self)
+            self.km['cov_tilde_min'] = func(covTildeAll, verbose=False)['best']
     
     def defTransitions(self):
         '''
@@ -599,228 +584,6 @@ class filterBasedAbstraction(Abstraction):
         print('Transition probabilities calculated - time:',
               self.time['3_probabilities'])
 
-    # def buildMDP(self):
-    #     '''
-    #     Build the (i)MDP and create all respective PRISM files.
-
-    #     Returns
-    #     -------
-    #     model_size : dict
-    #         Dictionary describing the number of states, choices, and 
-    #         transitions.
-
-    #     '''
-        
-    #     # Initialize MDP object
-    #     self.mdp = mdp(self.setup, self.N, self.abstr)
-        
-    #     if self.setup.mdp['prism_model_writer'] == 'explicit':
-            
-    #         # Create PRISM file (explicit way)
-    #         model_size, self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
-    #             self.mdp.writePRISM_explicit(self.abstr, self.trans, mode=self.setup.mdp['mode'], km=self.km)   
-        
-    #     else:
-        
-    #         # Create PRISM file (default way)
-    #         self.mdp.prism_file, self.mdp.spec_file, self.mdp.specification = \
-    #             self.mdp.writePRISM_scenario(self.abstr, self.trans, self.setup.mdp['mode'])  
-              
-    #         model_size = {'States':None,'Choices':None,'Transitions':None}
-
-    #     self.time['4_MDPcreated'] = tocDiff(False)
-    #     print('MDP created - time:',self.time['4_MDPcreated'])
-        
-    #     return model_size
-            
-    # def solveMDP(self):
-    #     '''
-    #     Solve the (i)MDP usign PRISM
-
-    #     Returns
-    #     -------
-    #     None.
-
-    #     '''
-            
-    #     # Solve the MDP in PRISM (which is called via the terminal)
-    #     policy_file, vector_file = self._solveMDPviaPRISM()
-        
-    #     # Load PRISM results back into Python
-    #     self.loadPRISMresults(policy_file, vector_file)
-            
-    #     self.time['5_MDPsolved'] = tocDiff(False)
-    #     print('MDP solved in',self.time['5_MDPsolved'])
-        
-    # def preparePlots(self):
-    #     '''
-    #     Initializing function to prepare for plotting
-
-    #     Returns
-    #     -------
-    #     None.
-
-    #     '''
-        
-    #     # Process results
-    #     self.plot           = dict()
-    
-    #     for delta_idx, delta in enumerate(self.setup.deltas):
-    #         self.plot[delta] = dict()
-    #         self.plot[delta]['N'] = dict()
-    #         self.plot[delta]['T'] = dict()
-            
-    #         self.plot[delta]['N']['start'] = 0
-            
-    #         # Convert index to absolute time (note: index 0 is time tau)
-    #         self.plot[delta]['T']['start'] = \
-    #             int(self.plot[delta]['N']['start'] * self.system.LTI['tau'])
-        
-    # def _solveMDPviaPRISM(self):
-    #     '''
-    #     Call PRISM to solve (i)MDP while executing the Python codes.
-
-    #     Returns
-    #     -------
-    #     policy_file : str
-    #         Name of the file in which the optimal policy is stored.
-    #     vector_file : str
-    #         Name of the file in which the optimal rewards are stored.
-
-    #     '''
-        
-    #     import subprocess
-
-    #     prism_folder = self.setup.mdp['prism_folder'] 
-        
-    #     print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
-        
-    #     print('Starting PRISM...')
-        
-    #     spec = self.mdp.specification
-    #     mode = self.setup.mdp['mode']
-    #     java_memory = self.setup.mdp['prism_java_memory']
-        
-    #     print(' -- Running PRISM with specification for mode',
-    #           mode.upper()+'...')
-    
-    #     file_prefix = self.setup.directories['outputFcase'] + "PRISM_" + mode
-    #     policy_file = file_prefix + '_policy.csv'
-    #     vector_file = file_prefix + '_vector.csv'
-    
-    #     options = ' -ex -exportadv "'+policy_file+'"'+ \
-    #               ' -exportvector "'+vector_file+'"'
-    
-    #     # Switch between PRISM command for explicit model vs. default model
-    #     if self.setup.mdp['prism_model_writer'] == 'explicit':
-    
-    #         print(' --- Execute PRISM command for EXPLICIT model description')        
-    
-    #         model_file      = '"'+self.mdp.prism_file+'"'             
-        
-    #         # Explicit model
-    #         command = prism_folder+"bin/prism -javamaxmem "+str(java_memory)+"g "+ \
-    #                   "-importmodel "+model_file+" -pf '"+spec+"' "+options
-    #     else:
-            
-    #         print(' --- Execute PRISM command for DEFAULT model description')
-            
-    #         model_file      = '"'+self.mdp.prism_file+'"'
-            
-    #         # Default model
-    #         command = prism_folder+"bin/prism -javamaxmem "+str(java_memory)+"g "+ \
-    #                   model_file+" -pf '"+spec+"' "+options    
-        
-    #     subprocess.Popen(command, shell=True).wait()    
-        
-    #     return policy_file, vector_file
-        
-    # def loadPRISMresults(self, policy_file, vector_file):
-    #     '''
-    #     Load results from existing PRISM output files.
-
-    #     Parameters
-    #     ----------
-    #     policy_file : str
-    #         Name of the file to load the optimal policy from.
-    #     vector_file : str
-    #         Name of the file to load the optimal policy from.
-
-    #     Returns
-    #     -------
-    #     None.
-
-    #     '''
-        
-    #     import pandas as pd
-        
-    #     self.results = dict()
-        
-    #     policy_all = pd.read_csv(policy_file, header=None).iloc[:, 3:].fillna(-1).to_numpy()
-    #     # Flip policy upside down (PRISM generates last time step at top!)
-    #     policy_all = np.flipud(policy_all)
-    #     policy_all = extractRowBlockDiag(policy_all, len(self.abstr['P']))
-        
-    #     self.results['optimal_policy'] = np.zeros(np.shape(policy_all))
-    #     self.results['optimal_delta'] = np.zeros(np.shape(policy_all))
-    #     self.results['optimal_reward'] = np.zeros(np.shape(policy_all))
-        
-    #     rewards_k0 = pd.read_csv(vector_file, header=None).iloc[3:].to_numpy()
-        
-    #     reward_rows = int((len(rewards_k0)-1)/len(self.abstr['P']) + 1)
-        
-    #     self.results['optimal_reward'][0:reward_rows, :] = \
-    #         np.reshape(rewards_k0, (reward_rows, len(self.abstr['P'])))
-        
-    #     # Split the optimal policy between delta and action itself
-    #     for i,row in enumerate(policy_all):
-            
-    #         for j,value in enumerate(row):
-                
-    #             # If value is not -1 (means no action defined)
-    #             if value != -1:
-    #                 # Split string
-    #                 value_split = value.split('_')
-    #                 # Store action and delta value separately
-    #                 self.results['optimal_policy'][i,j] = int(value_split[1])
-    #                 self.results['optimal_delta'][i,j] = int(value_split[3])
-    #             else:
-    #                 # If no policy is known, set to -1
-    #                 self.results['optimal_policy'][i,j] = int(value)
-    #                 self.results['optimal_delta'][i,j] = int(value) 
-        
-    # def generatePlots(self, delta_value, max_delta):
-    #     '''
-    #     Generate (optimal reachability probability) plots
-
-    #     Parameters
-    #     ----------
-    #     delta_value : int
-    #         Value of delta for the model to plot for.
-    #     max_delta : int
-    #         Maximum value of delta used for any model.
-
-    #     Returns
-    #     -------
-    #     None.
-    #     '''
-        
-    #     print('\nGenerate plots')
-        
-    #     if len(self.abstr['P']) <= 1000:
-        
-    #         from .postprocessing.createPlots import createProbabilityPlots
-            
-    #         if self.setup.plotting['probabilityPlots']:
-    #             createProbabilityPlots(self.setup, self.plot[delta_value], 
-    #                                    self.N, self.model[delta_value],
-    #                                    self.system.partition,
-    #                                    self.results, self.abstr, self.mc)
-                    
-    #     else:
-            
-    #         printWarning("Omit probability plots (nr. of regions too large)")
-            
     def monteCarlo(self, iterations='auto', init_states='auto', 
                    init_times='auto'):
         '''
@@ -948,10 +711,10 @@ class filterBasedAbstraction(Abstraction):
                         x = np.zeros((self.N+1, self.system.LTI['n']))
                         y = np.zeros((self.N, self.system.LTI['r']))
                         mu = np.zeros((self.N, self.system.LTI['n']))
-                        mu_goal = [None]*(self.N+1)
+                        mu_goal = [None for i in range(self.N+1)]
                         x_region = np.zeros(self.N+1).astype(int)
                         mu_region = np.zeros(self.N+1).astype(int)
-                        u = [None]*self.N
+                        u = [None for i in range(self.N)]
                         
                         actionToTake = np.zeros(self.N).astype(int)
                         deltaToTake = np.zeros(self.N).astype(int)
@@ -964,7 +727,7 @@ class filterBasedAbstraction(Abstraction):
                         
                         # Determine initial state and measurement
                         w_init = np.random.multivariate_normal(
-                            np.zeros(self.system.LTI['n']), self.km[delta]['cov'][n0])
+                            np.zeros(self.system.LTI['n']), self.km[delta]['F'][n0]['cov'])
                         v_init = v_array[n0id, i_abs, m, k]
                         
                         # True state model dynamics
@@ -975,7 +738,7 @@ class filterBasedAbstraction(Abstraction):
                         self.mc['traces'][n0][i][m]['k'] += [n0]
                         self.mc['traces'][n0][i][m]['x'] += [x[n0]]
                         self.mc['traces'][n0][i][m]['bel_mu'] += [mu[n0]]
-                        self.mc['traces'][n0][i][m]['bel_cov'] += [self.km[delta]['cov'][n0]]
+                        self.mc['traces'][n0][i][m]['bel_cov'] += [self.km[delta]['F'][n0]['cov']]
                         self.mc['traces'][n0][i][m]['y'] += [y[n0]]
                         
                         # For each time step in the finite time horizon
@@ -1062,7 +825,7 @@ class filterBasedAbstraction(Abstraction):
                                 # also account for the "waiting time"
                                 
                                 # Retreive gamma value
-                                gamma = self.km[delta]['waiting_time'][k]
+                                gamma = self.km[delta]['F'][k]['waiting_time']
                                 
                                 # Multiply with the minimum time step width to get waiting time
                                 waiting_time = gamma*min_delta
@@ -1110,14 +873,14 @@ class filterBasedAbstraction(Abstraction):
                                 y[k+delta] = self.model[delta]['C'] @ x[k+delta] + v_array[n0id, i_abs, m, k]
                                 
                                 # Update the belief based on action and measurement                    
-                                mu[k+delta] = mu_goal[k+delta] + self.km[delta]['K_gain'][k+delta] @ \
+                                mu[k+delta] = mu_goal[k+delta] + self.km[delta]['F'][k+delta]['K_gain'] @ \
                                                         (y[k+delta] - self.model[delta]['C'] @ mu_goal[k+delta])    
                                 
                                 # Add current state, belief, etc. to trace
                                 self.mc['traces'][n0][i][m]['k'] += [k+delta]
                                 self.mc['traces'][n0][i][m]['x'] += [x[k+delta]]
                                 self.mc['traces'][n0][i][m]['bel_mu'] += [mu[k+delta]]
-                                self.mc['traces'][n0][i][m]['bel_cov'] += [self.km[delta]['cov'][k+delta]]
+                                self.mc['traces'][n0][i][m]['bel_cov'] += [self.km[delta]['F'][k+delta]['cov']]
                                 self.mc['traces'][n0][i][m]['y'] += [y[k+delta]]
                             
                                 # Update the belief for the waiting time
@@ -1136,30 +899,30 @@ class filterBasedAbstraction(Abstraction):
                                         
                                     # Reconstruct the control input required to achieve this target point
                                     # Note that we do not constrain the control input; we already know that a suitable control exists!
-                                    u[kg] = np.array(self.model[min_delta].B_pinv @ ( mu_goal[k+delta] - self.model[min_delta].A @ mu[kg-min_delta] - self.model[min_delta].Q_flat ))
+                                    u[kg] = np.array(self.model[min_delta]['B_pinv'] @ ( mu_goal[k+delta] - self.model[min_delta]['A'] @ mu[kg-min_delta] - self.model[min_delta]['Q_flat'] ))
                                     
-                                    if any(self.system.control['limits']['uMin'] > u[kg]) or \
-                                       any(self.system.control['limits']['uMax'] < u[kg]):
+                                    if any(self.model[min_delta]['uMin'] > u[kg]) or \
+                                       any(self.model[min_delta]['uMax'] < u[kg]):
                                         tab.print_row([n0, i, m, kg-min_delta, 'Control input '+str(u[kg])+' outside limits'], sort="Warning")
                                     
                                     # Implement the control into the physical (unobservable) system
-                                    x_hat = self.model[min_delta].A @ x[kg-min_delta] + self.model[min_delta].B @ u[kg] + self.model[min_delta].Q_flat
+                                    x_hat = self.model[min_delta]['A'] @ x[kg-min_delta] + self.model[min_delta]['B'] @ u[kg] + self.model[min_delta]['Q_flat']
                                     
                                     if self.setup.scenarios['gaussian'] is True:
                                         # Use Gaussian process noise
                                         x[kg] = x_hat + w_array[min_delta][n0id, i_abs, m, kg]
                                     else:
                                         # Use generated samples                                    
-                                        disturbance = random.choice(self.model[min_delta].noise['samples'])
+                                        disturbance = random.choice(self.model[min_delta]['noise']['samples'])
                                         
                                         x[kg] = x_hat + disturbance
                                     
                                     # Since we wait in the same state, dynamics are changed accordingly
-                                    y[kg] = self.model[min_delta].C @ x[kg] + v_array[n0id, i_abs, m, kg]
+                                    y[kg] = self.model[min_delta]['C'] @ x[kg] + v_array[n0id, i_abs, m, kg]
                                     
                                     # Update the belief based on action and measurement
-                                    mu[kg] = mu_goal[k+delta] + self.km[min_delta]['K_gain'][kg] @ \
-                                                            (y[kg] - self.model[min_delta].C @ mu_goal[k+delta])
+                                    mu[kg] = mu_goal[k+delta] + self.km[delta]['F'][kg]['K_gain'] @ \
+                                                            (y[kg] - self.model[min_delta]['C'] @ mu_goal[k+delta])
                             
                             # Increase iterator variable by the value of delta associated to chosen action
                             k += delta + waiting_time

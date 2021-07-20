@@ -16,6 +16,10 @@ ______________________________________________________________________________
 """
 
 import numpy as np
+import csv                      # Import to create/load CSV files
+import sys                      # Allows to terminate the code at some point
+import os                       # Import OS to allow creationg of folders
+
 import itertools
 from .commons import table, is_invertible, floor_decimal, confidence_ellipse, \
     Chi2probability, tocDiff
@@ -100,6 +104,43 @@ def computeRegionCenters(points, partition):
     # Add the origin again to obtain the absolute center coordinates
     return centers + originShift
 
+def loadScenarioTable(tableFile):
+    '''
+    Load tabulated bounds on the transition probabilities (computed using
+    the scenario approach).
+
+    Parameters
+    ----------
+    tableFile : str
+        File from which to load the table.
+
+    Returns
+    -------
+    memory : dict
+        Dictionary containing all loaded probability bounds / intervals.
+
+    '''
+    
+    memory = dict()
+    
+    if not os.path.isfile(tableFile):
+        sys.exit('ERROR: the following table file does not exist:'+
+                 str(tableFile))
+    
+    with open(tableFile, newline='') as csvfile:
+        reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+        for i,row in enumerate(reader):
+            
+            strSplit = row[0].split(',')
+            
+            key = tuple( [int(float(i)) for i in strSplit[0:2]] + 
+                         [float(strSplit[2])] )
+            
+            value = [float(i) for i in strSplit[-2:]]
+            memory[key] = value
+                
+    return memory
+
 def kalmanFilter(model, cov0):    
     '''
     For a given model in `model` and prior belief covariance `cov0`, perform
@@ -153,8 +194,12 @@ def kalmanFilter(model, cov0):
     
     max_error_bound = minimumEpsilon( cov, beta=0.05, stepSize=0.01, singleParam = True )
     
-    return cov_pred, K_gain, cov_tilde, cov, cov_tilde_measure, max_error_bound
-
+    return {'cov_pred': cov_pred,
+            'K_gain': K_gain,
+            'cov_tilde': cov_tilde,
+            'cov': cov,
+            'cov_tilde_measure': cov_tilde_measure}, max_error_bound
+    
 def minimumEpsilon(cov, beta=0.05, stepSize=0.01, singleParam=True):
     
     n = np.shape(cov)[0]
@@ -229,7 +274,7 @@ def steadystateCovariance(covariances, verbose=False):
 
     '''
     
-    print('iterative approach')
+    print('Compute best/worst-case covariance (iterative method)')
     
     if verbose:
         fig, ax = plt.subplots(figsize=(6, 6))
@@ -298,7 +343,7 @@ def steadystateCovariance(covariances, verbose=False):
 
 def steadystateCovariance_sdp(covariances, verbose=False):
 
-    print('SDP approach')    
+    print('Compute best/worst-case covariance (SDP method)')    
 
     # Dimension of the covariance matrix
     n = len(covariances[0])    
