@@ -53,7 +53,7 @@ system = modelClasses[application_id, 1]()
 
 # Create settings object
 setup = settings(application=system.name)
-setup.deltas = system.deltas
+setup.base_delta = system.base_delta
 
 loadOptions('options.txt', setup)
 
@@ -116,7 +116,7 @@ else:
     system.setModel(observer=False)
     
     
-setup.lic = {'enabled': True, 'LICMaxA': 1, 'LICMinA': 1}
+setup.lic = {'enabled': True, 'LICMaxA': 1, 'LICMinA': 1, 'jump_factors': [2]}
 setup.mdp['k_steady_state'] = None #5
 setup.main['covarianceMode'] = ['SDP','iterative'][0]
 setup.main['interval_margin'] = 0.001

@@ -41,7 +41,7 @@ class robot(master.LTI_master):
         
         # Set value of delta (how many time steps are grouped together)
         # Used to make the model fully actuated
-        self.deltas = [2,4]
+        self.base_delta = 2
         
         # Authority limit for the control u, both positive and negative
         self.control['limits']['uMin'] =  [-5]

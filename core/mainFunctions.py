@@ -192,13 +192,14 @@ def kalmanFilter(model, cov0):
     # Calculate measure on the covariance matrix of the mean of the future belief
     cov_tilde_measure, _ = covarianceEllipseSize( cov_tilde )
     
-    max_error_bound = minimumEpsilon( cov, beta=0.05, stepSize=0.01, singleParam = True )
+    max_error_bound = np.max( minimumEpsilon( cov, beta=0.05, stepSize=0.01, singleParam = True ) )
     
     return {'cov_pred': cov_pred,
             'K_gain': K_gain,
             'cov_tilde': cov_tilde,
             'cov': cov,
-            'cov_tilde_measure': cov_tilde_measure}, max_error_bound
+            'cov_tilde_measure': cov_tilde_measure,
+            'error_bound': max_error_bound}
     
 def minimumEpsilon(cov, beta=0.05, stepSize=0.01, singleParam=True):
     

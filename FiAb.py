@@ -47,9 +47,9 @@ def filterBasedScheme(Ab, case_id):
             else:
                 func = steadystateCovariance
             
-            Ab.km[delta]['steady'] = func(
-                [ Ab.km[delta]['F'][k]['cov_tilde'] 
-                  for k in range(k_stst, len(Ab.km[delta]['F'])) ], 
+            Ab.km['X']['steady'] = func(
+                [ Ab.km[delta]['W'][k]['cov_tilde'] 
+                  for k in range(k_stst, len(Ab.km[delta]['W'])) ], 
                                           verbose=False)
         
         # Calculate transition probabilities
@@ -80,8 +80,8 @@ def filterBasedScheme(Ab, case_id):
          columns=range(len(Ab.abstr['P'])), index=range(horizonLen)).T
         delta_df    = pd.DataFrame( Ab.results['optimal_delta'], 
          columns=range(len(Ab.abstr['P'])), index=range(horizonLen)).T
-        reward_df   = pd.DataFrame( Ab.results['optimal_reward'], 
-         columns=range(len(Ab.abstr['P'])), index=range(horizonLen)).T
+        reward_df   = pd.DataFrame( Ab.results['optimal_reward'].T, 
+         columns=range(len(Ab.abstr['P'])), index=[0]).T
         
         # Write dataframes to a different worksheet
         policy_df.to_excel(writer, sheet_name='Optimal policy')

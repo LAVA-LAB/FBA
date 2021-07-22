@@ -555,3 +555,14 @@ def rotate_ellipse(mat):
 def Chi2probability(df, epsilon=0.05):
     
     return scipy.stats.chi2.ppf(1-epsilon, df=df)
+
+def is_pos_def(A, precision = 6):
+    A = np.round(A, precision)
+    if np.array_equal(A, A.T):
+        try:
+            np.linalg.cholesky(A)
+            return True
+        except np.linalg.LinAlgError:
+            return False
+    else:
+        return False

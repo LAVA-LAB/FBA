@@ -16,6 +16,7 @@ ______________________________________________________________________________
 """
 
 import numpy as np              # Import Numpy for computations
+import pandas as pd
 
 from .commons import writeFile, printSuccess
 
@@ -46,12 +47,6 @@ class mdp(object):
         self.nr_regions = len(abstr['P'])
         self.nr_actions = abstr['nr_actions']
         self.nr_states  = self.nr_regions
-        
-        # Specify goal state set
-        # self.goodStates = abstr['goal']
-        
-        # Specify sets that can never reach target set
-        # self.badStates  = abstr['critical']
 
     def writePRISM_scenario(self, abstr, trans, mode='estimate', 
                             horizon='infinite'):
@@ -78,7 +73,6 @@ class mdp(object):
         if horizon == 'infinite':
             time_step = self.N
         else:
-            # min_delta = min(self.setup.deltas)   
             time_step = self.setup.divide
     
         # Define PRISM filename
@@ -157,7 +151,7 @@ class mdp(object):
                         
                         # Retreive in which states this action is enabled
                         enabledIn = np.setdiff1d(abstr['actions_inv'][delta][a],
-                                                 np.concatenate((abstr['goal'][k],abstr['critical'][k])))
+                                                 np.concatenate((abstr['goal']['X'][k],abstr['critical']['X'][k])))
                         
                         # Only continue if this action is enabled anywhere
                         if len(enabledIn) > 0:
@@ -240,7 +234,7 @@ class mdp(object):
                 "init k=0 endinit \n\n"
                 ]
         
-        labelPieces = ["(x="+str(x)+") & (k="+str(k)+")" for x in abstr['goal'][k] for k in range(self.N)]
+        labelPieces = ["(x="+str(x)+") & (k="+str(k)+")" for x in abstr['goal']['X'][k] for k in range(self.N)]
         sep = "|"
         labelGuard = sep.join(labelPieces)
         labels = [
@@ -283,14 +277,14 @@ class mdp(object):
         
         if horizon == 'infinite':
             # Infer number of time steps in horizon (at minimum delta value)
-            self.horizonLen = int(self.N/self.setup.divide) #min(self.setup.deltas))
+            self.horizonLen = int(self.N) #/self.setup.divide)
         elif horizon == 'steadystate':
             # Infer number of time steps in horizon (at minimum delta value)
-            self.horizonLen = int(self.N/self.setup.divide) #min(self.setup.deltas))
+            self.horizonLen = int(self.N) #/self.setup.divide)
         else:
             # We always need to provide a maximum nr. of steps, so make equal
             # to time horizon (even though horizon is also in the state space.)
-            self.horizonLen = int(self.N/self.setup.divide) #min(self.setup.deltas))
+            self.horizonLen = int(self.N) #/self.setup.divide)
             
         if mode == 'estimate':
             # If mode is default, set maximum probability as specification
@@ -333,17 +327,86 @@ class mdp(object):
         if self.setup.main['mode'] == 'Filter':
             if self.setup.mdp['k_steady_state'] != None:
                 horizon = 'steadystate'
-                nr_states = self.nr_regions * (self.setup.mdp['k_steady_state'] + 1)
-                k_steps = np.arange(self.setup.mdp['k_steady_state'] + 1)
+                region_reps_base = self.setup.mdp['k_steady_state'] + 1
                 
             else:
                 horizon = 'finite'
-                nr_states = self.nr_regions * self.N
-                k_steps = np.arange(self.N)
+                region_reps_base = self.N
         else:
             horizon = 'infinite'
-            nr_states = self.nr_regions
-            k_steps = [0]
+            region_reps_base = 1
+            
+        region_list = [[] for i in self.setup.all_deltas]
+        k_list      = [[] for i in self.setup.all_deltas]
+        k_max_list  = [[] for i in self.setup.all_deltas]
+        delta_list  = [[] for i in self.setup.all_deltas]
+        stoch_list  = [[] for i in self.setup.all_deltas]
+        k_id_start  = [[] for i in self.setup.all_deltas]
+            
+        delta_start_id = {}
+        
+        for idx,delta in enumerate(self.setup.all_deltas):
+            # Repetitions for current delta
+            if delta == 1:
+                region_reps = region_reps_base
+                
+            else:
+                region_reps = km['waiting_time'] + delta
+            
+            length_before = np.sum([ len(i) for i in region_list ])
+            delta_start_id[delta] = length_before
+            
+            # Region list for current delta
+            region_list[idx] = np.tile( np.arange(self.nr_regions), region_reps )
+            
+            # Time step list
+            if delta == 1:
+                k_list[idx] = np.repeat( np.arange(region_reps), self.nr_regions )
+            else:
+                k_list[idx] = np.repeat( np.maximum(np.arange(region_reps) - 1, 0), self.nr_regions )
+            
+            # Maximum time step within this part of the model
+            if delta == 1:
+                k_max_list[idx] = np.full( region_reps * self.nr_regions, fill_value = region_reps-1 )
+            else:
+                k_max_list[idx] = np.full( region_reps * self.nr_regions, fill_value = region_reps-2 )
+            
+            # Delta value list
+            delta_list[idx] = np.full(region_reps * self.nr_regions, fill_value = delta)
+            
+            # Boolean whether transitions from this state are stochastic
+            if delta == 1:
+                stoch_list[idx] = np.full(region_reps * self.nr_regions, fill_value = True)
+                
+            else:
+                stoch_list[idx] = np.concatenate((
+                        np.full(self.nr_regions * (delta - 1), fill_value = False),
+                        np.full(self.nr_regions * (km['waiting_time'] + 1), fill_value = True),
+                    ))
+                
+            k_id_start[idx] = np.repeat([ length_before + i*self.nr_regions for i in range(region_reps) ], self.nr_regions)
+            
+        nr_states = np.sum([ len(i) for i in region_list])
+            
+        DF_DATA = {
+            'state': np.arange(nr_states) + 3,
+            'region': [item for sublist in region_list for item in sublist],
+            'delta': [item for sublist in delta_list for item in sublist], 
+            'stoch': [item for sublist in stoch_list for item in sublist],
+            'k': [item for sublist in k_list for item in sublist],
+            'k_id_start': [item for sublist in k_id_start for item in sublist],
+            'k_max': [item for sublist in k_max_list for item in sublist],
+            }
+        
+        # print(len(DF_DATA['state']))
+        # print(len(DF_DATA['region']))
+        # print(len(DF_DATA['delta']))
+        # print(len(DF_DATA['stoch']))
+        # print(len(DF_DATA['k']))
+        # print(len(DF_DATA['k_id_start']))
+        # print(len(DF_DATA['k_max']))
+        
+        self.PRISM_DF = pd.DataFrame(data = DF_DATA)
         
         # Define PRISM filename
         PRISM_allfiles = self.setup.directories['outputFcase']+ \
@@ -372,18 +435,17 @@ class mdp(object):
                           ['2: 1'] + \
                           ['' for i in range(nr_states)]
         
-        for i in range(self.nr_regions):
-            substring = ''
+        for index, row in self.PRISM_DF.iterrows():
+            
+            # Write default string
+            string = str(row['state'])+': 0'
             
             # Check if region is a deadlock state
-            for delta in self.setup.deltas:
-                if len(abstr['actions'][delta][i]) == 0:
-                    substring += ' 1'
-                    break
+            if len(abstr['actions'][row['delta']][row['region']]) == 0:
+                string += ' 1'
             
-            for k in k_steps:
-                add = k*self.nr_regions
-                label_file_list[i+4 + add] = str(i+3 + add)+': 0' + substring
+            # Write current row
+            label_file_list[index+4] = string
             
         label_file_string = '\n'.join(label_file_list)
            
@@ -396,13 +458,232 @@ class mdp(object):
         PRISM_transitionfile = self.setup.directories['outputFcase']+ \
             self.setup.mdp['filename']+"_"+mode+".tra"
             
-        transition_file_list = ['' for i in k_steps]
+        transition_file_list = ['' for i in range(len(self.PRISM_DF))]
             
         nr_choices_absolute = 0
         nr_transitions_absolute = 0
         
         printEvery = min(100, max(1, int(self.nr_regions/10)))
         
+        # For every row of the DataFrame
+        for index, row in self.PRISM_DF.iterrows():
+        
+            state = row['state']
+            r = row['region']
+            
+            if index % printEvery == 0:
+                print(' ---- Write for state',index,'region',r,'time step',row['k'],'delta',row['delta'])
+                
+            choice = 0
+            
+            # Some rows are non-stochastic, because they only model an
+            # arbitrary additional cost (because of the higher delta action)
+            if not row['stoch']:
+                
+                # No actions enabled, so only add self-loop
+                if mode == 'interval':
+                    selfloop_prob = '[1.0,1.0]'
+                else:
+                    selfloop_prob = '1.0'
+                
+                state_prime = state + self.nr_regions
+                df_row_string = [[str(state) +' 0 '+str(state_prime)+' '+selfloop_prob]]
+             
+                # Increment choices and transitions both by one
+                nr_choices_absolute += 1
+                nr_transitions_absolute += 1
+                choice += 1
+            
+            
+            # If there exists an action in this state...
+            elif all([len(abstr['actions'][delta][r]) == 0 for delta in self.setup.all_deltas]):        
+
+                # No actions enabled, so only add self-loop
+                if mode == 'interval':
+                    selfloop_prob = '[1.0,1.0]'
+                else:
+                    selfloop_prob = '1.0'
+                    
+                if row['k'] >= self.N:
+                    # If time horizon reached, to absorbing state
+                    df_row_string = [[str(state) +' 0 0 '+selfloop_prob]]
+                else:
+                    # If not horizon reached, self-loop
+                    df_row_string = [[str(state) +' 0 '+str(state)+' '+selfloop_prob]]
+                
+                # Increment choices and transitions both by one
+                nr_choices_absolute += 1
+                nr_transitions_absolute += 1
+                choice += 1
+                
+                
+                
+            else:
+                
+                '''
+                if row['delta'] == 1 or row['k'] == row['k_max']:              
+                    base_rate = True
+                else:
+                    base_rate = False
+                    
+                if base_rate:
+                '''
+                    
+                # If base rate, there's a normal action choice
+                df_row_string = ['' for i in self.setup.all_deltas]  
+                
+                if row['delta'] == 1 or row['k'] == row['k_max']:          
+                    allowed_deltas = self.setup.all_deltas  
+          
+                else:
+                    allowed_deltas = [1]
+          
+                # For every delta value
+                for delta_idx,delta in enumerate(allowed_deltas):
+                    
+                    action_string = ['' for i in range(len(abstr['actions'][delta][r]))]
+                    
+                    for a_idx,a in enumerate(abstr['actions'][delta][r]):
+                        
+                        string_start = str(state) +' '+ str(choice)
+                        
+                        # print('Action',a,'for delta',delta)
+                        
+                        if delta != 1:
+                            # Jump to higher delta rate
+                            succ_rep_start = delta_start_id[delta]
+                            k_prime = 0
+                            
+                        elif row['k'] == row['k_max'] and row['delta'] != 1:
+                            # Return to base rate
+                            succ_rep_start = km['return_step'][row['delta']] * self.nr_regions
+                            k_prime = km['return_step'][row['delta']]
+                            
+                        else:
+                            # Proceed according to base rate
+                            succ_rep_start = row['k_id_start'] + 1*self.nr_regions
+                            k_prime = row['k'] + 1
+                        
+                        # print('call action for delta',delta,'k_prime',k_prime,'action',a)
+                        
+                        # Call function to write transition rows
+                        action_string[a_idx], transitions_plus = \
+                            writePRISMtrans(trans, delta, k_prime, a, mode,
+                                              string_start, succ_rep_start)
+                            
+                        # Increase choice counter
+                        choice += 1
+                        nr_choices_absolute += 1
+                        nr_transitions_absolute += transitions_plus
+                        
+                    df_row_string[delta_idx] = action_string
+                 
+            transition_file_list[index] = df_row_string
+                 
+        self.dump = transition_file_list
+            
+        flatten = lambda t: [item for sublist in t for subsublist in sublist for item in subsublist]
+        transition_file_flat = '\n'.join(flatten(transition_file_list))
+        
+        print(' ---- String ready; write to file...')
+        
+        # Header contains nr of states, choices, and transitions
+        size_states = nr_states+3
+        size_choices = nr_choices_absolute+3
+        size_transitions = nr_transitions_absolute+3
+        model_size = {'States': size_states, 
+                      'Choices': size_choices, 
+                      'Transitions':size_transitions}
+        header = str(size_states)+' '+str(size_choices)+' '+str(size_transitions)+'\n'
+        
+        if mode == 'interval':
+            firstrow = '0 0 0 [1.0,1.0]\n1 0 1 [1.0,1.0]\n2 0 2 [1.0,1.0]\n'
+        else:
+            firstrow = '0 0 0 1.0\n1 0 1 1.0\n2 0 2 1.0\n'
+        
+        # Write content to file
+        writeFile(PRISM_transitionfile, 'w', header+firstrow+transition_file_flat)
+            
+        ### Write specification file
+        specfile, specification = self.writePRISM_specification(mode, horizon=horizon)
+        
+        return model_size, PRISM_allfiles, specfile, specification
+        
+   
+        
+def writePRISMtrans(trans, delta, k_prime, a, mode, string_start, succ_rep_start):
+    
+    # Define name of action
+    actionLabel = "a_"+str(a)+"_d_"+str(delta)
+    
+    if mode == 'interval':
+                        
+        # Add probability to end in absorbing state
+        deadlock_string = trans['prob'][delta][k_prime][a]['deadlock_interval_string']
+        
+        # Add probability to reach the goal
+        goal_string = trans['prob'][delta][k_prime][a]['goal_interval_string']
+        
+        # Add probability to reach the goal
+        critical_string = trans['prob'][delta][k_prime][a]['critical_interval_string']
+    
+        # Retreive probability intervals (and corresponding state ID's)
+        probability_strings = trans['prob'][delta][k_prime][a]['interval_strings']
+        probability_idxs    = trans['prob'][delta][k_prime][a]['interval_idxs']
+    
+        # Absorbing state has index zero
+        action_string_a = [string_start+' 0 '+deadlock_string+' '+actionLabel]
+        
+        if goal_string != None:
+            action_string_a += [string_start+' 1 '+goal_string+' '+actionLabel]
+        if critical_string != None:
+            action_string_a += [string_start+' 2 '+critical_string+' '+actionLabel]
+        
+        # Add resulting entries to the list
+        action_string_b = [string_start +" "+str(i+3+succ_rep_start)+" "+intv+" "+actionLabel 
+                      for (i,intv) in zip(probability_idxs,probability_strings) if intv]
+        
+    else:
+        
+        # Add probability to end in absorbing state
+        deadlock_string = str(trans['prob'][delta][k_prime][a]['deadlock_approx'])
+        
+        # Add probability to reach the goal
+        goal_string = str(trans['prob'][delta][k_prime][a]['goal_approx'])
+        
+        # Add probability to reach the goal
+        critical_string = str(trans['prob'][delta][k_prime][a]['goal_approx'])
+        
+        # Retreive probability intervals (and corresponding state ID's)
+        probability_strings = trans['prob'][delta][k_prime][a]['approx_strings']
+        probability_idxs    = trans['prob'][delta][k_prime][a]['approx_idxs']
+        
+        if float(deadlock_string) > 0:
+            # Absorbing state has index zero
+            action_string_a = [string_start+' 0 '+deadlock_string+' '+actionLabel]
+        else:
+            action_string_a = []
+            
+        if float(goal_string) > 0:
+            # Goal state has index 1
+            action_string_a += [string_start+' 1 '+goal_string+' '+actionLabel]
+            
+        if float(critical_string) > 0:
+            # Critical state has index 2
+            action_string_a += [string_start+' 2 '+critical_string+' '+actionLabel]
+            
+        # Add resulting entries to the list
+        action_string_b = [string_start +" "+str(i+3+succ_rep_start)+" "+intv+" "+actionLabel 
+                      for (i,intv) in zip(probability_idxs,probability_strings) if intv]
+        
+    nr_transitions = len(action_string_a) + len(action_string_b)
+    
+    merged_string = '\n'.join(action_string_a + action_string_b)
+    
+    return merged_string, nr_transitions
+        
+
+'''        
         # For every time step
         for k in k_steps:
         
@@ -416,11 +697,6 @@ class mdp(object):
                 
                 if s % printEvery == 0:
                     print(' ---- Write for region',s)
-                
-                # if s in abstr['goal'][k]:
-                #     continue
-                # elif s in abstr['critical'][k]:
-                #     continue
                 
                 substring = ['' for i in range(len(self.setup.deltas)+1)]
                 
@@ -437,7 +713,7 @@ class mdp(object):
                         gamma = 0
                     else:
                         # Retreive waiting time
-                        gamma = km[delta]['F'][k]['waiting_time']
+                        gamma = km[delta]['X'][k]['waiting_time']
                     
                     if horizon == 'infinite':
                         add_succ = add
@@ -594,3 +870,4 @@ class mdp(object):
         specfile, specification = self.writePRISM_specification(mode, horizon=horizon)
         
         return model_size, PRISM_allfiles, specfile, specification
+'''

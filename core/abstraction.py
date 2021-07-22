@@ -71,21 +71,27 @@ class Abstraction(object):
         self.N = int(self.T) #/self.system.LTI['tau'])
         
         # Reduce step size as much as possible
-        min_delta = min(self.setup.deltas)
+        base_delta = self.setup.base_delta
         self.setup.divide = 1
         
-        for div in range(min_delta, 0, -1):
-            if all(np.array(self.setup.deltas) % div):
+        for div in range(base_delta, 0, -1):
+            if base_delta % div == 0:
                 
                 print('Simplify step size by factor:',div)
                 self.N = int(self.N / div)
-                self.setup.deltas = (np.array(self.setup.deltas) / div).astype(int)
+                self.setup.base_delta  = (np.array(self.setup.base_delta) / div).astype(int)
                 self.setup.divide = div
                 
                 break
+            
+        print()
+            
+        self.setup.jump_deltas = self.setup.base_delta * self.setup.lic['jump_factors']
+        self.setup.all_deltas = np.concatenate(([self.setup.base_delta], 
+                                                self.setup.jump_deltas))
         
         self.model = dict()
-        for delta in self.setup.deltas:
+        for delta in self.setup.all_deltas:
             
             # Define model object for current delta value
             self.model[delta] = self._defModel(int(delta*div))
@@ -528,7 +534,7 @@ class Abstraction(object):
         np.set_printoptions(threshold=sys.maxsize)
         
         # Put goal regions up front of the list of actions
-        action_range = f7(np.concatenate(( list(self.abstr['goal'][0].keys()),
+        action_range = f7(np.concatenate(( list(self.abstr['goal']['X'][0].keys()),
                            np.arange(self.abstr['nr_actions']) )))
         
         # For every action
@@ -600,7 +606,7 @@ class Abstraction(object):
                 # Partition plot for the goal state, also showing pre-image
                 print('Create partition plot...')
                     
-                createPartitionPlot((0,1), (2,3), self.abstr['goal'][0], 
+                createPartitionPlot((0,1), (2,3), self.abstr['goal']['X'][0], 
                     delta, self.setup, self.model[delta], self.system.partition, self.abstr, 
                     self.abstr['allVertices'], predecessor_set)
             
@@ -611,19 +617,15 @@ class Abstraction(object):
             # only enabled anywhere, if there also exists a "waiting action"
             # from that state to itself
             if self.setup.lic['enabled']:
-                min_delta = min(self.setup.deltas)
                 
-                if delta == min_delta and action_id not in enabled_in_states[action_id]:
-                    # print(' >> ACTION',action_id,'DOES NOT EXIST IN ITSELF: disable for delta',delta)
-                    enabled_in_states[action_id] = np.array([])
-                elif delta != min_delta and action_id not in self.abstr['actions'][min_delta][action_id]:
+                if delta != 1 and action_id not in self.abstr['actions'][1][action_id]:
                     # print(' >> ACTION',action_id,'DOES NOT EXIST IN ITSELF disable for delta',delta)
                     enabled_in_states[action_id] = np.array([])
                 # else:
                     # print(' !! Waiting possible for action',str(action_id),'; ',str(targetPoint))
                 
             if action_id % printEvery == 0:
-                if action_id in self.abstr['goal'][0]:
+                if action_id in self.abstr['goal']['X'][0]:
                     print(' -- GOAL action',str(action_id),'enabled in',
                           str(len(enabled_in_states[action_id])),
                           'states - target point:',
@@ -705,29 +707,53 @@ class Abstraction(object):
         # Create flat (2D) array of all vertices
         self.abstr['allVerticesFlat'] = np.concatenate(self.abstr['allVertices'])
         
-        self.abstr['goal'] = dict()
-        self.abstr['critical'] = dict()
-            
-        for k in range(1,self.N + max(self.setup.deltas)):    
+        self.abstr['goal'] = {'X': {}}
+        self.abstr['critical'] = {'X': {}}
+        
+        for k in range(1,self.N + 1):    
             
             if self.setup.main['mode'] == 'Filter':
-                epsilon = self.km['max_error_bound'][k]
+                epsilon = self.km['X'][k]['error_bound']
             else:
                 epsilon = np.zeros(self.system.LTI['n'])
         
             # Determine goal regions
-            self.abstr['goal'][k] = self._defStateLabelSet(
+            self.abstr['goal']['X'][k] = self._defStateLabelSet(
                 self.abstr['allVertices'],
                 self.system.spec['goal'], typ="goal", epsilon=epsilon)
             
             # Determine critical regions
-            self.abstr['critical'][k] = self._defStateLabelSet(
+            self.abstr['critical']['X'][k] = self._defStateLabelSet(
                 self.abstr['allVertices'],
                 self.system.spec['critical'], typ="critical", epsilon=epsilon)
-    
-        self.abstr['goal'][0] = self.abstr['goal'][1]
-        self.abstr['critical'][0] = self.abstr['critical'][1]
+           
+        self.abstr['goal']['X'][0] = self.abstr['goal']['X'][1]
+        self.abstr['critical']['X'][0] = self.abstr['critical']['X'][1]
+        
+        for delta in self.setup.jump_deltas:
+            # Compute goal and critical regions for higher delta states
             
+            self.abstr['goal'][delta] = dict()
+            self.abstr['critical'][delta] = dict()
+            
+            for gamma in range(0, self.km['waiting_time'] + 1):
+            
+                if self.setup.main['mode'] == 'Filter':
+                    epsilon = self.km[delta][gamma]['error_bound']
+                else:
+                    epsilon = np.zeros(self.system.LTI['n'])
+            
+                # Determine goal regions
+                self.abstr['goal'][delta][gamma] = self._defStateLabelSet(
+                    self.abstr['allVertices'],
+                    self.system.spec['goal'], typ="goal", epsilon=epsilon)
+                
+                # Determine critical regions
+                self.abstr['critical'][delta][gamma] = self._defStateLabelSet(
+                    self.abstr['allVertices'],
+                    self.system.spec['critical'], typ="critical", epsilon=epsilon)
+            
+        # Compute goal and critical regions without augmented bounds (for plotting)
         self.abstr['goal']['zero_bound'] = self._defStateLabelSet(
                 self.abstr['allVertices'],
                 self.system.spec['goal'], typ="goal", epsilon=0)
@@ -760,7 +786,7 @@ class Abstraction(object):
         self.abstr['actions_inv'] = dict()
         
         # For every time step grouping value in the list
-        for delta_idx,delta in enumerate(self.setup.deltas):
+        for delta in self.setup.all_deltas:
             
             nr_A, self.abstr['actions'][delta], \
              self.abstr['actions_inv'][delta] = self._defEnabledActions(delta)
@@ -898,7 +924,7 @@ class Abstraction(object):
         # Process results
         self.plot           = dict()
     
-        for delta_idx, delta in enumerate(self.setup.deltas):
+        for delta_idx, delta in enumerate(self.setup.all_deltas):
             self.plot[delta] = dict()
             self.plot[delta]['N'] = dict()
             self.plot[delta]['T'] = dict()
@@ -931,20 +957,18 @@ class Abstraction(object):
         self.results = dict()
         
         policy_all = pd.read_csv(policy_file, header=None).iloc[:, 3:].fillna(-1).to_numpy()
+        
+        print('policy shape:',np.shape(policy_all))
+        
         # Flip policy upside down (PRISM generates last time step at top!)
         policy_all = np.flipud(policy_all)
         policy_all = extractRowBlockDiag(policy_all, len(self.abstr['P']))
         
         self.results['optimal_policy'] = np.zeros(np.shape(policy_all))
         self.results['optimal_delta'] = np.zeros(np.shape(policy_all))
-        self.results['optimal_reward'] = np.zeros(np.shape(policy_all))
         
-        rewards_k0 = pd.read_csv(vector_file, header=None).iloc[3:].to_numpy()
-        
-        reward_rows = int((len(rewards_k0)-1)/len(self.abstr['P']) + 1)
-        
-        self.results['optimal_reward'][0:reward_rows, :] = \
-            np.reshape(rewards_k0, (reward_rows, len(self.abstr['P'])))
+        self.results['optimal_reward'] = pd.read_csv(vector_file, 
+                 header=None).iloc[3:3+self.mdp.nr_regions].to_numpy()
         
         # Split the optimal policy between delta and action itself
         for i,row in enumerate(policy_all):
