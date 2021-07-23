@@ -40,16 +40,15 @@ def filterBasedScheme(Ab, case_id):
         # Compute steady state covariance matrices (best/worst-case)
         k_stst = Ab.setup.mdp['k_steady_state']
         if k_stst != None:
-          for delta in Ab.setup.deltas:
               
             if Ab.setup.main['covarianceMode'] == 'SDP':
                 func = steadystateCovariance_sdp
             else:
                 func = steadystateCovariance
             
-            Ab.km['X']['steady'] = func(
-                [ Ab.km[delta]['W'][k]['cov_tilde'] 
-                  for k in range(k_stst, len(Ab.km[delta]['W'])) ], 
+            Ab.km[1]['steady'] = func(
+                [ Ab.km[1][k]['cov_tilde'] 
+                  for k in range(k_stst, len(Ab.km[1])) ], 
                                           verbose=False)
         
         # Calculate transition probabilities
@@ -76,11 +75,11 @@ def filterBasedScheme(Ab, case_id):
         horizonLen = Ab.mdp.horizonLen
         
         # Load data into dataframes
-        policy_df   = pd.DataFrame( Ab.results['optimal_policy'], 
+        policy_df   = pd.DataFrame( Ab.results['policy']['action'][1], 
          columns=range(len(Ab.abstr['P'])), index=range(horizonLen)).T
-        delta_df    = pd.DataFrame( Ab.results['optimal_delta'], 
+        delta_df    = pd.DataFrame( Ab.results['policy']['delta'][1], 
          columns=range(len(Ab.abstr['P'])), index=range(horizonLen)).T
-        reward_df   = pd.DataFrame( Ab.results['optimal_reward'].T, 
+        reward_df   = pd.DataFrame( Ab.results['reward'].T, 
          columns=range(len(Ab.abstr['P'])), index=[0]).T
         
         # Write dataframes to a different worksheet
@@ -107,8 +106,8 @@ def filterBasedScheme(Ab, case_id):
         MCsims_df.to_excel(writer, sheet_name='Empirical reach.')
     
     # Plot results
-    Ab.generatePlots( delta_value = Ab.setup.deltas[0], 
-                       max_delta = max(Ab.setup.deltas),
+    Ab.generatePlots( delta_value = 1, 
+                       max_delta = max(Ab.setup.all_deltas),
                        case_id = case_id,
                        writer = writer)
     

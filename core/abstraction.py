@@ -88,7 +88,7 @@ class Abstraction(object):
             
         self.setup.jump_deltas = self.setup.base_delta * self.setup.lic['jump_factors']
         self.setup.all_deltas = np.concatenate(([self.setup.base_delta], 
-                                                self.setup.jump_deltas))
+                                                self.setup.jump_deltas)).astype(int)
         
         self.model = dict()
         for delta in self.setup.all_deltas:
@@ -476,7 +476,7 @@ class Abstraction(object):
         
         nr_corners = 2**self.system.LTI['n']
         
-        printEvery = 1 #min(100, max(1, int(self.abstr['nr_actions']/10)))
+        printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
         
         # Check if dimension of control area equals that if the state vector
         dimEqual = self.model[delta]['p'] == self.system.LTI['n']
@@ -542,9 +542,13 @@ class Abstraction(object):
             
             targetPoint = self.abstr['target']['d'][action_id]
             
+            # If system is 'robot', than only enable jump actions if the velocity
+            # is zero
+            if self.system.name == 'robot' and delta != 1 and targetPoint[1] != 0:
+                continue
+            
             # If system is UAV and local information controllers are enabled
-            if self.system.name == 'UAV' and self.setup.lic['enabled'] and \
-                delta != min(self.setup.deltas):
+            elif self.system.name == 'UAV' and delta != 1:
                 # Skip if any velocity component is notzero (because the 
                 # required waiting will not be enabled anyways)
                 if self.system.LTI['n'] == 4 and any(targetPoint[[1,3]] != 0) or \
@@ -616,13 +620,13 @@ class Abstraction(object):
             # If the local information controller is enabled, an action is
             # only enabled anywhere, if there also exists a "waiting action"
             # from that state to itself
-            if self.setup.lic['enabled']:
-                
-                if delta != 1 and action_id not in self.abstr['actions'][1][action_id]:
-                    # print(' >> ACTION',action_id,'DOES NOT EXIST IN ITSELF disable for delta',delta)
-                    enabled_in_states[action_id] = np.array([])
-                # else:
-                    # print(' !! Waiting possible for action',str(action_id),'; ',str(targetPoint))
+            '''
+            if delta != 1 and action_id not in self.abstr['actions'][1][action_id]:
+                # print(' >> ACTION',action_id,'DOES NOT EXIST IN ITSELF disable for delta',delta)
+                enabled_in_states[action_id] = np.array([])
+            # else:
+                # print(' !! Waiting possible for action',str(action_id),'; ',str(targetPoint))
+            '''
                 
             if action_id % printEvery == 0:
                 if action_id in self.abstr['goal']['X'][0]:
@@ -674,7 +678,7 @@ class Abstraction(object):
         
         if self.setup.main['skewed']:
         
-            basis_vectors = self._defBasisVectors(max(self.setup.deltas)) * 2
+            basis_vectors = self._defBasisVectors(max(self.setup.all_deltas)) * 2
             
             length = np.linalg.norm(basis_vectors, axis=1)
             normalization_factor = min(self.system.partition['width'] / length)
@@ -713,7 +717,7 @@ class Abstraction(object):
         for k in range(1,self.N + 1):    
             
             if self.setup.main['mode'] == 'Filter':
-                epsilon = self.km['X'][k]['error_bound']
+                epsilon = self.km[1][k]['error_bound']
             else:
                 epsilon = np.zeros(self.system.LTI['n'])
         
@@ -956,36 +960,63 @@ class Abstraction(object):
         
         self.results = dict()
         
-        policy_all = pd.read_csv(policy_file, header=None).iloc[:, 3:].fillna(-1).to_numpy()
+        ovh = self.mdp.overhead
         
-        print('policy shape:',np.shape(policy_all))
+        policy_all = pd.read_csv(policy_file, header=None).iloc[:, ovh:].fillna(-1).to_numpy()
         
         # Flip policy upside down (PRISM generates last time step at top!)
         policy_all = np.flipud(policy_all)
-        policy_all = extractRowBlockDiag(policy_all, len(self.abstr['P']))
         
-        self.results['optimal_policy'] = np.zeros(np.shape(policy_all))
-        self.results['optimal_delta'] = np.zeros(np.shape(policy_all))
+        self.results['reward'] = pd.read_csv(vector_file, 
+                 header=None).iloc[ovh:ovh+self.mdp.nr_regions].to_numpy()
         
-        self.results['optimal_reward'] = pd.read_csv(vector_file, 
-                 header=None).iloc[3:3+self.mdp.nr_regions].to_numpy()
+        policy = dict()
         
-        # Split the optimal policy between delta and action itself
-        for i,row in enumerate(policy_all):
+        self.results['policy'] = {'action': {}, 'delta': {}}
+        
+        for idx, delta in enumerate(self.setup.all_deltas):
             
-            for j,value in enumerate(row):
+            # Starting column to extract
+            if idx == 0:
+                col_start = 0
+            else:
+                col_start = int(sum(self.mdp.nr_states_per_delta[0:idx]))
+            
+            # Number of columns to extract
+            
+            col_end = col_start + self.mdp.nr_states_per_delta[idx]
+            
+            '''
+            if delta == 1:
+                policy[delta] = extractRowBlockDiag(policy_all[:, col_start:col_end], self.mdp.nr_regions)
+            '''
+            
+            policy[delta] = policy_all[:, col_start:col_end]
+
+            self.results['policy']['action'][delta] = np.zeros(np.shape(policy[delta]))
+            self.results['policy']['delta'][delta]  = np.zeros(np.shape(policy[delta]))
+            
+            # Split the optimal policy between delta and action itself
+            for i,row in enumerate(policy[delta]):
                 
-                # If value is not -1 (means no action defined)
-                if value != -1:
-                    # Split string
-                    value_split = value.split('_')
-                    # Store action and delta value separately
-                    self.results['optimal_policy'][i,j] = int(value_split[1])
-                    self.results['optimal_delta'][i,j] = int(value_split[3])
-                else:
-                    # If no policy is known, set to -1
-                    self.results['optimal_policy'][i,j] = int(value)
-                    self.results['optimal_delta'][i,j] = int(value) 
+                for j,value in enumerate(row):
+                    
+                    if value == 'step':
+                        # If action is to wait one step (for jump delta)
+                        self.results['policy']['action'][delta][i,j] = int(-2)
+                        self.results['policy']['delta'][delta][i,j] = int(-2) 
+                        
+                    elif value != -1:
+                        # Split string
+                        value_split = value.split('_')
+                        # Store action and delta value separately
+                        self.results['policy']['action'][delta][i,j] = int(value_split[1])
+                        self.results['policy']['delta'][delta][i,j] = int(value_split[3])
+                        
+                    else:
+                        # If no policy is known, set to -1
+                        self.results['policy']['action'][delta][i,j] = int(value)
+                        self.results['policy']['delta'][delta][i,j] = int(value) 
                     
     def generatePlots(self, delta_value, max_delta, case_id, writer,
                       iterative_results=None):

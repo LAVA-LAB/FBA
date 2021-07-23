@@ -88,12 +88,12 @@ def iterativeScheme(Ab):
             horizonLen = Ab.mdp.horizonLen
             
             # Load data into dataframes
-            policy_df   = pd.DataFrame( Ab.results['optimal_policy'], 
+            policy_df   = pd.DataFrame( Ab.results['policy']['action'][1], 
              columns=range(len(Ab.abstr['P'])), index=range(horizonLen)).T
-            delta_df    = pd.DataFrame( Ab.results['optimal_delta'], 
+            delta_df    = pd.DataFrame( Ab.results['policy']['delta'][1], 
              columns=range(len(Ab.abstr['P'])), index=range(horizonLen)).T
-            reward_df   = pd.DataFrame( Ab.results['optimal_reward'], 
-             columns=range(len(Ab.abstr['P'])), index=range(horizonLen)).T
+            reward_df   = pd.DataFrame( Ab.results['reward'].T, 
+             columns=range(len(Ab.abstr['P'])), index=[0]).T
             
             # Write dataframes to a different worksheet
             policy_df.to_excel(writer, sheet_name='Optimal policy')

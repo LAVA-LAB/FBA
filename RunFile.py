@@ -115,9 +115,8 @@ if setup.main['mode'] == 'Filter':
 else:
     system.setModel(observer=False)
     
-    
-setup.lic = {'enabled': True, 'LICMaxA': 1, 'LICMinA': 1, 'jump_factors': [2]}
-setup.mdp['k_steady_state'] = None #5
+setup.lic = {'jump_factors': [2]}
+setup.mdp['k_steady_state'] = 5
 setup.main['covarianceMode'] = ['SDP','iterative'][0]
 setup.main['interval_margin'] = 0.001
 

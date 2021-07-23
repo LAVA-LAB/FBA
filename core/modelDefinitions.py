@@ -61,7 +61,7 @@ class robot(master.LTI_master):
         self.spec['critical'] = {1: defSpecBlock(self.partition, a=[9.9,10.1], b=None)}
         
         # Step-bound on property
-        self.endTime = 16#64
+        self.endTime = 32#64
     
     def setModel(self, observer):
         '''

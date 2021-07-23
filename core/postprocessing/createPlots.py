@@ -228,25 +228,9 @@ def createProbabilityPlots(setup, plot, N, model, partition, results, abstr, mc)
         # Plot probability reachabilities
         color = next(ax._get_lines.prop_cycler)['color']
         
-        plt.plot(results['optimal_reward'][plot['N']['start'],:], label='k='+str(plot['T']['start']), linewidth=1, color=color)
+        plt.plot(results['reward'], label='k='+str(plot['T']['start']), linewidth=1, color=color)
         if setup.montecarlo['enabled'] and not setup.montecarlo['init_states']:
             plt.plot(mc['results']['reachability_probability'][:,0], label='Monte carlo (k='+str(plot['T']['start'])+')', \
-                     linewidth=1, color=color, linestyle='dashed')
-    
-    if 'half' in plot['N']:
-        color = next(ax._get_lines.prop_cycler)['color']
-        
-        plt.plot(results['optimal_reward'][plot['N']['half'],:], label='k='+str(plot['T']['half']), linewidth=1, color=color)
-        if setup.montecarlo['enabled'] and not setup.montecarlo['init_states']:
-            plt.plot(mc['results']['reachability_probability'][:,1], label='Monte carlo (k='+str(plot['T']['half'])+')', \
-                     linewidth=1, color=color, linestyle='dashed')
-    
-    if 'final' in plot['N']:
-        color = next(ax._get_lines.prop_cycler)['color']
-        
-        plt.plot(results['optimal_reward'][plot['N']['final'],:], label='k='+str(plot['T']['final']), linewidth=1, color=color)
-        if setup.montecarlo['enabled'] and not setup.montecarlo['init_states']:
-            plt.plot(mc['results']['reachability_probability'][:,2], label='Monte carlo (k='+str(plot['T']['final'])+')', \
                      linewidth=1, color=color, linestyle='dashed')
     
     # Styling plot
@@ -304,7 +288,7 @@ def createProbabilityPlots(setup, plot, N, model, partition, results, abstr, mc)
             ax_comb[fig_ind]  = fig_comb.add_subplot(1,3,fig_ind, projection="3d")
 
             # Determine matrix of probability values
-            Z   = np.reshape(results['optimal_reward'][k,:], (m[0],m[1]))
+            Z   = np.reshape(results['reward'].flatten(), (m[0],m[1]))
             
             # Plot the surface
             surf = ax.plot_surface(plot3D['x'], plot3D['y'], Z, 
@@ -374,7 +358,7 @@ def createProbabilityPlots(setup, plot, N, model, partition, results, abstr, mc)
     fig, ax = plt.subplots(figsize=cm2inch(16,6))
     
     # Shortcut to data
-    data = results['optimal_delta']
+    data = results['policy']['delta'][1]
     
     #get discrete colormap
     cmap = plt.get_cmap('Greys', np.max(data)-np.min(data)+1)
@@ -474,7 +458,7 @@ def policyPlot(setup, model, partition, results, abstr):
     
     frequency = 1
     
-    for state_from, action in enumerate(results['optimal_policy'][0,:]):
+    for state_from, action in enumerate(results['policy']['action'][1][0,:]):
         if state_from % frequency == 0 and action != -1:
             
             center_from = abstr['P'][state_from]['center']
@@ -557,7 +541,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
     Ab.setup.montecarlo['iterations'] = 100
     Ab.monteCarlo()
     
-    PRISM_reach = Ab.results['optimal_reward'][0,state_idxs]
+    PRISM_reach = Ab.results['reward'].flatten()[state_idxs]
     empirical_reach = Ab.mc['results']['reachability_probability'][state_idxs]
     
     print('Probabilistic reachability (PRISM): ',PRISM_reach)
@@ -586,7 +570,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
     else:
         belief_traces = None
     
-    min_delta = int(min(Ab.setup.deltas))
+    min_delta = int(min(Ab.setup.all_deltas))
     
     if Ab.system.modelDim == 2:
         
@@ -997,7 +981,7 @@ def reachabilityHeatMap(Ab):
         j = i % y_nr
         k = i // y_nr
         
-        cut_values[k,j] = Ab.results['optimal_reward'][0,idx]
+        cut_values[k,j] = Ab.results['reward'].flatten()[idx]
         cut_coords[k,j,:] = center
     
     if Ab.system.name == 'UAV':
