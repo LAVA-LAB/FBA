@@ -230,7 +230,7 @@ def createProbabilityPlots(setup, plot, N, model, partition, results, abstr, mc)
         
         plt.plot(results['reward'], label='k='+str(plot['T']['start']), linewidth=1, color=color)
         if setup.montecarlo['enabled'] and not setup.montecarlo['init_states']:
-            plt.plot(mc['results']['reachability_probability'][:,0], label='Monte carlo (k='+str(plot['T']['start'])+')', \
+            plt.plot(mc['reachability_probability'], label='Monte carlo (k='+str(plot['T']['start'])+')', \
                      linewidth=1, color=color, linestyle='dashed')
     
     # Styling plot
@@ -542,7 +542,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
     Ab.monteCarlo()
     
     PRISM_reach = Ab.results['reward'].flatten()[state_idxs]
-    empirical_reach = Ab.mc['results']['reachability_probability'][state_idxs]
+    empirical_reach = Ab.mc['reachability_probability'][state_idxs]
     
     print('Probabilistic reachability (PRISM): ',PRISM_reach)
     print('Empirical reachability (Monte Carlo):',empirical_reach)

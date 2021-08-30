@@ -18,6 +18,8 @@ from core.preprocessing.user_interface import load_PRISM_result_file
 from core.commons import createDirectory, tocDiff
 from core.mainFunctions import steadystateCovariance, steadystateCovariance_sdp
 
+from core.filterBasedAbstraction import MonteCarloSim
+
 #-----------------------------------------------------------------------------
 # Code below is repeated every iteration of the iterative scheme
 #-----------------------------------------------------------------------------
@@ -71,14 +73,9 @@ def filterBasedScheme(Ab, case_id):
         # Solve the MDP
         Ab.solveMDP()
         
-        # Write results to dataframes
-        horizonLen = Ab.mdp.horizonLen
-        
         # Load data into dataframes
-        policy_df   = pd.DataFrame( Ab.results['policy']['action'][1], 
-         columns=range(len(Ab.abstr['P'])), index=range(horizonLen)).T
-        delta_df    = pd.DataFrame( Ab.results['policy']['delta'][1], 
-         columns=range(len(Ab.abstr['P'])), index=range(horizonLen)).T
+        policy_df   = pd.DataFrame( Ab.results['policy']['action'][1].T )
+        delta_df    = pd.DataFrame( Ab.results['policy']['delta'][1].T )
         reward_df   = pd.DataFrame( Ab.results['reward'].T, 
          columns=range(len(Ab.abstr['P'])), index=[0]).T
         
@@ -94,13 +91,18 @@ def filterBasedScheme(Ab, case_id):
         # Perform monte carlo simulation for validation purposes
         
         # setup.setOptions(category='montecarlo', init_states=[7])
-        Ab.monteCarlo()
+        mc_obj = MonteCarloSim(Ab, iterations = Ab.setup.montecarlo['iterations'],
+                                   init_states = Ab.setup.montecarlo['init_states'] )
+        
+        Ab.mc = {'reachability_probability': mc_obj.results['reachability_probability'],
+                 'traces': mc_obj.traces }
         
         # Store Monte Carlo results as dataframe
-        cols = Ab.setup.montecarlo['init_timesteps']
-        MCsims_df = pd.DataFrame( 
-            Ab.mc['results']['reachability_probability'], \
-            columns=cols, index=Ab.abstr['P'].keys())
+        MCsims_df = pd.DataFrame( Ab.mc['reachability_probability'], 
+                                  index=Ab.abstr['P'].keys() )
+        
+        # Clean monte carlo object to save space
+        del mc_obj
             
         # Write Monte Carlo results to Excel
         MCsims_df.to_excel(writer, sheet_name='Empirical reach.')

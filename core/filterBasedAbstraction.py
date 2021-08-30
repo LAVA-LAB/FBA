@@ -439,7 +439,7 @@ class filterBasedAbstraction(Abstraction):
                     self.km[delta][gamma]['error_bound'] = np.max(np.array(jump_km[gamma]['error_bound']), axis=0)
 
                 jump_final_worst = self.km[delta][self.km['waiting_time'] + 1]['cov_pred_worst']
-                self.km[delta].pop(self.km['waiting_time'] + 1)
+                # self.km[delta].pop(self.km['waiting_time'] + 1)
                 
                 distance = np.zeros(self.N)
                 
@@ -565,353 +565,10 @@ class filterBasedAbstraction(Abstraction):
         self.time['3_probabilities'] = tocDiff(False)
         print('\nTransition probabilities calculated - time:',
               self.time['3_probabilities'],'\n\n')
-
-    def monteCarlo(self, iterations='auto', init_states='auto', 
-                   init_times='auto'):
-        '''
-        Perform Monte Carlo simulations to validate the obtained results
-
-        Parameters
-        ----------
-        iterations : str or int, optional
-            Number of Monte Carlo iterations. The default is 'auto'.
-        init_states : str or list, optional
-            Initial states to start simulations from. The default is 'auto'.
-        init_times : str or list, optional
-            Initial time steps to start sims. from. The default is 'auto'.
-
-        Returns
-        -------
-        None.
-
-        '''
         
-        tocDiff(False)
-        if self.setup.main['verbose']:
-            print(' -- Starting Monte Carlo simulations...')
-        
-        self.mc['results']  = dict()
-        self.mc['traces']   = dict()
-        
-        if iterations != 'auto':
-            self.setup.montecarlo['iterations'] = int(iterations)
-        if init_states != 'auto':
-            self.setup.montecarlo['init_states'] = list(init_states)
-        if init_times != 'auto':
-            self.setup.montecarlo['init_timesteps'] = list(init_times)
-        elif self.setup.montecarlo['init_timesteps'] is False:
-            # Determine minimum action time step width
-            min_delta = min(self.setup.all_deltas)
-            
-            self.setup.montecarlo['init_timesteps'] = [ n for n in self.plot[min_delta]['N'].values() ]
-            
-        n_list = self.setup.montecarlo['init_timesteps']
-        
-        self.mc['results']['reachability_probability'] = \
-            np.zeros((len(self.abstr['P']),len(n_list)))
-        
-        # Column widths for tabular prints
-        if self.setup.main['verbose']:
-            col_width = [6,8,6,6,46]
-            tab = table(col_width)
-
-            print(' -- Computing required Gaussian random variables...')
-        
-        if self.setup.montecarlo['init_states'] == False:
-            init_state_idxs = np.arange(len(self.abstr['P']))
-            
-        else:
-            init_state_idxs = self.setup.montecarlo['init_states']
-        
-        # The gaussian random variables are precomputed to speed up the code
-        w_array = dict()
-        for delta in self.setup.all_deltas:
-            w_array[delta] = np.random.multivariate_normal(
-                np.zeros(self.model[delta]['n']), self.model[delta]['noise']['w_cov'],
-               ( len(n_list), len(init_state_idxs), self.setup.montecarlo['iterations'], self.N ))
+class MonteCarloSim():
     
-        v_array = np.random.multivariate_normal(
-                np.zeros(self.system.LTI['r']), self.system.LTI['noise']['v_cov'], 
-               ( len(n_list), len(init_state_idxs), self.setup.montecarlo['iterations'], self.N ))
-            
-        # For each starting time step in the list
-        for n0id,n0 in enumerate(n_list):
-            
-            self.mc['results'][n0] = dict()
-            self.mc['traces'][n0] = dict()
-        
-            # For each initial state
-            for i_abs,i in enumerate(init_state_idxs):
-                
-                regionA = self.abstr['P'][i]
-                
-                # Check if we should indeed perform Monte Carlo sims for this state
-                if self.setup.montecarlo['init_states'] is not False and i not in self.setup.montecarlo['init_states']:
-                    print('cannot happen!')
-                    # If the current state is not in the list of initial states,
-                    # continue to the next iteration
-                    continue
-                # Otherwise, continue with the Monte Carlo simulation
-                
-                if self.setup.main['verbose']:
-                    tab.print_row(['K0','STATE','ITER','K','STATUS'], head=True)
-                else:
-                    print(' -- Monte Carlo for start time',n0,'and state',i)
-                
-                # Create dictionaries for results related to partition i
-                self.mc['results'][n0][i]  = dict()
-                self.mc['results'][n0][i]['goalReached'] = np.full(self.setup.montecarlo['iterations'], False, dtype=bool)
-                self.mc['traces'][n0][i]  = dict()    
-                
-                # For each of the monte carlo iterations
-                for m in range(self.setup.montecarlo['iterations']):
-                    
-                    self.mc['traces'][n0][i][m] = {'k': [], 'x': [], 'bel_mu': [], 'bel_cov': [], 'y': []}
-                    
-                    # Retreive the initial action time-grouping to be chosen
-                    # (given by the optimal policy to the MDP)
-                    delta = self.results['policy']['delta'][1][n0,i]
-                    
-                    if delta == -1:
-                        # If delta is zero, no policy is known, and reachability is zero
-                        if self.setup.main['verbose']:
-                            tab.print_row([n0, i, m, n0, 'No initial policy known, so abort'], sort="Warning")
-                    else:
-                        if self.setup.main['verbose']:
-                            tab.print_row([n0, i, m, n0, 'Start Monte Carlo iteration'])
-                                            
-                        # Initialize the current simulation
-                        x = np.zeros((self.N+1, self.system.LTI['n']))
-                        y = np.zeros((self.N, self.system.LTI['r']))
-                        mu = np.zeros((self.N, self.system.LTI['n']))
-                        mu_goal = [None for i in range(self.N+1)]
-                        x_region = np.zeros(self.N+1).astype(int)
-                        mu_region = np.zeros(self.N+1).astype(int)
-                        u = [None for i in range(self.N)]
-                        
-                        actionToTake = np.zeros(self.N).astype(int)
-                        deltaToTake = np.zeros(self.N).astype(int)
-                        
-                        # Set initial time
-                        k = n0
-                        
-                        # Construct initial belief
-                        mu[n0] = np.array(regionA['center'])
-                        
-                        # Determine initial state and measurement
-                        w_init = np.random.multivariate_normal(
-                            np.zeros(self.system.LTI['n']), self.km[delta][n0]['cov'])
-                        v_init = v_array[n0id, i_abs, m, k]
-                        
-                        # True state model dynamics
-                        x[n0] = mu[n0] + w_init
-                        y[n0] = self.model[delta]['C'] @ np.array(x[n0]) + v_init
-                        
-                        # Add current state, belief, etc. to trace
-                        self.mc['traces'][n0][i][m]['k'] += [n0]
-                        self.mc['traces'][n0][i][m]['x'] += [x[n0]]
-                        self.mc['traces'][n0][i][m]['bel_mu'] += [mu[n0]]
-                        self.mc['traces'][n0][i][m]['bel_cov'] += [self.km[delta][n0]['cov']]
-                        self.mc['traces'][n0][i][m]['y'] += [y[n0]]
-                        
-                        # For each time step in the finite time horizon
-                        while k < self.N:
-                            
-                            if self.setup.main['verbose']:
-                                tab.print_row([n0, i, m, k, 'New time step'])
-                            
-                            # Determine in which region the TRUE state is
-                            x_cubic = skew2cubic(x[k], self.abstr)
-                            
-                            cubic_center_x = computeRegionCenters(x_cubic, 
-                                                    self.system.partition).flatten()
-                            
-                            # Determine in which region the BELIEF MEAN is
-                            mu_cubic = skew2cubic(mu[k], self.abstr)
-                            
-                            cubic_center_mu = computeRegionCenters(mu_cubic, 
-                                                    self.system.partition).flatten()
-                            
-                            ###
-                            
-                            # Check if the state is in a goal region
-                            if any([in_hull( x_cubic, block['hull'] ) for block in self.system.spec['goal'].values()]):
-                                
-                                # Then abort the current iteration, as we have achieved the goal
-                                self.mc['results'][n0][i]['goalReached'][m] = True
-                                
-                                if self.setup.main['verbose']:
-                                    tab.print_row([n0, i, m, k, 'Goal state reached'], sort="Success")
-                                break  
-                            
-                            # Check if the state is in a critical region
-                            if any([in_hull( x_cubic, block['hull'] ) for block in self.system.spec['critical'].values()]):
-                                
-                                # Then abort current iteration
-                                if self.setup.main['verbose']:
-                                    tab.print_row([n0, i, m, k, 'Critical state reached, so abort'], sort="Warning")
-                                break
-                            
-                            ###
-                            
-                            if tuple(cubic_center_x) in self.abstr['allCentersCubic']:
-                                # Save region of TRUE state
-                                x_region[k] = self.abstr['allCentersCubic'][tuple(cubic_center_x)]
-                                
-                            else:
-                                x_region[k] = -1
-                                
-                            if tuple(cubic_center_mu) in self.abstr['allCentersCubic']:
-                                # Save region of BELIEF MEAN state
-                                mu_region[k] = self.abstr['allCentersCubic'][tuple(cubic_center_mu)]
-                                
-                                # Retreive the action from the policy
-                                actionToTake[k] = self.results['optimal_policy'][k, mu_region[k]]
-                                
-                            else:
-                                mu_region[k] = -1
-                            
-                            if mu_region[k] == -1:
-                                if self.setup.main['verbose']:
-                                    tab.print_row([n0, i, m, k, 'Absorbing state reached, so abort'], sort="Warning")
-                                break
-                            elif actionToTake[k] == -1:
-                                if self.setup.main['verbose']:
-                                    tab.print_row([n0, i, m, k, 'No policy known, so abort'], sort="Warning")
-                                break
-                            
-                            # If loop was not aborted, we have a valid action
-    
-                            # Update the value of the time-grouping of the action
-                            # dictated by the optimal policy
-                            deltaToTake[k] = self.results['optimal_delta'][k, mu_region[k]]
-                            delta = deltaToTake[k]
-                            
-                            # If delta is zero, no policy is known, and reachability is zero
-                            if delta == 0:
-                                if self.setup.main['verbose']:
-                                    tab.print_row([n0, i, m, k, 'Action type undefined, so abort'], sort="Warning")
-                                break
-                            
-                            if len(self.setup.jump_deltas) > 0:
-                                # If the local information controller is active,
-                                # also account for the "waiting time"
-                                
-                                # Retreive gamma value
-                                gamma = self.km[delta][k]['waiting_time']
-                                
-                                # Multiply with the minimum time step width to get waiting time
-                                waiting_time = gamma*min_delta
-                                
-                                # Print message
-                                if self.setup.main['verbose']:
-                                    tab.print_row([n0, i, m, k, 'Wait for '+str(gamma)+'*'+\
-                                               str(min_delta)+'='+str(waiting_time)+' time steps'])
-                            else:
-                                # If local information controller is not active,
-                                # simply set the waiting time to zero
-                                gamma = 0
-                                waiting_time = 0
-                                
-                            if self.setup.main['verbose']:
-                                tab.print_row([n0, i, m, k, 'Belief state '+str(mu_region[k])+', true state '+str(x_region[k])+', action '+str(actionToTake[k])+' (delta='+str(delta)+')'])
-                            
-                            # Only perform another movement if k < N
-                            if k < self.N - delta:
-                            
-                                # Move predicted mean to the future belief to the target point of the next state
-                                mu_goal[k+delta] = self.abstr['target']['d'][actionToTake[k]]
-        
-                                # Reconstruct the control input required to achieve this target point
-                                # Note that we do not constrain the control input; we already know that a suitable control exists!
-                                u[k] = np.array(self.model[delta]['B_pinv'] @ ( mu_goal[k+delta] - self.model[delta]['A'] @ x[k] - self.model[delta]['Q_flat'] ))
-                                
-                                if any(self.model[delta]['uMin'] > u[k]) or \
-                                   any(self.model[delta]['uMax'] < u[k]):
-                                    tab.print_row([n0, i, m, k, 'Control input '+str(u[k])+' outside limits'], sort="Warning")
-                                
-                                # Implement the control into the physical (unobservable) system
-                                x_hat = self.model[delta]['A'] @ x[k] + self.model[delta]['B'] @ u[k] + self.model[delta]['Q_flat']
-                                
-                                if self.setup.scenarios['gaussian'] is True:
-                                    # Use Gaussian process noise
-                                    x[k+delta] = x_hat + w_array[delta][n0id, i_abs, m, k]
-                                else:
-                                    # Use generated samples                                    
-                                    disturbance = random.choice(self.model[delta]['noise']['samples'])
-                                    
-                                    x[k+delta] = x_hat + disturbance
-                                    
-                                # Generate a measurement of the true state
-                                y[k+delta] = self.model[delta]['C'] @ x[k+delta] + v_array[n0id, i_abs, m, k]
-                                
-                                # Update the belief based on action and measurement                    
-                                mu[k+delta] = mu_goal[k+delta] + self.km[delta][k+delta]['K_gain'] @ \
-                                                        (y[k+delta] - self.model[delta]['C'] @ mu_goal[k+delta])    
-                                
-                                # Add current state, belief, etc. to trace
-                                self.mc['traces'][n0][i][m]['k'] += [k+delta]
-                                self.mc['traces'][n0][i][m]['x'] += [x[k+delta]]
-                                self.mc['traces'][n0][i][m]['bel_mu'] += [mu[k+delta]]
-                                self.mc['traces'][n0][i][m]['bel_cov'] += [self.km[delta][k+delta]['cov']]
-                                self.mc['traces'][n0][i][m]['y'] += [y[k+delta]]
-                            
-                                # Update the belief for the waiting time
-                                for g in range(gamma):
-                                    # Currently at time k, plus delta of action, plus waiting time
-                                    kg = k + delta + (g+1)*min_delta
-                                    
-                                    # If waiting does not fit in time horizon anymore, break
-                                    if kg >= self.N:
-                                        if self.setup.main['verbose']:
-                                            tab.print_row([n0, i, m, kg-min_delta, 'Time horizon exceeded by waiting, so abort'], sort="Warning")
-                                        break
-                                    
-                                    if self.setup.main['verbose']:
-                                        tab.print_row([n0, i, m, kg-min_delta, 'Wait until time: '+str(kg)])
-                                        
-                                    # Reconstruct the control input required to achieve this target point
-                                    # Note that we do not constrain the control input; we already know that a suitable control exists!
-                                    u[kg] = np.array(self.model[min_delta]['B_pinv'] @ ( mu_goal[k+delta] - self.model[min_delta]['A'] @ mu[kg-min_delta] - self.model[min_delta]['Q_flat'] ))
-                                    
-                                    if any(self.model[min_delta]['uMin'] > u[kg]) or \
-                                       any(self.model[min_delta]['uMax'] < u[kg]):
-                                        tab.print_row([n0, i, m, kg-min_delta, 'Control input '+str(u[kg])+' outside limits'], sort="Warning")
-                                    
-                                    # Implement the control into the physical (unobservable) system
-                                    x_hat = self.model[min_delta]['A'] @ x[kg-min_delta] + self.model[min_delta]['B'] @ u[kg] + self.model[min_delta]['Q_flat']
-                                    
-                                    if self.setup.scenarios['gaussian'] is True:
-                                        # Use Gaussian process noise
-                                        x[kg] = x_hat + w_array[min_delta][n0id, i_abs, m, kg]
-                                    else:
-                                        # Use generated samples                                    
-                                        disturbance = random.choice(self.model[min_delta]['noise']['samples'])
-                                        
-                                        x[kg] = x_hat + disturbance
-                                    
-                                    # Since we wait in the same state, dynamics are changed accordingly
-                                    y[kg] = self.model[min_delta]['C'] @ x[kg] + v_array[n0id, i_abs, m, kg]
-                                    
-                                    # Update the belief based on action and measurement
-                                    mu[kg] = mu_goal[k+delta] + self.km[delta][kg]['K_gain'] @ \
-                                                            (y[kg] - self.model[min_delta]['C'] @ mu_goal[k+delta])
-                            
-                            # Increase iterator variable by the value of delta associated to chosen action
-                            k += delta + waiting_time
-                        
-                # Set of monte carlo iterations completed for specific initial state
-                
-                # Calculate the overall reachability probability for initial state i
-                self.mc['results']['reachability_probability'][i,n0id] = \
-                    np.sum(self.mc['results'][n0][i]['goalReached']) / self.setup.montecarlo['iterations']
-                    
-        self.time['6_MonteCarlo'] = tocDiff(False)
-        print('Monte Carlo simulations finished:',self.time['6_MonteCarlo'])
-        
-class monteCarlo():
-    
-    def __init__(self, Ab, iterations, init_states):
+    def __init__(self, Ab, iterations=100, init_states=False):
         
         self.results = dict()
         self.traces = dict()
@@ -925,20 +582,20 @@ class monteCarlo():
         self.model = Ab.model
         
         nr_regions = len(self.abstr['P'])
-        
-        self.results['reachability_probability'] = \
-            np.zeros(nr_regions)
 
         # Column widths for tabular prints
         if self.setup.main['verbose']:
             col_width = [8,6,6,46]
             self.tab = table(col_width)
                                             
-        if self.setup.montecarlo['init_states'] == False:
+        if not init_states:
             self.init_states = np.arange(nr_regions)
             
         else:
-            self.init_states = self.setup.montecarlo['init_states']
+            self.init_states = init_states
+            
+        self.results['reachability_probability'] = \
+            np.zeros(len(self.init_states))
             
         self.iterations = iterations
         
@@ -946,6 +603,16 @@ class monteCarlo():
         
         self.defineDisturbances()
         self.run()
+        
+        #####
+        
+        del self.setup
+        del self.system
+        del self.km
+        del self.policy
+        del self.abstr
+        del self.horizon
+        del self.model
         
     def defineDisturbances(self):
         
@@ -983,6 +650,9 @@ class monteCarlo():
                 
                 self.traces[r][m], self.results[r]['goalReached'][m] = \
                     self._runIteration(r_abs, r, m)
+                    
+            self.results['reachability_probability'][r] = \
+                np.mean( self.results[r]['goalReached'] )
     
     def _runIteration(self, r_abs, r, m):
         
@@ -1211,7 +881,6 @@ class monteCarlo():
     
     def _computeState(self, k_rel, delta, K_gain, mu_goal, x, w, v):
         
-
         # Reconstruct the control input required to achieve this target point
         # Note that we do not constrain the control input; we already know that a suitable control exists!
         u = np.array(self.model[delta]['B_pinv'] @ ( mu_goal - self.model[delta]['A'] @ x - self.model[delta]['Q_flat'] ))
