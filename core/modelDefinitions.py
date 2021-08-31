@@ -131,7 +131,8 @@ class UAV(master.LTI_master):
         
         # Set value of delta (how many time steps are grouped together)
         # Used to make the model fully actuated
-        self.deltas = [2,3]#,4]
+        #self.deltas = [2,3]#,4]
+        self.base_delta = 2
         
         # Let the user make a choice for the model dimension
         self.modelDim, _  = ui.user_choice('model dimension',[2,3])
@@ -154,10 +155,10 @@ class UAV(master.LTI_master):
             # Specification information
             self.spec['goal']     = {1: defSpecBlock(self.partition, a=[-9, -5], b=None, c=[5, 9], d=None)}
             
-            self.spec['critical'] = {1: defSpecBlock(self.partition, a=[-9,-3.3], b=None, c=[-2,2], d=None),
-                                                       2: defSpecBlock(self.partition, a=[3.5, 6.5], b=None, c=[-9, -5], d=None),
-                                                       3: defSpecBlock(self.partition, a=[-0.5, 4], b=None, c=[-1, 3], d=None),
-                                                       4: defSpecBlock(self.partition, a=[-0.5, 4], b=None, c=[8, 11], d=None)}
+            self.spec['critical'] = {1: defSpecBlock(self.partition, a=[-9,-3.3], b=None, c=[-2,3], d=None),
+                                     2: defSpecBlock(self.partition, a=[3.5, 6.5], b=None, c=[-9, -5], d=None),
+                                     3: defSpecBlock(self.partition, a=[-0.5, 4], b=None, c=[-1, 3], d=None),
+                                     4: defSpecBlock(self.partition, a=[1.0, 4], b=None, c=[8, 11], d=None)}
             
         elif self.modelDim == 3:
             
@@ -244,7 +245,7 @@ class UAV(master.LTI_master):
             self.LTI['Q']  = np.array([[0],[0],[0],[0]])
         
             # Covariance of the process noise
-            self.LTI['noise']['w_cov'] = 1*np.diag([0.10, 0.02, 0.10, 0.02])
+            self.LTI['noise']['w_cov'] = np.diag([0.10, 0.02, 0.10, 0.02])
         
             if observer:
                 # Observation matrix

@@ -26,7 +26,6 @@ from matplotlib.patches import Rectangle
 
 from ..commons import printWarning, mat_to_vec, cm2inch, confidence_ellipse
 
-
 def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, partition, \
                         abstr, allVerticesNested, predecessor_set):
     
@@ -185,7 +184,7 @@ def _set_axes_radius(ax, origin, radius):
     ax.set_ylim3d([y - radius, y + radius])
     # ax.set_zlim3d([z - radius, z + radius])
 
-def createProbabilityPlots(setup, plot, N, model, partition, results, abstr, mc):
+def createProbabilityPlots(setup, plot, N, model, partition, mdp, abstr, mc):
     '''
     Create the result plots for the abstraction instance.
 
@@ -199,8 +198,8 @@ def createProbabilityPlots(setup, plot, N, model, partition, results, abstr, mc)
         Finite time horizon.
     model : dict
         Main dictionary of the LTI system model.
-    results : dict
-        Dictionary containing all results from solving the MDP.
+    mdp : dict
+        Dictionary containing all iMDP data
     abstr : dict
         Dictionay containing all information of the finite-state abstraction.
     mc : dict
@@ -228,7 +227,7 @@ def createProbabilityPlots(setup, plot, N, model, partition, results, abstr, mc)
         # Plot probability reachabilities
         color = next(ax._get_lines.prop_cycler)['color']
         
-        plt.plot(results['reward'], label='k='+str(plot['T']['start']), linewidth=1, color=color)
+        plt.plot(mdp.opt_reward, label='k='+str(plot['T']['start']), linewidth=1, color=color)
         if setup.montecarlo['enabled'] and not setup.montecarlo['init_states']:
             plt.plot(mc['reachability_probability'], label='Monte carlo (k='+str(plot['T']['start'])+')', \
                      linewidth=1, color=color, linestyle='dashed')
@@ -288,7 +287,7 @@ def createProbabilityPlots(setup, plot, N, model, partition, results, abstr, mc)
             ax_comb[fig_ind]  = fig_comb.add_subplot(1,3,fig_ind, projection="3d")
 
             # Determine matrix of probability values
-            Z   = np.reshape(results['reward'].flatten(), (m[0],m[1]))
+            Z   = np.reshape(mdp.opt_reward, (m[0],m[1]))
             
             # Plot the surface
             surf = ax.plot_surface(plot3D['x'], plot3D['y'], Z, 
@@ -355,6 +354,7 @@ def createProbabilityPlots(setup, plot, N, model, partition, results, abstr, mc)
     ######################
     # Visualize matrix of action types, based on nr of time steps grouped
 
+    '''
     fig, ax = plt.subplots(figsize=cm2inch(16,6))
     
     # Shortcut to data
@@ -379,6 +379,7 @@ def createProbabilityPlots(setup, plot, N, model, partition, results, abstr, mc)
     filename = setup.directories['outputFcase']+'policy_action_delta_value'
     for form in setup.plotting['exportFormats']:
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
+    '''
     
 def policyPlot(setup, model, partition, results, abstr):
     '''
@@ -504,6 +505,8 @@ def trajectoryPlot(Ab, case_id, writer = None):
     from core.mainFunctions import computeRegionCenters
     from core.commons import setStateBlock
     
+    from ..filterBasedAbstraction import MonteCarloSim
+    
     # Determine desired state IDs
     if Ab.system.name == 'UAV':
         if Ab.system.modelDim == 2:
@@ -539,10 +542,15 @@ def trajectoryPlot(Ab, case_id, writer = None):
     
     Ab.setup.montecarlo['init_states'] = state_idxs
     Ab.setup.montecarlo['iterations'] = 100
-    Ab.monteCarlo()
     
-    PRISM_reach = Ab.results['reward'].flatten()[state_idxs]
-    empirical_reach = Ab.mc['reachability_probability'][state_idxs]
+    mc_obj = MonteCarloSim(Ab, iterations = Ab.setup.montecarlo['iterations'],
+                               init_states = Ab.setup.montecarlo['init_states'] )
+    
+    Ab.mc = {'reachability_probability': mc_obj.results['reachability_probability'],
+                 'traces': mc_obj.traces }
+    
+    PRISM_reach = Ab.mdp.opt_reward[state_idxs]
+    empirical_reach = Ab.mc['reachability_probability']
     
     print('Probabilistic reachability (PRISM): ',PRISM_reach)
     print('Empirical reachability (Monte Carlo):',empirical_reach)
@@ -558,14 +566,14 @@ def trajectoryPlot(Ab, case_id, writer = None):
     
     for i in state_idxs:
         for j in range(itersToShow):
-            traces += [Ab.mc['traces'][0][i][j]['x']]
+            traces += [Ab.mc['traces'][i][j]['x']]
             
     if Ab.setup.main['mode'] == 'Filter':
         belief_traces = {'mu': [], 'cov': []}
         for i in state_idxs:
             for j in range(itersToShow):
-                belief_traces['mu'] += [Ab.mc['traces'][0][i][j]['bel_mu']]
-                belief_traces['cov'] += [Ab.mc['traces'][0][i][j]['bel_cov']]
+                belief_traces['mu'] += [Ab.mc['traces'][i][j]['bel_mu']]
+                belief_traces['cov'] += [Ab.mc['traces'][i][j]['bel_cov']]
                 
     else:
         belief_traces = None
@@ -583,11 +591,14 @@ def trajectoryPlot(Ab, case_id, writer = None):
             
         filenames = ['' for i in range(len(plot_times))]
             
+        # Create list of error bounds
+        error_bound_list = [dic['error_bound'] if 'error_bound' in dic else 0 for dic in Ab.km[Ab.setup.base_delta].values()]
+        
         for i,plot_time in enumerate(plot_times):
             filenames[i] = trajectoryPlot2D(plot_time, Ab.N, Ab.setup, 
                 Ab.model[min_delta], Ab.system.partition,
                 Ab.system.spec, Ab.abstr, 
-                Ab.km['max_error_bound'], cut_value, traces, belief_traces)
+                error_bound_list, cut_value, traces, belief_traces)
 
         if animate:
     
@@ -687,8 +698,8 @@ def trajectoryPlot2D(plot_time, N, setup, model, partition, spec, abstr, max_err
         lower  = region['limits'][:,0]
         size   = region['limits'][:,1] - region['limits'][:,0]
         
-        lower_eps  = lower + max_error_bound[plot_time, :]
-        size_eps   = size - 2*max_error_bound[plot_time, :]
+        lower_eps  = lower + max_error_bound[plot_time]#, :]
+        size_eps   = size - 2*max_error_bound[plot_time]#, :]
         
         state = Rectangle(lower[[ix, iy]], width=size[ix], height=size[iy], 
                               color="green", alpha=0.3, linewidth=None)
@@ -705,8 +716,8 @@ def trajectoryPlot2D(plot_time, N, setup, model, partition, spec, abstr, max_err
         lower  = region['limits'][:,0]
         size   = region['limits'][:,1] - region['limits'][:,0]
         
-        lower_eps  = lower - max_error_bound[plot_time, :]
-        size_eps   = size + 2*max_error_bound[plot_time, :]
+        lower_eps  = lower - max_error_bound[plot_time]#, :]
+        size_eps   = size + 2*max_error_bound[plot_time]#, :]
         
         state = Rectangle(lower[[ix, iy]], width=size[ix], height=size[iy], 
                               color="red", alpha=0.3, linewidth=None)
@@ -981,7 +992,7 @@ def reachabilityHeatMap(Ab):
         j = i % y_nr
         k = i // y_nr
         
-        cut_values[k,j] = Ab.results['reward'].flatten()[idx]
+        cut_values[k,j] = Ab.mdp.opt_reward[idx]
         cut_coords[k,j,:] = center
     
     if Ab.system.name == 'UAV':

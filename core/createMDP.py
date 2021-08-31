@@ -197,7 +197,7 @@ class mdp(object):
         # print(len(DF_DATA['k_id_start']))
         # print(len(DF_DATA['k_max']))
         
-        self.PRISM_DF = pd.DataFrame(data = DF_DATA)
+        self.MAIN_DF = pd.DataFrame(data = DF_DATA)
         
         # Define PRISM filename
         PRISM_allfiles = self.setup.directories['outputFcase']+ \
@@ -228,7 +228,7 @@ class mdp(object):
                           ['2: 2'] + \
                           ['' for i in range(self.nr_states)]
         
-        for index, row in self.PRISM_DF.iterrows():
+        for index, row in self.MAIN_DF.iterrows():
             
             # Write default string
             string = str(row['state'])+': 0'
@@ -251,7 +251,7 @@ class mdp(object):
         PRISM_transitionfile = self.setup.directories['outputFcase']+ \
             self.setup.mdp['filename']+"_"+mode+".tra"
             
-        transition_file_list = ['' for i in range(len(self.PRISM_DF))]
+        transition_file_list = ['' for i in range(len(self.MAIN_DF))]
             
         nr_choices_absolute = 0
         nr_transitions_absolute = 0
@@ -259,7 +259,7 @@ class mdp(object):
         printEvery = min(100, max(1, int(self.nr_states/10)))
         
         # For every row of the DataFrame
-        for index, row in self.PRISM_DF.iterrows():
+        for index, row in self.MAIN_DF.iterrows():
         
             state = row['state']
             r = row['region']
@@ -353,7 +353,7 @@ class mdp(object):
                         
                         # print('call action for delta',delta,'k_prime',k_prime,'action',a)
                         
-                        # Call function to write transition rows
+                        # Call function to write transitions for this S-A pair
                         action_string[a_idx], transitions_plus = \
                             writePRISMtrans(trans, delta, k_prime, a, mode,
                                               string_start, succ_rep_start,
@@ -408,7 +408,7 @@ class mdp(object):
 def writePRISMtrans(trans, delta, k_prime, a, mode, string_start, succ_rep_start, overhead):
     
     # Define name of action
-    actionLabel = "a_"+str(a)+"_d_"+str(delta)
+    actionLabel = str(a)+"_"+str(delta)+"_"+str(succ_rep_start)
     
     # print('Delta:',delta,'k_prime:',k_prime,'action',a)
     

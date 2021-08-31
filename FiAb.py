@@ -74,10 +74,9 @@ def filterBasedScheme(Ab, case_id):
         Ab.solveMDP()
         
         # Load data into dataframes
-        policy_df   = pd.DataFrame( Ab.results['policy']['action'][1].T )
-        delta_df    = pd.DataFrame( Ab.results['policy']['delta'][1].T )
-        reward_df   = pd.DataFrame( Ab.results['reward'].T, 
-         columns=range(len(Ab.abstr['P'])), index=[0]).T
+        policy_df   = pd.DataFrame( np.stack(Ab.mdp.MAIN_DF['opt_action'].to_numpy()) )
+        delta_df    = pd.DataFrame( np.stack(Ab.mdp.MAIN_DF['opt_delta'].to_numpy()) )
+        reward_df   = pd.DataFrame( Ab.mdp.opt_reward )
         
         # Write dataframes to a different worksheet
         policy_df.to_excel(writer, sheet_name='Optimal policy')

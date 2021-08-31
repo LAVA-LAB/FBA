@@ -248,6 +248,13 @@ class filterBasedAbstraction(Abstraction):
                                 lims[:,0], lims[:,1], muCubic, SigmaCubic_best)[0] 
                                 for lims in all_limits.values()
                                 ]), threshold_decimals)
+                            
+                        
+                        # if j == a:
+                        #     print('\nfor action',a,'region',j,'CRIT PROB:',prob_critical_worst,prob_critical_best)
+                        #     print('muCubic:',muCubic)
+                        #     for lims in all_limits.values():
+                        #         print(' --- lb:',lims[:,0], 'ub:',lims[:,1])
                         
                     else:
                         prob_critical_worst = 0
@@ -494,7 +501,7 @@ class filterBasedAbstraction(Abstraction):
             
             k_prime = k + 1
             goal = self.abstr['goal']['X'][k_prime]
-            critical = self.abstr['goal']['X'][k_prime]
+            critical = self.abstr['critical']['X'][k_prime]
             
             Sigma_worst = self.km[1][k_prime]['cov_tilde']
             Sigma_best  = self.km[1][k_prime]['cov_tilde']
@@ -516,7 +523,7 @@ class filterBasedAbstraction(Abstraction):
             
             k_prime = self.setup.mdp['k_steady_state'] + 1
             goal = self.abstr['goal']['X'][k_prime]
-            critical = self.abstr['goal']['X'][k_prime]
+            critical = self.abstr['critical']['X'][k_prime]
             
             Sigma_worst = self.km[1]['steady']['worst']
             Sigma_best  = self.km[1]['steady']['best']
@@ -545,7 +552,7 @@ class filterBasedAbstraction(Abstraction):
                 # Continue with jump delta value
                 k_prime = gamma
                 goal = self.abstr['goal'][delta][k_prime]
-                critical = self.abstr['goal'][delta][k_prime]
+                critical = self.abstr['critical'][delta][k_prime]
                 
                 Sigma_worst = self.km[delta][k_prime]['cov_tilde_worst']
                 Sigma_best  = self.km[delta][k_prime]['cov_tilde_best']
@@ -576,12 +583,10 @@ class MonteCarloSim():
         self.setup = Ab.setup
         self.system = Ab.system
         self.km = Ab.km
-        self.policy = Ab.results['policy']
+        self.policy = Ab.mdp.MAIN_DF
         self.abstr = Ab.abstr
         self.horizon = Ab.N
         self.model = Ab.model
-        
-        nr_regions = len(self.abstr['P'])
 
         # Column widths for tabular prints
         if self.setup.main['verbose']:
@@ -589,7 +594,7 @@ class MonteCarloSim():
             self.tab = table(col_width)
                                             
         if not init_states:
-            self.init_states = np.arange(nr_regions)
+            self.init_states = np.arange(len(self.abstr['P']))
             
         else:
             self.init_states = init_states
@@ -651,7 +656,7 @@ class MonteCarloSim():
                 self.traces[r][m], self.results[r]['goalReached'][m] = \
                     self._runIteration(r_abs, r, m)
                     
-            self.results['reachability_probability'][r] = \
+            self.results['reachability_probability'][r_abs] = \
                 np.mean( self.results[r]['goalReached'] )
     
     def _runIteration(self, r_abs, r, m):
@@ -660,7 +665,6 @@ class MonteCarloSim():
         trace = {'k': [], 'x': [], 'bel_mu': [], 'bel_cov': [], 'y': []}
         
         k = 0
-        k_rel = 0
         
         if self.setup.main['verbose']:
             self.tab.print_row([r, m, k, 'Start Monte Carlo iteration'])
@@ -685,7 +689,7 @@ class MonteCarloSim():
         # Retreive the initial action time-grouping to be chosen
         # (given by the optimal policy to the MDP)
         delta = 1
-        long_delta = delta
+        # long_delta = delta
         
         # Determine initial state and measurement
         w_init = np.random.multivariate_normal(
@@ -704,6 +708,8 @@ class MonteCarloSim():
         trace['y'] += [y[0]]
         
         ######
+        
+        abs_state_shift = 0
         
         # For each time step in the finite time horizon
         while k < self.horizon:
@@ -743,16 +749,26 @@ class MonteCarloSim():
                 # Save region of BELIEF MEAN state
                 mu_region[k] = self.abstr['allCentersCubic'][tuple(cubic_center_mu)]
                 
-                # Determine the shift based on the relative time step
-                shift = k_rel * len(self.abstr['P'])
-                
-                # print('Long delta is:',long_delta)
-                # print('k_rel is:',k_rel)
-                # print('shift is:',shift)
-                
                 # Retreive the action from the policy
-                actionToTake[k] = self.policy['action'][long_delta][k, shift + mu_region[k]]
-                deltaToTake[k]  = self.policy['delta'][long_delta][k, shift + mu_region[k]]
+                abs_state = abs_state_shift + mu_region[k]
+                actionToTake[k] = self.policy['opt_action'][abs_state][k]
+                deltaToTake[k]  = self.policy['opt_delta'][abs_state][k]
+                
+                # Compute the new state shift value
+                opt_k_succ_id   = self.policy['opt_ksucc_id'][abs_state][k]
+                
+                # Here, we automatcially skip trivial waiting actions for delta>1 actions
+                abs_state_shift = opt_k_succ_id + (deltaToTake[k]-1)*self.abstr['nr_actions']
+                
+                # if opt_k_succ_id == -2:
+                #     # If value was -2, means that it's a trivial waiting action
+                #     abs_state_shift = self.policy['k_id_start'] + self.abstr['nr_regions']
+                # else:
+                #     # Otherwise, copy directly as shift value for next state
+                #     abs_state_shift = opt_k_succ_id
+                
+                # actionToTake[k] = self.policy['action'][long_delta][k, shift + mu_region[k]]
+                # deltaToTake[k]  = self.policy['delta'][long_delta][k, shift + mu_region[k]]
                 
                 if actionToTake[k] == -1:
                     
@@ -781,18 +797,16 @@ class MonteCarloSim():
             
             # If a jump delta action was chosen, switch to that branch
             if delta > 1:
-                k_rel = 0
                 long_delta = delta
-                
-                # kalman_k = 0
-            # else:
-            #     kalman_k = k_rel + delta
             
             if self.setup.main['verbose']:
-                self.tab.print_row([r, m, k, 'Belief state '+
-                                    str(mu_region[k])+', true state '+
-                                    str(x_region[k])+', action '+
-                                    str(actionToTake[k])+
+                
+                branch_delta = self.policy['delta'][abs_state]
+                
+                self.tab.print_row([r, m, k, 'Belief region '+
+                                    str(mu_region[k])+', true region '+
+                                    str(x_region[k])+' (branch delta='+str(branch_delta)+
+                                    '), action ' + str(actionToTake[k])+
                                     ' (delta='+str(delta)+')'])
                 
             # Only perform another movement if k < N
@@ -809,7 +823,7 @@ class MonteCarloSim():
         
                 # Compute state at the next time step
                 x[k+delta], u[k], y[k+delta], mu[k+delta] = \
-                    self._computeState(k_rel, delta, belief['K_gain'],
+                    self._computeState(delta, belief['K_gain'],
                                       mu_goal[k+delta], x[k], w, v)
         
                 # Update posterior belief covariance
@@ -829,28 +843,19 @@ class MonteCarloSim():
             # Increase iterator variable by the value of delta associated to chosen action
             k += delta
             
-            if delta > 1:
-                k_rel += delta - 1
+            # if delta > 1:
+            #     k_rel += delta - 1
                 
-                # print('Jump to delta',delta,'rate')
-            else:
+            # else:
                 
-                if k_rel < self.setup.mdp['k_steady_state']:
+            #     if k_rel < self.setup.mdp['k_steady_state']:
+            #         k_rel += 1
                 
-                    k_rel += 1
-                    # print('Proceed at normal rate to k_rel',k_rel)
-                
-                # else:
-                    
-                    # print('Keep k_rel at',k_rel,'(steady-state phase)')
-                
-            # Check if we should move back to the base rate again
-            if long_delta > 1 and k_rel >= long_delta + self.km['waiting_time'] - 1:
-                # If so, put long delta back to 1, and reset relative time step            
-                k_rel = self.km['return_step'][long_delta]
-                long_delta = 1
-                
-                # print('Move back to base rate')
+            # # Check if we should move back to the base rate again
+            # if long_delta > 1 and k_rel >= long_delta + self.km['waiting_time'] - 1:
+            #     # If so, put long delta back to 1, and reset relative time step            
+            #     k_rel = self.km['return_step'][long_delta]
+            #     long_delta = 1
                         
         ######
         
@@ -879,7 +884,7 @@ class MonteCarloSim():
         else:
             return -1
     
-    def _computeState(self, k_rel, delta, K_gain, mu_goal, x, w, v):
+    def _computeState(self, delta, K_gain, mu_goal, x, w, v):
         
         # Reconstruct the control input required to achieve this target point
         # Note that we do not constrain the control input; we already know that a suitable control exists!

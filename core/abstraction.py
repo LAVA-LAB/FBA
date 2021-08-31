@@ -956,9 +956,23 @@ class Abstraction(object):
 
         '''
         
-        import pandas as pd
+        def _split_policy(value):
+            
+            if value == 'step':
+                # If action is to wait one step (for jump delta)
+                return [-2, -2, -2]
+                
+            elif value != -1:
+                # Split string
+                values_split = value.split('_')
+                # Store action and delta value separately
+                return [int(value_split) for value_split in values_split]
+                
+            else:
+                # If no policy is known, set to -1
+                return [-1, -1, -1]
         
-        self.results = dict()
+        import pandas as pd
         
         ovh = self.mdp.overhead
         
@@ -967,56 +981,71 @@ class Abstraction(object):
         # Flip policy upside down (PRISM generates last time step at top!)
         policy_all = np.flipud(policy_all)
         
-        self.results['reward'] = pd.read_csv(vector_file, 
-                 header=None).iloc[ovh:ovh+self.mdp.nr_regions].to_numpy()
+        self.mdp.opt_reward = pd.read_csv(vector_file, header=None).iloc[
+                ovh:ovh+self.mdp.nr_regions].to_numpy().flatten()
         
-        policy = dict()
+        # Initialize policy columns to dataframe
+        cols = ['opt_action', 'opt_delta', 'opt_ksucc_id']
+        for col in cols:
+            self.mdp.MAIN_DF[col] = -1
+            self.mdp.MAIN_DF[col] = self.mdp.MAIN_DF[col].astype(object)
         
-        self.results['policy'] = {'action': {}, 'delta': {}}
+        # Loop over every row of the dataframe
+        for index, row in self.mdp.MAIN_DF.iterrows():
+            
+            # Create policy matrix (every row is a time step)
+            split_matrix = np.array([ _split_policy(value) for value in policy_all[:, index] ]).T
+            
+            self.mdp.MAIN_DF['opt_action'].loc[index]   = split_matrix[0]
+            self.mdp.MAIN_DF['opt_delta'][index]        = split_matrix[1]
+            self.mdp.MAIN_DF['opt_ksucc_id'][index]     = split_matrix[2]
         
-        for idx, delta in enumerate(self.setup.all_deltas):
+        # policy = dict()
+        
+        # self.results['policy'] = {'action': {}, 'delta': {}}
+        
+        # for idx, delta in enumerate(self.setup.all_deltas):
             
-            # Starting column to extract
-            if idx == 0:
-                col_start = 0
-            else:
-                col_start = int(sum(self.mdp.nr_states_per_delta[0:idx]))
+        #     # Starting column to extract
+        #     if idx == 0:
+        #         col_start = 0
+        #     else:
+        #         col_start = int(sum(self.mdp.nr_states_per_delta[0:idx]))
             
-            # Number of columns to extract
+        #     # Number of columns to extract
+        #     col_end = col_start + self.mdp.nr_states_per_delta[idx]
             
-            col_end = col_start + self.mdp.nr_states_per_delta[idx]
+        #     '''
+        #     if delta == 1:
+        #         policy[delta] = extractRowBlockDiag(policy_all[:, col_start:col_end], self.mdp.nr_regions)
+        #     '''
             
-            '''
-            if delta == 1:
-                policy[delta] = extractRowBlockDiag(policy_all[:, col_start:col_end], self.mdp.nr_regions)
-            '''
-            
-            policy[delta] = policy_all[:, col_start:col_end]
+        #     policy[delta] = policy_all[:, col_start:col_end]
 
-            self.results['policy']['action'][delta] = np.zeros(np.shape(policy[delta]))
-            self.results['policy']['delta'][delta]  = np.zeros(np.shape(policy[delta]))
+        #     self.results['policy']['action'][delta] = np.zeros(np.shape(policy[delta]))
+        #     self.results['policy']['delta'][delta]  = np.zeros(np.shape(policy[delta]))
             
-            # Split the optimal policy between delta and action itself
-            for i,row in enumerate(policy[delta]):
+        #     # Split the optimal policy between delta and action itself
+        #     for i,row in enumerate(policy[delta]):
                 
-                for j,value in enumerate(row):
+        #         for j,value in enumerate(row):
                     
-                    if value == 'step':
-                        # If action is to wait one step (for jump delta)
-                        self.results['policy']['action'][delta][i,j] = int(-2)
-                        self.results['policy']['delta'][delta][i,j] = int(-2) 
+        #             if value == 'step':
+        #                 # If action is to wait one step (for jump delta)
+        #                 self.results['policy']['action'][delta][i,j] = int(-2)
+        #                 self.results['policy']['delta'][delta][i,j] = int(-2) 
                         
-                    elif value != -1:
-                        # Split string
-                        value_split = value.split('_')
-                        # Store action and delta value separately
-                        self.results['policy']['action'][delta][i,j] = int(value_split[1])
-                        self.results['policy']['delta'][delta][i,j] = int(value_split[3])
+        #             elif value != -1:
+        #                 # Split string
+        #                 value_split = value.split('_')
+        #                 # Store action and delta value separately
+        #                 self.results['policy']['action'][delta][i,j] = int(value_split[0])
+        #                 self.results['policy']['delta'][delta][i,j] = int(value_split[1])
                         
-                    else:
-                        # If no policy is known, set to -1
-                        self.results['policy']['action'][delta][i,j] = int(value)
-                        self.results['policy']['delta'][delta][i,j] = int(value) 
+        #             else:
+        #                 # If no policy is known, set to -1
+        #                 self.results['policy']['action'][delta][i,j] = int(value)
+        #                 self.results['policy']['delta'][delta][i,j] = int(value) 
                     
     def generatePlots(self, delta_value, max_delta, case_id, writer,
                       iterative_results=None):
@@ -1047,7 +1076,7 @@ class Abstraction(object):
                 createProbabilityPlots(self.setup, self.plot[delta_value], 
                                        self.N, self.model[delta_value],
                                        self.system.partition,
-                                       self.results, self.abstr, self.mc)
+                                       self.mdp, self.abstr, self.mc)
                     
         else:
             
