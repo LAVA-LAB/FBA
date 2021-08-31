@@ -89,7 +89,6 @@ def filterBasedScheme(Ab, case_id):
     if Ab.setup.montecarlo['enabled']:
         # Perform monte carlo simulation for validation purposes
         
-        # setup.setOptions(category='montecarlo', init_states=[7])
         mc_obj = MonteCarloSim(Ab, iterations = Ab.setup.montecarlo['iterations'],
                                    init_states = Ab.setup.montecarlo['init_states'] )
         

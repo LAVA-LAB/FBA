@@ -69,9 +69,8 @@ class filterBasedAbstraction(Abstraction):
         for a in range(self.abstr['nr_actions']):
             
             self.abstr['P'][a]['distances'] = self.abstr['target']['d'][a] - allCentersArray
-            # self.abstr['P'][a]['euclidDist'] = np.hypot(*(self.abstr['target']['d'][a] - allCentersArray).T)
-            # self.abstr['P'][a]['priority'] = [i for i,d in enumerate(self.abstr['P'][a]['distances']) if sum(d == 0) == len(d)-1]
-        
+            
+            
     def _computeProbabilityBounds(self, tab, Sigma_worst, Sigma_best, actions_inv, GOAL, CRITICAL, verbose=True):
         '''
         Compute transition probability intervals (bounds)
@@ -248,13 +247,6 @@ class filterBasedAbstraction(Abstraction):
                                 lims[:,0], lims[:,1], muCubic, SigmaCubic_best)[0] 
                                 for lims in all_limits.values()
                                 ]), threshold_decimals)
-                            
-                        
-                        # if j == a:
-                        #     print('\nfor action',a,'region',j,'CRIT PROB:',prob_critical_worst,prob_critical_best)
-                        #     print('muCubic:',muCubic)
-                        #     for lims in all_limits.values():
-                        #         print(' --- lb:',lims[:,0], 'ub:',lims[:,1])
                         
                     else:
                         prob_critical_worst = 0
@@ -366,15 +358,6 @@ class filterBasedAbstraction(Abstraction):
 
         '''
         
-        # Column widths for tabular prints
-        if self.setup.main['verbose']:
-            col_width = [8,8,46]
-            tab = table(col_width)
-        
-        # Print header row
-        if self.setup.main['verbose']:
-            tab.print_row(['K','STATUS'], head=True)
-        
         # List to compute best-case covariance
         covsTilde = []
         covsPred  = []
@@ -446,7 +429,6 @@ class filterBasedAbstraction(Abstraction):
                     self.km[delta][gamma]['error_bound'] = np.max(np.array(jump_km[gamma]['error_bound']), axis=0)
 
                 jump_final_worst = self.km[delta][self.km['waiting_time'] + 1]['cov_pred_worst']
-                # self.km[delta].pop(self.km['waiting_time'] + 1)
                 
                 distance = np.zeros(self.N)
                 
@@ -457,8 +439,6 @@ class filterBasedAbstraction(Abstraction):
                     
                     lambdas = eigh(cov, jump_final_worst, eigvals_only=True)
                     distance[k] = np.sqrt( sum([np.log(lambd)**2 for lambd in lambdas]) )
-                        
-                # print('Distances between covariance matrices:',distance)
                 
                 self.km['return_step'][delta] = np.minimum( np.argmin(distance),
                                                         self.setup.mdp['k_steady_state'] )
@@ -689,7 +669,6 @@ class MonteCarloSim():
         # Retreive the initial action time-grouping to be chosen
         # (given by the optimal policy to the MDP)
         delta = 1
-        # long_delta = delta
         
         # Determine initial state and measurement
         w_init = np.random.multivariate_normal(
@@ -760,16 +739,6 @@ class MonteCarloSim():
                 # Here, we automatcially skip trivial waiting actions for delta>1 actions
                 abs_state_shift = opt_k_succ_id + (deltaToTake[k]-1)*self.abstr['nr_actions']
                 
-                # if opt_k_succ_id == -2:
-                #     # If value was -2, means that it's a trivial waiting action
-                #     abs_state_shift = self.policy['k_id_start'] + self.abstr['nr_regions']
-                # else:
-                #     # Otherwise, copy directly as shift value for next state
-                #     abs_state_shift = opt_k_succ_id
-                
-                # actionToTake[k] = self.policy['action'][long_delta][k, shift + mu_region[k]]
-                # deltaToTake[k]  = self.policy['delta'][long_delta][k, shift + mu_region[k]]
-                
                 if actionToTake[k] == -1:
                     
                     if self.setup.main['verbose']:
@@ -794,10 +763,6 @@ class MonteCarloSim():
             
             # If loop was not aborted, we have a valid action
             delta = deltaToTake[k]
-            
-            # If a jump delta action was chosen, switch to that branch
-            if delta > 1:
-                long_delta = delta
             
             if self.setup.main['verbose']:
                 
@@ -842,20 +807,6 @@ class MonteCarloSim():
             
             # Increase iterator variable by the value of delta associated to chosen action
             k += delta
-            
-            # if delta > 1:
-            #     k_rel += delta - 1
-                
-            # else:
-                
-            #     if k_rel < self.setup.mdp['k_steady_state']:
-            #         k_rel += 1
-                
-            # # Check if we should move back to the base rate again
-            # if long_delta > 1 and k_rel >= long_delta + self.km['waiting_time'] - 1:
-            #     # If so, put long delta back to 1, and reset relative time step            
-            #     k_rel = self.km['return_step'][long_delta]
-            #     long_delta = 1
                         
         ######
         

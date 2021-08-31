@@ -52,6 +52,8 @@ class Abstraction(object):
 
         '''
         
+        print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
+        
         # Define empty dictionary for monte carlo sims. (even if not used)
         self.mc = dict()   
         
@@ -77,14 +79,12 @@ class Abstraction(object):
         for div in range(base_delta, 0, -1):
             if base_delta % div == 0:
                 
-                print('Simplify step size by factor:',div)
+                print(' -- Simplify step size by a factor of',div)
                 self.N = int(self.N / div)
                 self.setup.base_delta  = (np.array(self.setup.base_delta) / div).astype(int)
                 self.setup.divide = div
                 
                 break
-            
-        print()
             
         self.setup.jump_deltas = self.setup.base_delta * self.setup.lic['jump_factors']
         self.setup.all_deltas = np.concatenate(([self.setup.base_delta], 
@@ -436,7 +436,7 @@ class Abstraction(object):
         
         return basis_vectors
     
-    def _defEnabledActions(self, delta):
+    def _defEnabledActions(self, delta, verbose=False):
         '''
         Define dictionaries to sture points in the preimage of a state, and
         the corresponding polytope points.
@@ -483,39 +483,35 @@ class Abstraction(object):
         
         if dimEqual:
             
-            print(' -- Computing inverse basis vectors...')
+            print('\nCompute enabled actions for delta='+str(delta)+' via linear transformation...')
             # Use preferred method: map back the skewed image to squares
             
             basis_vectors = self._defBasisVectors(delta)   
             
-            print('Basis vectors:',basis_vectors)
+            if verbose:
+                print(' >> Basis vectors of backward reachable set (BRS):\n',basis_vectors)
             
-            for i,v1 in enumerate(basis_vectors):
-                for j,v2 in enumerate(basis_vectors):
-                    if i != j:
-                        print(' ---- Angle between control',i,'and',j,':',
-                              angle_between(v1,v2) / np.pi * 180)
+                for i,v1 in enumerate(basis_vectors):
+                    for j,v2 in enumerate(basis_vectors):
+                        if i != j:
+                            print(' ---- Angle between control',i,'and',j,':',
+                                  angle_between(v1,v2) / np.pi * 180)
             
             parralelo2cube = np.linalg.inv( basis_vectors )
-            print('Transformation:',parralelo2cube)
-            
-            # print('Normal inverse area:',x_inv_area)
             
             x_inv_area_normalized = x_inv_area @ parralelo2cube
-            # print('Normalized hypercube:',x_inv_area_normalized)
             
             predSet_originShift = -np.average(x_inv_area_normalized, axis=0)
-            print('Off origin:',predSet_originShift)
             
-            # print('Shifted normalized hypercube:',x_inv_area @ parralelo2cube
-            #         + predSet_originShift)
+            if verbose:
+                print('Shift of BRS from origin:',predSet_originShift)
             
             allRegionVertices = self.abstr['allVerticesFlat'] @ parralelo2cube \
                     - predSet_originShift
             
         else:
             
-            print(' -- Creating inverse hull for delta =',delta,'...')
+            print('\nCompute enabled actions for delta='+str(delta)+' based on convex hull...')
             
             # Use standard method: check if points are in (skewed) hull
             x_inv_hull = self._defInvHull(x_inv_area)
@@ -525,8 +521,6 @@ class Abstraction(object):
                   furthest_site=False,
                   incremental=False, 
                   interior_point=None)
-            
-            # print('Normal inverse area:',x_inv_area)
         
             allRegionVertices = self.abstr['allVerticesFlat'] 
         
@@ -536,6 +530,8 @@ class Abstraction(object):
         # Put goal regions up front of the list of actions
         action_range = f7(np.concatenate(( list(self.abstr['goal']['X'][0].keys()),
                            np.arange(self.abstr['nr_actions']) )))
+        
+        print('\nStart to compute the set of enabled actions...')
         
         # For every action
         for action_id in action_range:
@@ -600,11 +596,6 @@ class Abstraction(object):
             if self.setup.plotting['partitionPlot'] and \
                 action_id == int(self.abstr['nr_regions']/2):
 
-                # print('x_inv_area:',x_inv_area)
-                # print('origin shift:',A_inv_d)       
-                # print('targetPoint:',targetPoint,' - drift:',
-                #       self.model[delta]['Q_flat'])
-                
                 predecessor_set = A_inv_d - x_inv_area
                 
                 # Partition plot for the goal state, also showing pre-image
@@ -616,19 +607,8 @@ class Abstraction(object):
             
             # Retreive the ID's of all states in which the action is enabled
             enabled_in_states[action_id] = np.nonzero(enabled_in)[0]
-            
-            # If the local information controller is enabled, an action is
-            # only enabled anywhere, if there also exists a "waiting action"
-            # from that state to itself
-            '''
-            if delta != 1 and action_id not in self.abstr['actions'][1][action_id]:
-                # print(' >> ACTION',action_id,'DOES NOT EXIST IN ITSELF disable for delta',delta)
-                enabled_in_states[action_id] = np.array([])
-            # else:
-                # print(' !! Waiting possible for action',str(action_id),'; ',str(targetPoint))
-            '''
                 
-            if action_id % printEvery == 0:
+            if action_id % printEvery == 0 or delta > 1:
                 if action_id in self.abstr['goal']['X'][0]:
                     print(' -- GOAL action',str(action_id),'enabled in',
                           str(len(enabled_in_states[action_id])),
@@ -662,7 +642,7 @@ class Abstraction(object):
         '''
         
         # Create partition
-        print('Computing partition of the state space...')
+        print('\nComputing partition of the state space...')
         
         self.abstr = self._defPartition()
 
@@ -670,7 +650,7 @@ class Abstraction(object):
         print('Discretized states defined - time:',self.time['1_partition'])
         
         # Create target points
-        print('Creating actions (target points)...')
+        print('\nCreating actions (target points)...')
         
         self.abstr['allVertices']     = self._defAllVertices()
         
@@ -784,8 +764,6 @@ class Abstraction(object):
         None.
         '''
         
-        print('Computing set of enabled actions...')
-        
         self.abstr['actions']     = dict()
         self.abstr['actions_inv'] = dict()
         
@@ -801,7 +779,7 @@ class Abstraction(object):
                 sys.exit()
         
         self.time['2_enabledActions'] = tocDiff(False)
-        print('Enabled actions define - time:',self.time['2_enabledActions'])
+        print('\nEnabled actions define - time:',self.time['2_enabledActions'])
         
     def buildMDP(self):
         '''
@@ -833,7 +811,7 @@ class Abstraction(object):
             model_size = {'States':None,'Choices':None,'Transitions':None}
 
         self.time['4_MDPcreated'] = tocDiff(False)
-        print('MDP created - time:',self.time['4_MDPcreated'])
+        print('\ninterval MDP created - time:',self.time['4_MDPcreated'])
         
         return model_size
         
@@ -997,55 +975,9 @@ class Abstraction(object):
             split_matrix = np.array([ _split_policy(value) for value in policy_all[:, index] ]).T
             
             self.mdp.MAIN_DF['opt_action'].loc[index]   = split_matrix[0]
-            self.mdp.MAIN_DF['opt_delta'][index]        = split_matrix[1]
-            self.mdp.MAIN_DF['opt_ksucc_id'][index]     = split_matrix[2]
-        
-        # policy = dict()
-        
-        # self.results['policy'] = {'action': {}, 'delta': {}}
-        
-        # for idx, delta in enumerate(self.setup.all_deltas):
+            self.mdp.MAIN_DF['opt_delta'].loc[index]    = split_matrix[1]
+            self.mdp.MAIN_DF['opt_ksucc_id'].loc[index] = split_matrix[2]
             
-        #     # Starting column to extract
-        #     if idx == 0:
-        #         col_start = 0
-        #     else:
-        #         col_start = int(sum(self.mdp.nr_states_per_delta[0:idx]))
-            
-        #     # Number of columns to extract
-        #     col_end = col_start + self.mdp.nr_states_per_delta[idx]
-            
-        #     '''
-        #     if delta == 1:
-        #         policy[delta] = extractRowBlockDiag(policy_all[:, col_start:col_end], self.mdp.nr_regions)
-        #     '''
-            
-        #     policy[delta] = policy_all[:, col_start:col_end]
-
-        #     self.results['policy']['action'][delta] = np.zeros(np.shape(policy[delta]))
-        #     self.results['policy']['delta'][delta]  = np.zeros(np.shape(policy[delta]))
-            
-        #     # Split the optimal policy between delta and action itself
-        #     for i,row in enumerate(policy[delta]):
-                
-        #         for j,value in enumerate(row):
-                    
-        #             if value == 'step':
-        #                 # If action is to wait one step (for jump delta)
-        #                 self.results['policy']['action'][delta][i,j] = int(-2)
-        #                 self.results['policy']['delta'][delta][i,j] = int(-2) 
-                        
-        #             elif value != -1:
-        #                 # Split string
-        #                 value_split = value.split('_')
-        #                 # Store action and delta value separately
-        #                 self.results['policy']['action'][delta][i,j] = int(value_split[0])
-        #                 self.results['policy']['delta'][delta][i,j] = int(value_split[1])
-                        
-        #             else:
-        #                 # If no policy is known, set to -1
-        #                 self.results['policy']['action'][delta][i,j] = int(value)
-        #                 self.results['policy']['delta'][delta][i,j] = int(value) 
                     
     def generatePlots(self, delta_value, max_delta, case_id, writer,
                       iterative_results=None):

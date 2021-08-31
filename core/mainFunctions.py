@@ -428,8 +428,8 @@ def covarianceEllipseSize(cov):
     min_eigenval = eigenval[np.argmin(eigenval)]
     
     # Determine width parameter of ellipse
-    max_ellipse_size = np.sqrt( max_eigenval )
-    min_ellipse_size = np.sqrt( min_eigenval )
+    max_ellipse_size = np.sqrt( max(0, max_eigenval) )
+    min_ellipse_size = np.sqrt( max(0, min_eigenval) )
     
     return max_ellipse_size, min_ellipse_size
 

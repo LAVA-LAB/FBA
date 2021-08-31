@@ -189,14 +189,6 @@ class mdp(object):
             'k_max': [item for sublist in k_max_list for item in sublist],
             }
         
-        # print(len(DF_DATA['state']))
-        # print(len(DF_DATA['region']))
-        # print(len(DF_DATA['delta']))
-        # print(len(DF_DATA['stoch']))
-        # print(len(DF_DATA['k']))
-        # print(len(DF_DATA['k_id_start']))
-        # print(len(DF_DATA['k_max']))
-        
         self.MAIN_DF = pd.DataFrame(data = DF_DATA)
         
         # Define PRISM filename
@@ -349,9 +341,6 @@ class mdp(object):
                             # Proceed according to base rate
                             succ_rep_start = row['k_id_start'] + 1*self.nr_regions
                             k_prime = row['k'] + 1
-                            
-                        
-                        # print('call action for delta',delta,'k_prime',k_prime,'action',a)
                         
                         # Call function to write transitions for this S-A pair
                         action_string[a_idx], transitions_plus = \
@@ -373,7 +362,7 @@ class mdp(object):
         flatten = lambda t: [item for sublist in t for subsublist in sublist for item in subsublist]
         transition_file_flat = '\n'.join(flatten(transition_file_list))
         
-        print(' ---- String ready; write to file...')
+        print(' String ready; write to file...')
         
         # Header contains nr of states, choices, and transitions
         size_states = self.nr_states + self.overhead
@@ -409,8 +398,6 @@ def writePRISMtrans(trans, delta, k_prime, a, mode, string_start, succ_rep_start
     
     # Define name of action
     actionLabel = str(a)+"_"+str(delta)+"_"+str(succ_rep_start)
-    
-    # print('Delta:',delta,'k_prime:',k_prime,'action',a)
     
     if mode == 'interval':
                         
