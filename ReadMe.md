@@ -99,17 +99,18 @@ $ pip3 install -r requirements.txt
 
 The following packages will be installed:
 
+- cvxpy==1.1.15
 - imageio==2.9.0 (needed for visvis)
-- matplotlib==3.2.2
-- numpy==1.18.5
-- pandas==1.0.5
+- matplotlib==3.3.4
+- numpy==1.20.1
+- pandas==1.3.2
 - pyopengl==3.1.5 (needed for visvis)
 - pyqt5==5.15.4 (needed for visvis)
-- scipy==1.5.0
-- seaborn==0.10.1
-- xlrd==1.2.0
-- xlsxwriter==1.2.9
+- scipy==1.6.2
+- seaborn==0.11.2
 - visvis==1.12.4 (to create 3D UAV plots)
+- xlrd==2.0.1
+- xlsxwriter==3.0.1
 
 ## 5. Set default folders and options
 
