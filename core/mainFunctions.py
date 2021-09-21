@@ -368,8 +368,6 @@ def steadystateCovariance_sdp(covariances, verbose=False):
             # Plot current ellipse
             confidence_ellipse(mean, cov, ax, n_std=1, edgecolor='firebrick')
         
-        print('cov is:',cov)
-        
         # Increase eigenvalues artificially if some are zero
         if not is_invertible(cov):
         
