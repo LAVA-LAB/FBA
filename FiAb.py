@@ -10,7 +10,6 @@ Created on Wed Jun  9 17:15:52 2021
 # Load general packages
 import pandas as pd             # Import Pandas to store data in frames
 import numpy as np              # Import Numpy for computations
-import math                     # Import Math for mathematical operations
 import matplotlib.pyplot as plt # Import Pyplot to generate plots
 
 # Load main classes and methods
