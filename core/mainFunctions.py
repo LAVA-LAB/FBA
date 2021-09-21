@@ -374,7 +374,7 @@ def steadystateCovariance_sdp(covariances, verbose=False):
         if not is_invertible(cov):
         
             eigvals, eigvecs = np.linalg.eig(cov)
-            eigvals = np.maximum(1e-9, eigvals)
+            eigvals = np.maximum(1e-6, eigvals)
             cov = eigvecs @ np.diag(eigvals) @ np.linalg.inv(eigvecs)
         
         constraints_w += [X_w >> cov]
