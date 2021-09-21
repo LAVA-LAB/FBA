@@ -82,9 +82,6 @@ def filterBasedScheme(Ab, case_id):
         policy_df.to_excel(writer, sheet_name='Optimal policy')
         delta_df.to_excel(writer, sheet_name='Optimal delta')
         reward_df.to_excel(writer, sheet_name='Optimal reward')
-        
-    # Initialize plotting
-    Ab.preparePlots()
     
     if Ab.setup.montecarlo['enabled']:
         # Perform monte carlo simulation for validation purposes

@@ -24,11 +24,11 @@ import core.preprocessing.user_interface as ui
 import core.masterClasses as master
 from .commons import setStateBlock, defSpecBlock
 
-class robot(master.LTI_master):
+class double_integrator(master.LTI_master):
     
     def __init__(self):
         '''
-        Initialize robot model class, which is a 1-dimensional dummy problem
+        Initialize double_integrator class, which is a 1D dummy problem
 
         Returns
         -------
@@ -48,8 +48,8 @@ class robot(master.LTI_master):
         self.control['limits']['uMax'] =  [5]
         
         # Partition size
-        self.partition['nrPerDim']  = [21, 21] #[11, 11] 
-        self.partition['width']     = [2, 2] #[0.25, 0.25]
+        self.partition['nrPerDim']  = [21, 21]
+        self.partition['width']     = [2, 2] 
         self.partition['origin']    = [0, 0]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
@@ -58,7 +58,7 @@ class robot(master.LTI_master):
 
         # Specification information
         self.spec['goal']     = {1: defSpecBlock(self.partition, a=[-2,2], b=[-2,2])}
-        self.spec['critical'] = {1: defSpecBlock(self.partition, a=[9.9,10.1], b=None)}
+        self.spec['critical'] = {}#{1: defSpecBlock(self.partition, a=[9,11], b=None)}
         
         # Step-bound on property
         self.endTime = 32#64
@@ -144,7 +144,7 @@ class UAV(master.LTI_master):
             self.control['limits']['uMax'] = [4, 4]        
     
             # Partition size
-            self.partition['nrPerDim']  = [11,5,11,5]
+            self.partition['nrPerDim']  = [9,5,9,5]
             self.partition['width']     = [2, 1.5, 2, 1.5]
             self.partition['origin']    = [0, 0, 0, 0]
             
@@ -237,6 +237,8 @@ class UAV(master.LTI_master):
                 
                 self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.15
                 
+            self.filter = {'cov0': np.diag([1, .01, 1, .01, 1, .01])}
+                
         else:
             self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock)
             self.LTI['B']  = scipy.linalg.block_diag(Bblock, Bblock)
@@ -249,13 +251,12 @@ class UAV(master.LTI_master):
         
             if observer:
                 # Observation matrix
-                self.LTI['C']          = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
+                self.LTI['C']          = np.diag([1,1,1,1,]) #np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
                 self.LTI['r']          = len(self.LTI['C'])
                 
-                self.LTI['noise']['v_cov'] = 1*np.eye(np.size(self.LTI['C'],0))*0.2
-                
-        if observer:
-            self.filter = {'cov0': np.diag([8, .01, 4, .01])}
+                self.LTI['noise']['v_cov'] = 0.001*np.eye(np.size(self.LTI['C'],0))*0.2
+
+                self.filter = {'cov0': np.diag([4, .01, 4, .01])}
             
         # Determine system dimensions
         self.LTI['n'] = np.size(self.LTI['A'],1)
@@ -469,7 +470,7 @@ class building_1room(master.LTI_master):
         
         # Set value of delta (how many time steps are grouped together)
         # Used to make the model fully actuated
-        self.deltas = [1]
+        self.base_delta = 1
         
         # Let the user make a choice for the model dimension
         _, gridType  = ui.user_choice('grid size',['19x20','40x40'])
@@ -583,4 +584,225 @@ class building_1room(master.LTI_master):
         
         self.LTI['noise']['w_cov'] = np.diag([ BAS.Zone1['Tz']['sigma'], BAS.Radiator['rw']['sigma'] ])
 
+class shuttle(master.LTI_master):
+    
+    def __init__(self):
+        '''
+        Initialize the spaceshuttle rendezvous model class.
+
+        Returns
+        -------
+        None.
+
+        '''
         
+        # Initialize superclass
+        master.LTI_master.__init__(self)
+        
+        # Set value of delta (how many time steps are grouped together)
+        # Used to make the model fully actuated
+        self.base_delta = 2
+        
+        # Authority limit for the control u, both positive and negative
+        self.control['limits']['uMin'] = [-0.1, -0.1]
+        self.control['limits']['uMax'] = [0.1, 0.1]
+        
+        # Partition size
+        self.partition['nrPerDim']  = [20, 10, 4, 4]
+        self.partition['width']     = [0.1, 0.1, 0.01, 0.01]
+        self.partition['origin']    = [0, -0.5, 0.01, 0.01]
+        
+        # Number of actions per dimension (if 'auto', then equal to nr of regions)
+        self.targets['nrPerDim']    = 'auto'
+        self.targets['domain']      = 'auto'
+        
+        # Specification information
+        self.spec['goal']     = {1: defSpecBlock(self.partition, a=[-0.2, 0.2], b=[-0.2, 0], c=None, d=None)}
+        
+        self.spec['critical'] = {1: defSpecBlock(self.partition, a=[-1, -0.2], b=[-0.3, 0], c=None, d=None),
+                                 #2: defSpecBlock(self.partition, a=[-1, -0.2], b=[-0.3, -0.2], c=None, d=None),
+                                 2: defSpecBlock(self.partition, a=[-1, -0.3], b=[-0.4, -0.3], c=None, d=None),
+                                 3: defSpecBlock(self.partition, a=[-1, -0.4], b=[-0.5, -0.4], c=None, d=None),
+                                 4: defSpecBlock(self.partition, a=[-1, -0.5], b=[-0.6, -0.5], c=None, d=None),
+                                 5: defSpecBlock(self.partition, a=[-1, -0.6], b=[-0.7, -0.6], c=None, d=None),
+                                 6: defSpecBlock(self.partition, a=[-1, -0.7], b=[-0.8, -0.7], c=None, d=None),
+                                 7: defSpecBlock(self.partition, a=[-1, -0.8], b=[-0.9, -0.8], c=None, d=None),
+                                 8: defSpecBlock(self.partition, a=[-1, -0.9], b=[-1.0, -0.9], c=None, d=None),
+                                 9: defSpecBlock(self.partition, a=[0.2, 1], b=[-0.3, 0], c=None, d=None),
+                                  #11: defSpecBlock(self.partition, a=[0.2, 1], b=[-0.3, -0.2], c=None, d=None),
+                                 10: defSpecBlock(self.partition, a=[0.3, 1], b=[-0.4, -0.3], c=None, d=None),
+                                 11: defSpecBlock(self.partition, a=[0.4, 1], b=[-0.5, -0.4], c=None, d=None),
+                                 12: defSpecBlock(self.partition, a=[0.5, 1], b=[-0.6, -0.5], c=None, d=None),
+                                 13: defSpecBlock(self.partition, a=[0.6, 1], b=[-0.7, -0.6], c=None, d=None),
+                                 14: defSpecBlock(self.partition, a=[0.7, 1], b=[-0.8, -0.7], c=None, d=None),
+                                 15: defSpecBlock(self.partition, a=[0.8, 1], b=[-0.9, -0.8], c=None, d=None),
+                                 16: defSpecBlock(self.partition, a=[0.9, 1], b=[-1.0, -0.9], c=None, d=None),}
+        
+        # Step-bound on property
+        self.endTime = 16
+        
+        self.modelDim = 2
+
+    def setModel(self, observer):           
+        '''
+        Set linear dynamical system.
+
+        Parameters
+        ----------
+        observer : Boolean
+            If True, an observer is created for the model.
+
+        Returns
+        -------
+        None.
+
+        '''
+        self.LTI = {}
+        
+        # Discretization step size
+        self.LTI['tau'] = .7
+        
+        # Defining Deterministic Model corresponding matrices
+        self.LTI['A'] = np.array([[1.000631, 0, 19.9986, 0.410039],
+                            [8.62e-6, 1, -0.41004, 19.9944],
+                            [6.30e-05, 0, 0.99979, 0.041002],
+                            [-1.29e-6, 0, -0.041, 0.999159]])
+        
+        self.LTI['A'] = (self.LTI['A'] - np.eye(4)) / 2 + np.eye(4)
+        
+        self.LTI['B'] = np.array([[0.666643, 0.009112],
+                           [-0.00911, 0.666573],
+                           [0.66662, 0.001367],
+                           [-0.00137, 0.66648]]) / 2
+        
+        self.LTI['Q'] = np.zeros((4,1))
+        
+        # Determine system dimensions
+        self.LTI['n'] = np.size(self.LTI['A'],1)
+        self.LTI['p'] = np.size(self.LTI['B'],1)
+
+        self.LTI['noise'] = dict()
+        self.LTI['noise']['w_cov'] = 10*np.diag([ 1e-4, 1e-4, 5e-8, 5e-8 ])
+        
+        if observer:
+            # Observation matrix
+            self.LTI['C']          = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
+            self.LTI['r']          = len(self.LTI['C'])
+            
+            self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.000001
+            
+            self.filter = {'cov0': 0.0001*np.diag([.001, .001, .0001, .0001])}
+               
+class anaesthesia(master.LTI_master):
+    
+    def __init__(self):
+        '''
+        Initialize the sanaesthesia delivery model class.
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        # Initialize superclass
+        master.LTI_master.__init__(self)
+        
+        # Set value of delta (how many time steps are grouped together)
+        # Used to make the model fully actuated
+        self.base_delta = 3
+        
+        # Authority limit for the control u, both positive and negative
+        self.control['limits']['uMin'] = [0]
+        self.control['limits']['uMax'] = [7]
+        
+        # Partition size
+        self.partition['nrPerDim']  = [11, 11, 11]
+        self.partition['width']     = [.01, .01, .01]
+        self.partition['origin']    = [5, 5, 5]
+        
+        # Number of actions per dimension (if 'auto', then equal to nr of regions)
+        self.targets['nrPerDim']    = 'auto'
+        self.targets['domain']      = 'auto'
+        
+        # Specification information
+        self.spec['goal']     = {1: defSpecBlock(self.partition, a=[4.9, 5.1], b=[4.9, 5.1], c=[4.9, 5.1])}
+        self.spec['critical'] = {}
+        
+        # Step-bound on property
+        self.endTime = 16
+        
+        self.modelDim = 3
+
+    def setModel(self, observer):           
+        '''
+        Set linear dynamical system.
+
+        Parameters
+        ----------
+        observer : Boolean
+            If True, an observer is created for the model.
+
+        Returns
+        -------
+        None.
+
+        '''
+        self.LTI = {}
+        
+        # Discretization step size
+        self.LTI['tau'] = 1
+        
+        '''
+        k10 = 0.4436
+        k12 = 0.1140
+        k13 = 0.0419
+        k21 = 0.550
+        k31 = 0.0033
+        V1  = 16.044
+        
+        # Defining Deterministic Model corresponding matrices
+        self.LTI['A'] = np.array([
+                            [-(k10+k12+k13),    k12,    k13],
+                            [k21,               -k21,   0],
+                            [k31,               0,      -k31],
+                            ])
+        
+        self.LTI['B'] = np.array([
+                           [1/V1],
+                           [0],
+                           [0]
+                           ]) / 2
+        '''
+        
+        # Defining Deterministic Model corresponding matrices
+        self.LTI['A'] = np.array([
+                            [0.8192,    0.3412,    0.1265],
+                            [0.1646,   0.9822,     0.0001],
+                            [0.09,    0.00002,    0.9989],
+                            ])
+        
+        self.LTI['B'] = np.array([
+                           [0.01883],
+                           [0.02],
+                           [0.001]
+                           ])
+        
+        self.LTI['Q'] = np.zeros((3,1))
+        
+        # Determine system dimensions
+        self.LTI['n'] = np.size(self.LTI['A'],1)
+        self.LTI['p'] = np.size(self.LTI['B'],1)
+
+        self.LTI['noise'] = dict()
+        self.LTI['noise']['w_cov'] = 10**-3 * np.eye(3)
+        
+        if observer:
+            # Observation matrix
+            self.LTI['C']          = np.eye(3)
+            self.LTI['r']          = len(self.LTI['C'])
+            
+            self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.0001
+            
+            self.filter = {'cov0': np.diag([.001, .001, .001])}
+               

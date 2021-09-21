@@ -115,10 +115,11 @@ if setup.main['mode'] == 'Filter':
 else:
     system.setModel(observer=False)
     
-setup.lic = {'jump_factors': []}
-setup.mdp['k_steady_state'] = 2
+setup.lic = {'jump_factors': [2,4]}
+setup.mdp['k_steady_state'] = 4
 setup.main['covarianceMode'] = ['SDP','iterative'][0]
 setup.main['interval_margin'] = 0.001
+setup.precision = 5
 
 # If TRUE monte carlo simulations are performed
 _, choice = user_choice( \

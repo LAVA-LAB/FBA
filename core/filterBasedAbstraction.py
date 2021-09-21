@@ -66,12 +66,15 @@ class filterBasedAbstraction(Abstraction):
         # Compute array of all region centers
         allCentersArray = np.array([region['center'] for region in self.abstr['P'].values()])
         
+        self.abstr['action_distances'] = dict()
+        
         for a in range(self.abstr['nr_actions']):
             
-            self.abstr['P'][a]['distances'] = self.abstr['target']['d'][a] - allCentersArray
+            self.abstr['action_distances'][a] = self.abstr['target']['d'][a] - allCentersArray
             
             
-    def _computeProbabilityBounds(self, tab, Sigma_worst, Sigma_best, actions_inv, GOAL, CRITICAL, verbose=True):
+    def _computeProbabilityBounds(self, tab, Sigma_worst, Sigma_best, 
+                                  actions_inv, GOAL, CRITICAL, verbose=True):
         '''
         Compute transition probability intervals (bounds)
 
@@ -119,6 +122,9 @@ class filterBasedAbstraction(Abstraction):
         prob_worst_mem = dict()
         prob_best_mem  = dict()
         
+        # Initialize switch to show warning only once
+        warningSwitch = False
+        
         # For every action (i.e. target point)
         for a in range(self.abstr['nr_actions']):
             
@@ -152,7 +158,7 @@ class filterBasedAbstraction(Abstraction):
                     ### 1) Main transition probability
                     # Compute the vector difference between the target point
                     # and the current region
-                    coord_distance = self.abstr['P'][a]['distances'][j]
+                    coord_distance = self.abstr['action_distances'][a][j]
                     
                     if any(np.abs(coord_distance) > limit_norm):
                         skipped_counter += 1
@@ -247,6 +253,20 @@ class filterBasedAbstraction(Abstraction):
                                 lims[:,0], lims[:,1], muCubic, SigmaCubic_best)[0] 
                                 for lims in all_limits.values()
                                 ]), threshold_decimals)
+                        
+                        # Prob. to reach critical cannot exceed whole probability to reach region
+                        if not warningSwitch and (prob_critical_worst > probs_worst + 1e-4 or 
+                                                  prob_critical_best > probs_best + 1e-4):
+                        
+                            # Only show this warning once per action iteration
+                            warningSwitch = True
+                            
+                            print(' >> Warning: Prob. to reach critical higher than overall prob.\n',
+                                  '>> Can be caused by overlapping critical regions\n',
+                                  '>> Further warnings are supressed')
+                            
+                            prob_critical_worst = min(probs_worst, prob_critical_worst)
+                            prob_critical_best  = min(probs_best, prob_critical_best)
                         
                     else:
                         prob_critical_worst = 0
@@ -346,6 +366,75 @@ class filterBasedAbstraction(Abstraction):
                        ' (skipped: '+str(skipped_counter)+')'])
                 
         return prob
+    
+    def _initProbabilityBounds(self, Sigma_worst, Sigma_best, GOAL, CRITICAL, verbose=True):
+        '''
+        Compute transition probability intervals (bounds) for the initial time step
+
+        Parameters
+        ----------
+        
+
+        Returns
+        -------
+        prob : dict
+            Dictionary containing the computed transition probabilities.
+
+        '''
+
+        threshold_decimals = 4 # Minimum probability to model
+                
+        # Transform covariance back to hypercubic partition
+        if self.setup.main['skewed']:
+            SigmaCubic_worst = self.abstr['basis_vectors_inv'].T @ Sigma_worst @ self.abstr['basis_vectors_inv'] 
+            SigmaCubic_best  = self.abstr['basis_vectors_inv'].T @ Sigma_best @ self.abstr['basis_vectors_inv'] 
+        else:
+            SigmaCubic_worst = Sigma_worst
+            SigmaCubic_best  = Sigma_best
+        
+        ######
+        
+        # Initializ the probability lists
+        prob_goal = np.zeros(self.abstr['nr_regions'])
+        prob_critical = np.zeros(self.abstr['nr_regions'])
+        
+        for j in self.abstr['P'].keys():
+            
+            # Retrieve and transform mean of distribution
+            mu = self.abstr['P'][j]['center']
+            
+            if self.setup.main['skewed']:
+                muCubic = skew2cubic(mu, self.abstr)
+            else:
+                muCubic = mu
+                
+            ### Probability to be already in goal state
+            
+            prob_goal_worst = floor_decimal(sum([mvn.mvnun(
+                 list(lims['limits'][:,0]), list(lims['limits'][:,1]), muCubic, SigmaCubic_worst)[0] 
+                 for lims in GOAL.values()
+                 ]), 6)
+            prob_goal_best = floor_decimal(sum([mvn.mvnun(
+                 list(lims['limits'][:,0]), list(lims['limits'][:,1]), muCubic, SigmaCubic_best)[0] 
+                 for lims in GOAL.values()
+                 ]), 6)
+                
+            prob_goal[j] = min(prob_goal_worst, prob_goal_best)
+        
+            ### Probability to be already in critical state 
+                    
+            prob_critical_worst = floor_decimal(sum([mvn.mvnun(
+                list(lims['limits'][:,0]), list(lims['limits'][:,1]), muCubic, SigmaCubic_worst)[0] 
+                for lims in CRITICAL.values()
+                ]), threshold_decimals)
+            prob_critical_best = floor_decimal(sum([mvn.mvnun(
+                list(lims['limits'][:,0]), list(lims['limits'][:,1]), muCubic, SigmaCubic_best)[0] 
+                for lims in CRITICAL.values()
+                ]), threshold_decimals)
+               
+            prob_critical[j] = max(prob_critical_worst, prob_critical_best)
+                
+        return {'prob_goal': prob_goal, 'prob_critical': prob_critical}
     
     def KalmanPrediction(self):
         '''
@@ -475,13 +564,27 @@ class filterBasedAbstraction(Abstraction):
         
         ######
         
+        # Compute the probability that we already start in a goal / critical state
+        goal        = self.system.spec['goal']
+        critical    = self.system.spec['critical']
+        
+        Sigma_worst = self.km[1][0]['cov']
+        Sigma_best  = self.km[1][0]['cov']
+        
+        print('Compute transition probabilities for initial time step')
+        
+        self.trans['prob'][1][0] = \
+            self._initProbabilityBounds(Sigma_worst, Sigma_best, goal, critical)
+        
+        ######
+        
         # Compute transition probabilities at the base rate
         # For every time step in the horizon
         for k in k_range:
             
-            k_prime = k + 1
-            goal = self.abstr['goal']['X'][k_prime]
-            critical = self.abstr['critical']['X'][k_prime]
+            k_prime     = k + 1
+            goal        = self.abstr['goal']['X'][k_prime]
+            critical    = self.abstr['critical']['X'][k_prime]
             
             Sigma_worst = self.km[1][k_prime]['cov_tilde']
             Sigma_best  = self.km[1][k_prime]['cov_tilde']
@@ -501,9 +604,9 @@ class filterBasedAbstraction(Abstraction):
         # If 2-phase time horizon is enabled...
         if self.setup.mdp['k_steady_state'] != None:
             
-            k_prime = self.setup.mdp['k_steady_state'] + 1
-            goal = self.abstr['goal']['X'][k_prime]
-            critical = self.abstr['critical']['X'][k_prime]
+            k_prime     = self.setup.mdp['k_steady_state'] + 1
+            goal        = self.abstr['goal']['X'][k_prime]
+            critical    = self.abstr['critical']['X'][k_prime]
             
             Sigma_worst = self.km[1]['steady']['worst']
             Sigma_best  = self.km[1]['steady']['best']
@@ -697,13 +800,13 @@ class MonteCarloSim():
             x_cubic = skew2cubic(x[k], self.abstr)
             
             cubic_center_x = computeRegionCenters(x_cubic, 
-                                    self.system.partition).flatten()
+                    self.system.partition, self.setup.precision).flatten()
             
             # Determine in which region the BELIEF MEAN is
             mu_cubic = skew2cubic(mu[k], self.abstr)
             
             cubic_center_mu = computeRegionCenters(mu_cubic, 
-                                    self.system.partition).flatten()
+                    self.system.partition, self.setup.precision).flatten()
             
             # Check if the state is in a goal region
             if self._stateInGoal( point=x_cubic ):
@@ -757,6 +860,7 @@ class MonteCarloSim():
                 
                 if self.setup.main['verbose']:
                     self.tab.print_row([r, m, k, 'Absorbing state reached, so abort'], sort="Warning")
+                    self.tab.print_row([r, m, k, 'Mean of belief at:'+str(mu_cubic)], sort="Warning")
                 return trace, success
             
             ###

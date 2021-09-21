@@ -27,7 +27,7 @@ from .mainFunctions import definePartitions, computeRegionOverlap, \
     in_hull, makeModelFullyActuated, cubic2skew, skew2cubic, point_in_hull
 from .commons import tocDiff, printWarning, findMinDiff, tic, ticDiff, \
     extractRowBlockDiag
-from .postprocessing.createPlots import createPartitionPlot
+from .postprocessing.createPlots import partitionPlot2D, partitionPlot3D
 
 from .createMDP import mdp
 
@@ -66,11 +66,8 @@ class Abstraction(object):
         print(' -- Dimension of the state:',self.system.LTI['n'])
         print(' -- Dimension of the control input:',self.system.LTI['p'])
         
-        # Simulation end time is the end time
-        self.T  = self.system.endTime
-        
         # Number of simulation time steps
-        self.N = int(self.T) #/self.system.LTI['tau'])
+        self.N = int(self.system.endTime)
         
         # Reduce step size as much as possible
         base_delta = self.setup.base_delta
@@ -170,7 +167,8 @@ class Abstraction(object):
         abstr['nr_regions'] = len(abstr['P'])
         abstr['origin'] = self.system.partition['origin']
         
-        centerTuples = [tuple(region['center']) for region in abstr['P'].values()] 
+        centerTuples = [tuple(np.round(region['center'], self.setup.precision)) 
+                              for region in abstr['P'].values()] 
         
         abstr['allCentersCubic'] = dict(zip(centerTuples, 
                                        abstr['P'].keys()))
@@ -246,7 +244,7 @@ class Abstraction(object):
                             goalAnywhere = True
                         
         if typ == "goal" and goalAnywhere is False:
-            printWarning('Warning: the augmented goal region is not contained in any region')
+            printWarning('Warning: the augmented goal region is not contained in any region (epsilon='+str(epsilon)+')')
         
         return limits_overlap
     
@@ -297,6 +295,13 @@ class Abstraction(object):
         
         return Delaunay(points, qhull_options='QJ')
     
+    def _stateInCritical(self, point):
+    
+        if any([in_hull( point, block['hull'] ) for block in self.system.spec['critical'].values()]):
+            return True
+        else:
+            return False
+    
     def _createTargetPoints(self):
         '''
         Create target points, based on the vertices given
@@ -332,7 +337,11 @@ class Abstraction(object):
         else:
         
             # Set default target points to the center of every region
-            target['d'] = [region['center'] for region in self.abstr['P'].values()]
+            target['d'] = [region['center'] for region in self.abstr['P'].values() 
+                           if not self._stateInCritical(region['center']) ] #+ \
+                #[np.array([0,-.1, 0.01, 0.01])]
+        
+        print(target['d'])
         
         targetPointTuples = [tuple(point) for point in target['d']]        
         target['inv'] = dict(zip(targetPointTuples, range(len(target['d']))))
@@ -528,8 +537,12 @@ class Abstraction(object):
         np.set_printoptions(threshold=sys.maxsize)
         
         # Put goal regions up front of the list of actions
+        '''
         action_range = f7(np.concatenate(( list(self.abstr['goal']['X'][0].keys()),
                            np.arange(self.abstr['nr_actions']) )))
+        '''
+        
+        action_range = np.arange(self.abstr['nr_actions']) 
         
         print('\nStart to compute the set of enabled actions...')
         
@@ -540,16 +553,19 @@ class Abstraction(object):
             
             # If system is 'robot', than only enable jump actions if the velocity
             # is zero
-            if self.system.name == 'robot' and delta != 1 and targetPoint[1] != 0:
+            if self.system.name == 'double_integrator' and delta != 1 and targetPoint[1] != 0:
                 continue
             
             # If system is UAV and local information controllers are enabled
             elif self.system.name == 'UAV' and delta != 1:
                 # Skip if any velocity component is notzero (because the 
                 # required waiting will not be enabled anyways)
-                if self.system.LTI['n'] == 4 and any(targetPoint[[1,3]] != 0) or \
-                   self.system.LTI['n'] == 6 and any(targetPoint[[1,3,5]] != 0):
-                       continue
+                # if self.system.LTI['n'] == 4 and any(targetPoint[[1,3]] != 0) or \
+                #    self.system.LTI['n'] == 6 and any(targetPoint[[1,3,5]] != 0):
+                #        continue
+                   
+                if action_id not in [772, 1002, 1682, 1692, 1477, 1027, 577]:
+                    continue
             
             if dimEqual:
             
@@ -600,10 +616,16 @@ class Abstraction(object):
                 
                 # Partition plot for the goal state, also showing pre-image
                 print('Create partition plot...')
-                    
-                createPartitionPlot((0,1), (2,3), self.abstr['goal']['X'][0], 
+                
+                partitionPlot2D((0,1), (2,3), self.abstr['goal']['X'][0], 
                     delta, self.setup, self.model[delta], self.system.partition, self.abstr, 
                     self.abstr['allVertices'], predecessor_set)
+            
+                # If number of dimensions is 3, create 3D plot
+                if self.system.LTI['n'] == 3:
+                    
+                    partitionPlot3D(self.setup, self.model[delta], 
+                                    self.abstr['allVertices'], predecessor_set)
             
             # Retreive the ID's of all states in which the action is enabled
             enabled_in_states[action_id] = np.nonzero(enabled_in)[0]
@@ -892,30 +914,6 @@ class Abstraction(object):
         subprocess.Popen(command, shell=True).wait()    
         
         return policy_file, vector_file
-    
-    def preparePlots(self):
-        '''
-        Initializing function to prepare for plotting
-
-        Returns
-        -------
-        None.
-
-        '''
-        
-        # Process results
-        self.plot           = dict()
-    
-        for delta_idx, delta in enumerate(self.setup.all_deltas):
-            self.plot[delta] = dict()
-            self.plot[delta]['N'] = dict()
-            self.plot[delta]['T'] = dict()
-            
-            self.plot[delta]['N']['start'] = 0
-            
-            # Convert index to absolute time (note: index 0 is time tau)
-            self.plot[delta]['T']['start'] = \
-                int(self.plot[delta]['N']['start'] * self.system.LTI['tau'])
                 
     def loadPRISMresults(self, policy_file, vector_file):
         '''
@@ -962,6 +960,20 @@ class Abstraction(object):
         self.mdp.opt_reward = pd.read_csv(vector_file, header=None).iloc[
                 ovh:ovh+self.mdp.nr_regions].to_numpy().flatten()
         
+        #####
+        
+        # Compensate in the optimal reachability probabability for the prob.
+        # that we already started in a goal/critical state. This is on itself
+        # not modeled in the iMDP, so we must do it here. Note that this has no
+        # effect on the optimal policy.
+        
+        pI_goal = self.trans['prob'][1][0]['prob_goal']
+        pI_crit = self.trans['prob'][1][0]['prob_critical']
+        
+        self.mdp.opt_reward = pI_goal + (1-pI_goal-pI_crit)*self.mdp.opt_reward
+        
+        #####
+        
         # Initialize policy columns to dataframe
         cols = ['opt_action', 'opt_delta', 'opt_ksucc_id']
         for col in cols:
@@ -1005,8 +1017,7 @@ class Abstraction(object):
             from .postprocessing.createPlots import createProbabilityPlots
             
             if self.setup.plotting['probabilityPlots']:
-                createProbabilityPlots(self.setup, self.plot[delta_value], 
-                                       self.N, self.model[delta_value],
+                createProbabilityPlots(self.setup, self.model[delta_value]['n'],
                                        self.system.partition,
                                        self.mdp, self.abstr, self.mc)
                     
@@ -1015,19 +1026,19 @@ class Abstraction(object):
             printWarning("Omit probability plots (nr. of regions too large)")
             
         # The code below plots the trajectories
-        if self.system.name in ['UAV']:
+        if self.system.name in ['UAV', 'shuttle']:
             
             from core.postprocessing.createPlots import trajectoryPlot
         
             # Create trajectory plot
-            performance_df = trajectoryPlot(self, case_id, writer)
+            performance_df, _ = trajectoryPlot(self, case_id, writer)
             
             if self.setup.main['iterative'] is True and iterative_results != None:
                 performance = pd.concat(
                     [iterative_results['performance'], performance_df], axis=0)
     
         # The code below plots the heat map
-        if self.system.name in ['building_1room','building_2room','robot','UAV'] or \
+        if self.system.name in ['building_1room','building_2room','double_integrator','UAV'] or \
             (self.system.name == 'UAV' and self.system.modelDim == 2):
             
             from core.postprocessing.createPlots import reachabilityHeatMap

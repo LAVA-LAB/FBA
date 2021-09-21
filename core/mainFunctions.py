@@ -53,7 +53,7 @@ def point_in_hull(queries, hull):
     
     return np.all(queries @ equations[:-1] < - equations[-1], axis=1)
 
-def computeRegionCenters(points, partition):
+def computeRegionCenters(points, partition, precision):
     '''
     Function to compute to which region (center) a list of points belong
 
@@ -102,7 +102,7 @@ def computeRegionCenters(points, partition):
             centers[:,q] = (pointsShift[:,q] // region_width[q]) * region_width[q] + 0.5*region_width[q]
     
     # Add the origin again to obtain the absolute center coordinates
-    return centers + originShift
+    return np.round(centers + originShift, precision)
 
 def loadScenarioTable(tableFile):
     '''

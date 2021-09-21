@@ -124,9 +124,6 @@ def iterativeScheme(Ab):
             # Load results
             Ab.loadPRISMresults(policy_file, vector_file)
         
-        # Initialize plotting
-        Ab.preparePlots()
-        
         if Ab.setup.montecarlo['enabled']:
             # Perform monte carlo simulation for validation purposes
             

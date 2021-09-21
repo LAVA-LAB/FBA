@@ -26,7 +26,7 @@ from matplotlib.patches import Rectangle
 
 from ..commons import printWarning, mat_to_vec, cm2inch, confidence_ellipse
 
-def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, partition, \
+def partitionPlot2D(i_tup, j_tup, j, delta_plot, setup, model, partition, \
                         abstr, allVerticesNested, predecessor_set):
     
     '''
@@ -70,13 +70,18 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, partition, \
         i0 = 0
         i1 = 1
         
+        print(' -- Plot 2D partition plot')
+        
     else:
         i0,i1 = i_tup
         j0,j1 = j_tup
         
         plt.xlabel('$x_'+str(i0)+'$', labelpad=0)
         plt.ylabel('$x_'+str(i1)+'$', labelpad=-10)
+        
+        print(' -- Plot partition plot w.r.t. axes',str(i_tup))
     
+    '''
     for k,poly in enumerate(allVerticesNested):
 
         if model['n'] <= 2 or ( \
@@ -94,15 +99,16 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, partition, \
             ax.plot(polyMat[hull.vertices,i0], polyMat[hull.vertices,i1], lw=1)
             ax.plot([polyMat[hull.vertices[0],i0], polyMat[hull.vertices[-1],i0]], \
                       [polyMat[hull.vertices[0],i1], polyMat[hull.vertices[-1],i1]], lw=1)
+    '''
         
     for k,target_point in enumerate(abstr['target']['d']):
           
-        if model['n'] <= 2 or ( \
-            abstr['P'][k]['center'][j0] == partition['origin'][j0] and \
-            abstr['P'][k]['center'][j1] == partition['origin'][j1]):
+        # if model['n'] <= 2 or ( \
+        #     abstr['P'][k]['center'][j0] == partition['origin'][j0] and \
+        #     abstr['P'][k]['center'][j1] == partition['origin'][j1]):
         
-            # Plot target point
-            plt.scatter(target_point[i0], target_point[i1], c='k', s=6)
+        # Plot target point
+        plt.scatter(target_point[i0], target_point[i1], c='k', s=6)
     
     if setup.plotting['partitionPlot_plotHull']:
         # Plot convex hull of the preimage of the target point
@@ -113,52 +119,72 @@ def createPartitionPlot(i_tup, j_tup, j, delta_plot, setup, model, partition, \
         
     # Set tight layout
     fig.tight_layout()
+    
+    plt.show()
                 
     # Save figure
     filename = setup.directories['outputF']+'partitioning_'+str(delta_plot)+'_coords=('+str(i0)+','+str(i1)+')'
     for form in setup.plotting['exportFormats']:
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
     
-    # If number of dimensions is 3, create 3D plot
-    if model['n'] == 3:
-        
-        fig = plt.figure(figsize=cm2inch(5.33, 4))
-        ax = fig.add_subplot(111, projection="3d")
-        
-        for k,poly in enumerate(allVerticesNested):
+def partitionPlot3D(setup, model, allVerticesNested, predecessor_set):
     
-            # Convert list to numpy array
-            poly = np.array(poly)
-            
-            # Create hull for this partition
-            hull = ConvexHull(poly)
-            
-            # Plot defining corner points
-            for t in range(2**model['n']):
-                # If contained in the inverse image, plot green. blue otherwise
-                '''
-                if enabledPolypoints[j][k, t]:
-                    color = "g"
-                else:
-                    color = "b"
-                '''
+    '''
+    
+    Create partition plot for the current abstraction instance.
+
+    Parameters
+    ----------
+    setup : dict
+        Setup dictionary.
+    model : dict
+        Main dictionary of the LTI system model.
+    allVerticesNested : list
+        Nested lists containing all origin points of all regions.
+    predecessor_set : array
+        Vertices of the predecessor set
+
+    Returns
+    -------
+    None.
+    '''
+        
+    print(' -- Create 3D partition plot')
+    
+    fig = plt.figure(figsize=cm2inch(5.33, 4))
+    ax = fig.add_subplot(111, projection="3d")
+    
+    for k,poly in enumerate(allVerticesNested):
+
+        # Convert list to numpy array
+        poly = np.array(poly)
+        
+        # Create hull for this partition
+        hull = ConvexHull(poly)
+        
+        # Plot defining corner points
+        for t in range(2**model['n']):
+            # If contained in the inverse image, plot green. blue otherwise
+            '''
+            if enabledPolypoints[j][k, t]:
+                color = "g"
+            else:
                 color = "b"
-                ax.scatter(poly[t,0], poly[t,1], poly[t,2], c=color)
-            
-        # Make axis label
-        for i in ["x", "y", "z"]:
-            eval("ax.set_{:s}label('{:s}')".format(i, i))
-    
-        # Set tight layout
-        fig.tight_layout()
-                    
-        # Save figure
-        filename = setup.directories['outputF']+'partitioning'
-        for form in setup.plotting['exportFormats']:
-            plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
+            '''
+            color = "b"
+            ax.scatter(poly[t,0], poly[t,1], poly[t,2], c=color)
         
-    else:
-        print('Number of dimensions is larger than 3, so partition plot omitted')
+    # Make axis label
+    for i in ["x", "y", "z"]:
+        eval("ax.set_{:s}label('{:s}')".format(i, i))
+
+    # Set tight layout
+    fig.tight_layout()
+                
+    # Save figure
+    filename = setup.directories['outputF']+'partitioning'
+    for form in setup.plotting['exportFormats']:
+        plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
 
 def set_axes_equal(ax: plt.Axes):
     """
@@ -184,7 +210,7 @@ def _set_axes_radius(ax, origin, radius):
     ax.set_ylim3d([y - radius, y + radius])
     # ax.set_zlim3d([z - radius, z + radius])
 
-def createProbabilityPlots(setup, plot, N, model, partition, mdp, abstr, mc):
+def createProbabilityPlots(setup, modelDim, partition, mdp, abstr, mc):
     '''
     Create the result plots for the abstraction instance.
 
@@ -192,12 +218,8 @@ def createProbabilityPlots(setup, plot, N, model, partition, mdp, abstr, mc):
     ----------
     setup : dict
         Setup dictionary.
-    plot : dict
-        Dictionary containing info about plot settings
-    N : int
-        Finite time horizon.
-    model : dict
-        Main dictionary of the LTI system model.
+    modelDim : int
+        Dimension of the model.
     mdp : dict
         Dictionary containing all iMDP data
     abstr : dict
@@ -211,11 +233,7 @@ def createProbabilityPlots(setup, plot, N, model, partition, mdp, abstr, mc):
 
     '''
     
-    # Plot 2D probability plot over time
-    
-    if N/2 != round(N/2):
-        printWarning('WARNING: '+str(N/2)+' is no valid integer index')
-        printWarning('Print results for time index k='+str(int(np.floor(N/2)-1))+' instead')
+    # Plot 2D probability plot
     
     if setup.montecarlo['enabled']:
         fig = plt.figure(figsize=cm2inch(14, 7))
@@ -223,14 +241,13 @@ def createProbabilityPlots(setup, plot, N, model, partition, mdp, abstr, mc):
         fig = plt.figure(figsize=cm2inch(8, 6))
     ax = plt.gca()
     
-    if 'start' in plot['N']:
-        # Plot probability reachabilities
-        color = next(ax._get_lines.prop_cycler)['color']
-        
-        plt.plot(mdp.opt_reward, label='k='+str(plot['T']['start']), linewidth=1, color=color)
-        if setup.montecarlo['enabled'] and not setup.montecarlo['init_states']:
-            plt.plot(mc['reachability_probability'], label='Monte carlo (k='+str(plot['T']['start'])+')', \
-                     linewidth=1, color=color, linestyle='dashed')
+    # Plot probability reachabilities
+    color = next(ax._get_lines.prop_cycler)['color']
+    
+    plt.plot(mdp.opt_reward, label='k=0', linewidth=1, color=color)
+    if setup.montecarlo['enabled'] and not setup.montecarlo['init_states']:
+        plt.plot(mc['reachability_probability'], label='Monte carlo (k=0)', \
+                 linewidth=1, color=color, linestyle='dashed')
     
     # Styling plot
     plt.xlabel('States')
@@ -250,7 +267,7 @@ def createProbabilityPlots(setup, plot, N, model, partition, mdp, abstr, mc):
     m = partition['nrPerDim']
     
     # Plot 3D probability plot for selected time steps
-    if model['n'] > 2:
+    if modelDim > 2:
         printWarning('Number of dimensions is larger than 2, so 3D reachability plot omitted')
     
     else:
@@ -268,86 +285,42 @@ def createProbabilityPlots(setup, plot, N, model, partition, mdp, abstr, mc):
         plot3D['x'] = np.reshape(plot3D['x'], (m[0],m[1]))
         plot3D['y'] = np.reshape(plot3D['y'], (m[0],m[1]))
         
-        fig_comb    = plt.figure(figsize=cm2inch(16,5.33))
-        fig_ind     = 0
-        ax_comb     = dict()
-        surf_comb   = dict()
+        # Create figure for 2D probability
+        fig = plt.figure(figsize=cm2inch(8,5.33))
+        ax  = plt.axes(projection='3d')
         
-        time_list = [ [plot['N'][key], plot['T'][key]] for key in plot['N'].keys() ]
+        # Determine matrix of probability values
+        Z   = np.reshape(mdp.opt_reward, (m[0],m[1]))
         
-        for [k,t] in time_list:
-            # Create figure
-            fig = plt.figure(figsize=cm2inch(8,5.33))
-            ax  = plt.axes(projection='3d')
-            
-            # Increase combo figure index
-            fig_ind += 1
-            
-            # Create combo subplot
-            ax_comb[fig_ind]  = fig_comb.add_subplot(1,3,fig_ind, projection="3d")
-
-            # Determine matrix of probability values
-            Z   = np.reshape(mdp.opt_reward, (m[0],m[1]))
-            
-            # Plot the surface
-            surf = ax.plot_surface(plot3D['x'], plot3D['y'], Z, 
-                            cmap=cm.coolwarm, linewidth=0, antialiased=False)
-            
-            # Add subfigure in combined figure
-            surf_comb[fig_ind] = ax_comb[fig_ind].plot_surface(plot3D['x'], plot3D['y'], Z, 
-                            cmap=cm.coolwarm, linewidth=0, antialiased=False)
-            
-            # Customize the z axis
-            ax.set_zlim(0,1)
-            
-            # Add a color bar which maps values to colors.
-            fig.colorbar(surf, shrink=0.5, aspect=5)
-            
-            # Set title and axis format
-            ax.title.set_text('Reachability probability at time k = '+str(t))
-            x_row = mat_to_vec( plot3D['x'] )
-            y_col = mat_to_vec( plot3D['y'] )
-            n_ticks = 5
-            plt.xticks(np.arange(min(x_row), max(x_row)+1, \
-                                 (max(x_row) - min(x_row))/n_ticks ))
-            plt.yticks(np.arange(min(y_col), max(y_col)+1, \
-                                 (max(y_col) - min(y_col))/n_ticks ))
-            plt.tick_params(pad=-3)
-                
-            plt.xlabel('x_1', labelpad=-6)
-            plt.ylabel('x_2', labelpad=-6)
-            
-            # Set tight layout
-            fig.tight_layout()
-            
-            # Save figure
-            filename = setup.directories['outputFcase']+'3d_reachability_k='+str(t)
-            for form in setup.plotting['exportFormats']:
-                plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
-            
-            # Style combined subplot figure
-            ax_comb[fig_ind].set_zlim(0,1)
-            ax_comb[fig_ind].set_title('time k = '+str(t))
-            ax_comb[fig_ind].set_xticks(np.arange(min(x_row), max(x_row)+1, \
-                                 (max(x_row) - min(x_row))/n_ticks ))
-            ax_comb[fig_ind].set_yticks(np.arange(min(y_col), max(y_col)+1, \
-                                 (max(y_col) - min(y_col))/n_ticks ))
-            ax_comb[fig_ind].tick_params(pad=-3)
-            ax_comb[fig_ind].set_xlabel('x_1', labelpad=-6)
-            ax_comb[fig_ind].set_ylabel('x_2', labelpad=-6)
-            
-            '''
-            ax.set_box_aspect([1,1,1])
-            set_axes_equal(ax)
-            ax_comb[fig_ind].set_box_aspect([1,1,1])
-            set_axes_equal(ax_comb[fig_ind])
-            '''
+        # Plot the surface
+        surf = ax.plot_surface(plot3D['x'], plot3D['y'], Z, 
+                        cmap=cm.coolwarm, linewidth=0, antialiased=False)
         
-        # Style combined subplot figure
-        fig_comb.tight_layout()
+        # Customize the z axis
+        ax.set_zlim(0,1)
+        
+        # Add a color bar which maps values to colors.
+        fig.colorbar(surf, shrink=0.5, aspect=5)
+        
+        # Set title and axis format
+        ax.title.set_text('Reachability probability at time k=0')
+        x_row = mat_to_vec( plot3D['x'] )
+        y_col = mat_to_vec( plot3D['y'] )
+        n_ticks = 5
+        plt.xticks(np.arange(min(x_row), max(x_row)+1, \
+                             (max(x_row) - min(x_row))/n_ticks ))
+        plt.yticks(np.arange(min(y_col), max(y_col)+1, \
+                             (max(y_col) - min(y_col))/n_ticks ))
+        plt.tick_params(pad=-3)
+            
+        plt.xlabel('x_1', labelpad=-6)
+        plt.ylabel('x_2', labelpad=-6)
+        
+        # Set tight layout
+        fig.tight_layout()
         
         # Save figure
-        filename = setup.directories['outputFcase']+'3d_reachability_all'
+        filename = setup.directories['outputFcase']+'3d_reachability_k=0'
         for form in setup.plotting['exportFormats']:
             plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
     
@@ -510,7 +483,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
     # Determine desired state IDs
     if Ab.system.name == 'UAV':
         if Ab.system.modelDim == 2:
-            x_init = setStateBlock(Ab.system.partition, a=[-2], b=[0], c=[-6], d=[0])
+            x_init = setStateBlock(Ab.system.partition, a=[-6], b=[0], c=[-6], d=[0])
             
             cut_value = np.zeros(2)
             for i,d in enumerate(range(1, Ab.system.LTI['n'], 2)):
@@ -528,15 +501,20 @@ def trajectoryPlot(Ab, case_id, writer = None):
                     cut_value[i] = 0
                 else:
                     cut_value[i] = Ab.system.partition['width'][d] / 2          
+                    
+    elif Ab.system.name == 'shuttle':
+        x_init = setStateBlock(Ab.system.partition, a=[-0.65], b=[-0.85], c=[0], d=[0])
+        
+        cut_value = np.array([0.005, 0.005])
             
     # Compute all centers of regions associated with points
-    x_init_centers = computeRegionCenters(np.array(x_init), Ab.system.partition)
+    x_init_centers = computeRegionCenters(np.array(x_init), Ab.system.partition, Ab.setup.precision)
     
     # Filter to only keep unique centers
     x_init_unique = np.unique(x_init_centers, axis=0)
     
     state_idxs = [Ab.abstr['allCentersCubic'][tuple(c)] for c in x_init_unique 
-                                   if tuple(c) in Ab.abstr['allCentersCubic']]
+                                   if tuple(list(c)) in Ab.abstr['allCentersCubic']]
     
     print(' -- Perform simulations for initial states:',state_idxs)
     
@@ -588,17 +566,25 @@ def trajectoryPlot(Ab, case_id, writer = None):
             plot_times = np.arange(1, Ab.N+1)
         else:        
             plot_times = [Ab.N]
+        
+        if Ab.system.name == 'UAV':
+            i_show = (0,2)
+            i_hide = (1,3)
             
+        elif Ab.system.name == 'shuttle':
+            i_show = (0,1)
+            i_hide = (2,3)
+        
         filenames = ['' for i in range(len(plot_times))]
             
         # Create list of error bounds
         error_bound_list = [dic['error_bound'] if 'error_bound' in dic else 0 for dic in Ab.km[Ab.setup.base_delta].values()]
         
         for i,plot_time in enumerate(plot_times):
-            filenames[i] = trajectoryPlot2D(plot_time, Ab.N, Ab.setup, 
+            filenames[i] = trajectoryPlot2D(i_show, i_hide, plot_time, Ab.N, Ab.setup, 
                 Ab.model[min_delta], Ab.system.partition,
                 Ab.system.spec, Ab.abstr, 
-                error_bound_list, cut_value, traces, belief_traces)
+                error_bound_list, traces, belief_traces)
 
         if animate:
     
@@ -627,10 +613,10 @@ def trajectoryPlot(Ab, case_id, writer = None):
             UAVplot3d_visvis( Ab.setup, Ab.model[min_delta], 
                  Ab.system.partition, Ab.abstr, traces, cut_value ) 
     
-    return performance_df
+    return performance_df, traces
     
-def trajectoryPlot2D(plot_time, N, setup, model, partition, spec, abstr, max_error_bound, 
-              cut_value, traces, belief_traces = None):
+def trajectoryPlot2D(i_show, i_hide, plot_time, N, setup, model, partition, spec, abstr, max_error_bound, 
+              traces, belief_traces = None):
     '''
     Create 2D trajectory plots for the 2D UAV benchmark
 
@@ -644,8 +630,6 @@ def trajectoryPlot2D(plot_time, N, setup, model, partition, spec, abstr, max_err
         Dictionay containing all information of the finite-state abstraction.
     traces : list
         Nested list containing the trajectories (traces) to plot for
-    cut_value : array
-        Values to create the cross-section for
 
     Returns
     -------
@@ -655,8 +639,8 @@ def trajectoryPlot2D(plot_time, N, setup, model, partition, spec, abstr, max_err
     
     from scipy.interpolate import interp1d
     
-    ix = 0
-    iy = 2
+    is1, is2 = i_show
+    ih1, ih2 = i_hide
     
     fig, ax = plt.subplots(figsize=cm2inch(6.1, 5))
     
@@ -669,11 +653,11 @@ def trajectoryPlot2D(plot_time, N, setup, model, partition, spec, abstr, max_err
     min_xy = partition['origin'] - domainMax
     max_xy = partition['origin'] + domainMax
     
-    major_ticks_x = np.arange(min_xy[ix]+1, max_xy[ix]+1, 4*width[ix])
-    major_ticks_y = np.arange(min_xy[iy]+1, max_xy[iy]+1, 4*width[iy])
+    major_ticks_x = np.arange(min_xy[is1]+1, max_xy[is1]+1, 4*width[is1])
+    major_ticks_y = np.arange(min_xy[is2]+1, max_xy[is2]+1, 4*width[is2])
     
-    minor_ticks_x = np.arange(min_xy[ix], max_xy[ix]+1, width[ix])
-    minor_ticks_y = np.arange(min_xy[iy], max_xy[iy]+1, width[iy])
+    minor_ticks_x = np.arange(min_xy[is1], max_xy[is1]+1, width[is1])
+    minor_ticks_y = np.arange(min_xy[is2], max_xy[is2]+1, width[is2])
     
     ax.set_xticks(major_ticks_x)
     ax.set_yticks(major_ticks_y)
@@ -689,8 +673,8 @@ def trajectoryPlot2D(plot_time, N, setup, model, partition, spec, abstr, max_err
     plt.grid(which='minor', color='#CCCCCC', linewidth=0.3)
     
     # Goal x-y limits
-    ax.set_xlim(min_xy[ix], max_xy[ix])
-    ax.set_ylim(min_xy[iy], max_xy[iy])
+    ax.set_xlim(min_xy[is1], max_xy[is1])
+    ax.set_ylim(min_xy[is2], max_xy[is2])
     
     # Draw goal regions
     for region in spec['goal'].values():
@@ -701,11 +685,11 @@ def trajectoryPlot2D(plot_time, N, setup, model, partition, spec, abstr, max_err
         lower_eps  = lower + max_error_bound[plot_time]#, :]
         size_eps   = size - 2*max_error_bound[plot_time]#, :]
         
-        state = Rectangle(lower[[ix, iy]], width=size[ix], height=size[iy], 
+        state = Rectangle(lower[[is1, is2]], width=size[is1], height=size[is2], 
                               color="green", alpha=0.3, linewidth=None)
         ax.add_patch(state)
         
-        bound = Rectangle(lower_eps[[ix, iy]], width=size_eps[ix], height=size_eps[iy], 
+        bound = Rectangle(lower_eps[[is1, is2]], width=size_eps[is1], height=size_eps[is2], 
                               edgecolor="green", linestyle='dashed', facecolor='None')
         ax.add_patch(bound)
         
@@ -719,24 +703,13 @@ def trajectoryPlot2D(plot_time, N, setup, model, partition, spec, abstr, max_err
         lower_eps  = lower - max_error_bound[plot_time]#, :]
         size_eps   = size + 2*max_error_bound[plot_time]#, :]
         
-        state = Rectangle(lower[[ix, iy]], width=size[ix], height=size[iy], 
+        state = Rectangle(lower[[is1, is2]], width=size[is1], height=size[is2], 
                               color="red", alpha=0.3, linewidth=None)
         ax.add_patch(state)
         
-        bound = Rectangle(lower_eps[[ix, iy]], width=size_eps[ix], height=size_eps[iy], 
+        bound = Rectangle(lower_eps[[is1, is2]], width=size_eps[is1], height=size_eps[is2], 
                               edgecolor="red", linestyle='dashed', facecolor='None')
         ax.add_patch(bound)
-    
-    with plt.rc_context({"font.size": 5}):        
-        # Draw every X-th label
-        skip = 1
-        for i in range(0, len(abstr['P']), skip):
-            
-            state = abstr['P'][i]
-            if state['center'][1] == cut_value[0] and state['center'][3] == cut_value[1]:
-                            
-                ax.text(abstr['P'][i]['center'][ix], abstr['P'][i]['center'][iy], i, \
-                          va='baseline', ha='center' ) 
             
     # Add traces
     for i,trace in enumerate(traces):
@@ -751,8 +724,8 @@ def trajectoryPlot2D(plot_time, N, setup, model, partition, spec, abstr, max_err
         length = min(plot_time, np.shape(trace_array)[0])
         
         # Extract x,y coordinates of trace
-        x = trace_array[:length, ix]
-        y = trace_array[:length, iy]
+        x = trace_array[:length, is1]
+        y = trace_array[:length, is2]
         points = np.array([x,y]).T
         
         # Plot precise points
@@ -763,8 +736,8 @@ def trajectoryPlot2D(plot_time, N, setup, model, partition, spec, abstr, max_err
             ax.text(point[0], point[1], str(j), c='red', verticalalignment='center', horizontalalignment='center')
         
             if belief_traces != None:
-                mean = belief_traces['mu'][i][j][ [ix,iy] ]
-                row_idx = col_idx = np.array([ix, iy])
+                mean = belief_traces['mu'][i][j][ [is1, is2] ]
+                row_idx = col_idx = np.array([is1, is2])
                 cov = belief_traces['cov'][i][j][ row_idx[:, None], col_idx ]
                 
                 confidence_ellipse(mean, cov, ax, n_std=1, edgecolor='gold',
@@ -1069,3 +1042,39 @@ def reachabilityHeatMap(Ab):
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
         
     plt.show()
+    
+def control_plot(Ab, k=0):
+    
+    policy = Ab.mdp.MAIN_DF['opt_action']
+    
+    fig, ax = plt.subplots(figsize=cm2inch(6.1, 5))
+        
+    plt.xlabel('$x_1$', labelpad=0)
+    plt.ylabel('$x_2$', labelpad=0)
+    
+    for i, region in Ab.abstr['P'].items():
+        
+        state = region['center']
+        
+        action = policy[i][k]
+        
+        if action != -1:
+            state_hat = Ab.abstr['target']['d'][action]
+            
+            diff = state_hat - state
+            
+            plt.arrow(state[0], state[1], diff[0], diff[1], width=0.1, 
+                      linewidth=0, head_width = 1, head_length = 1)
+            
+    # Set title
+    ax.set_title("Control under filter-based abstraction", fontsize=8)
+    
+    # Set axis limits
+    ax.set_xlim(-22, 22)
+    ax.set_xlim(-22, 22)
+    
+    # Set tight layout
+    fig.tight_layout()
+            
+    plt.show()
+    
