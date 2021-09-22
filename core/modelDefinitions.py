@@ -207,7 +207,7 @@ class UAV(master.LTI_master):
             sys.exit()
         
         # Step-bound on property
-        self.endTime = 16
+        self.endTime = 24
 
     def setModel(self, observer):
         '''
