@@ -45,7 +45,6 @@ class mdp(object):
         self.N = N
         
         self.nr_regions = len(abstr['P'])
-        self.nr_actions = abstr['nr_actions']
     
     def writePRISM_specification(self, mode, horizon):
         '''
@@ -128,12 +127,13 @@ class mdp(object):
             horizon = 'infinite'
             region_reps_base = 1
             
-        region_list = [[] for i in self.setup.all_deltas]
-        k_list      = [[] for i in self.setup.all_deltas]
-        k_max_list  = [[] for i in self.setup.all_deltas]
-        delta_list  = [[] for i in self.setup.all_deltas]
-        stoch_list  = [[] for i in self.setup.all_deltas]
-        k_id_start  = [[] for i in self.setup.all_deltas]
+        region_list =       [[] for i in self.setup.all_deltas]
+        region_centers =    [[] for i in self.setup.all_deltas]
+        k_list      =       [[] for i in self.setup.all_deltas]
+        k_max_list  =       [[] for i in self.setup.all_deltas]
+        delta_list  =       [[] for i in self.setup.all_deltas]
+        stoch_list  =       [[] for i in self.setup.all_deltas]
+        k_id_start  =       [[] for i in self.setup.all_deltas]
             
         delta_start_id = {}
         
@@ -150,6 +150,7 @@ class mdp(object):
             
             # Region list for current delta
             region_list[idx] = np.tile( np.arange(self.nr_regions), region_reps )
+            region_centers[idx] = np.array([abstr['P'][i]['center'] for i in region_list[idx]])
             
             # Time step list
             k_list[idx] = np.repeat( np.maximum(np.arange(region_reps) - (delta-1), 0), self.nr_regions )

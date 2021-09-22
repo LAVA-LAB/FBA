@@ -79,7 +79,7 @@ class scenarioBasedAbstraction(Abstraction):
         printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
 
         # For every action (i.e. target point)
-        for a in range(self.abstr['nr_actions']):
+        for a in range(self.abstr['nr_actions'][delta]):
             
             # Check if action a is available in any state at all
             if len(self.abstr['actions_inv'][delta][a]) > 0:

@@ -68,13 +68,15 @@ class filterBasedAbstraction(Abstraction):
         
         self.abstr['action_distances'] = dict()
         
-        for a in range(self.abstr['nr_actions']):
+        for delta in self.setup.all_deltas:
             
-            self.abstr['action_distances'][a] = self.abstr['target']['d'][a] - allCentersArray
+            self.abstr['action_distances'][delta] = {a: self.abstr['target'][delta]['d'][a] - allCentersArray
+                                                     for a in range(self.abstr['nr_actions'][delta])}
             
             
     def _computeProbabilityBounds(self, tab, Sigma_worst, Sigma_best, 
-                                  actions_inv, GOAL, CRITICAL, verbose=True):
+                                  actions_inv, action_distances, target_points,
+                                  GOAL, CRITICAL, verbose=True):
         '''
         Compute transition probability intervals (bounds)
 
@@ -91,7 +93,8 @@ class filterBasedAbstraction(Abstraction):
 
         SigmaEqual = np.array_equal(Sigma_worst, Sigma_best)
 
-        printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
+        d = self.system.base_delta
+        printEvery = min(100, max(1, int(self.abstr['nr_actions'][d]/10)))
 
         nr_decimals = 5 # Number of decimals to round off on
         threshold_decimals = 4 # Minimum probability to model
@@ -126,7 +129,7 @@ class filterBasedAbstraction(Abstraction):
         warningSwitch = False
         
         # For every action (i.e. target point)
-        for a in range(self.abstr['nr_actions']):
+        for a in range(len(actions_inv)):
             
             skipped_counter = 0
         
@@ -136,7 +139,7 @@ class filterBasedAbstraction(Abstraction):
                 prob[a] = dict()
                     
                 # Retrieve and transform mean of distribution
-                mu = self.abstr['target']['d'][a]
+                mu = target_points[a]
                 
                 if self.setup.main['skewed']:
                     muCubic = skew2cubic(mu, self.abstr)
@@ -158,7 +161,7 @@ class filterBasedAbstraction(Abstraction):
                     ### 1) Main transition probability
                     # Compute the vector difference between the target point
                     # and the current region
-                    coord_distance = self.abstr['action_distances'][a][j]
+                    coord_distance = action_distances[a][j]
                     
                     if any(np.abs(coord_distance) > limit_norm):
                         skipped_counter += 1
@@ -461,7 +464,7 @@ class filterBasedAbstraction(Abstraction):
         for k in range(self.N):
             
             # Perform Kalman filter prediction at current time k for delta-type action
-            self.km[1][k+1] = kalmanFilter(self.model[self.setup.base_delta], self.km[1][k]['cov'])
+            self.km[1][k+1] = kalmanFilter(self.model[self.system.base_delta], self.km[1][k]['cov'])
         
             covsTilde += [self.km[1][k+1]['cov_tilde']]
             covsPred  += [self.km[1][k+1]['cov_pred']]
@@ -496,7 +499,7 @@ class filterBasedAbstraction(Abstraction):
                 
                     # Propagate the waiting time steps (recovering steps)
                     for gamma in range(1, self.km['waiting_time'] + 2):
-                        belief = kalmanFilter(self.model[self.setup.base_delta], belief['cov'])
+                        belief = kalmanFilter(self.model[self.system.base_delta], belief['cov'])
                 
                         jump_km[gamma]['cov']         += [belief['cov']]
                         jump_km[gamma]['cov_pred']    += [belief['cov_pred']]
@@ -596,7 +599,9 @@ class filterBasedAbstraction(Abstraction):
             print('Compute transition probabilities for k',k)
             
             self.trans['prob'][1][k_prime] = \
-                self._computeProbabilityBounds(tab, Sigma_worst, Sigma_best, self.abstr['actions_inv'][1], goal, critical)
+                self._computeProbabilityBounds(tab, Sigma_worst, Sigma_best, 
+                   self.abstr['actions_inv'][1], self.abstr['action_distances'][1], self.abstr['target'][1]['d'],
+                   goal, critical)
             
         # Delete iterable variables
         del k
@@ -620,7 +625,9 @@ class filterBasedAbstraction(Abstraction):
             # Compute worst/best-case transition probabilities in 
             # steady-state portion of the time horizon
             self.trans['prob'][1][k_prime] = \
-                self._computeProbabilityBounds(tab, Sigma_worst, Sigma_best, self.abstr['actions_inv'][1], goal, critical)
+                self._computeProbabilityBounds(tab, Sigma_worst, Sigma_best, 
+                   self.abstr['actions_inv'][1], self.abstr['action_distances'][1], self.abstr['target'][1]['d'],
+                   goal, critical)
                 
         ######
         
@@ -647,7 +654,9 @@ class filterBasedAbstraction(Abstraction):
                 print('Compute transition probabilities for delta',delta)
                 
                 self.trans['prob'][delta][k_prime] = \
-                    self._computeProbabilityBounds(tab, Sigma_worst, Sigma_best, self.abstr['actions_inv'][delta], goal, critical)
+                    self._computeProbabilityBounds(tab, Sigma_worst, Sigma_best, 
+                       self.abstr['actions_inv'][delta], self.abstr['action_distances'][delta], self.abstr['target'][delta]['d'], 
+                       goal, critical)
                 
             # Delete iterable variables
             del gamma
@@ -813,7 +822,7 @@ class MonteCarloSim():
                 
                 success = True
                 if self.setup.main['verbose']:
-                    self.tab.print_row([r, m, k, 'Goal state reached'], sort="Success")
+                    self.tab.print_row([r, m, k, 'Goal state reached - True state:'+str(np.round(x[k],2))], sort="Success")
                 return trace, success
             
             # Check if the state is in a critical region
@@ -840,7 +849,7 @@ class MonteCarloSim():
                 opt_k_succ_id   = self.policy['opt_ksucc_id'][abs_state][k]
                 
                 # Here, we automatcially skip trivial waiting actions for delta>1 actions
-                abs_state_shift = opt_k_succ_id + (deltaToTake[k]-1)*self.abstr['nr_actions']
+                abs_state_shift = opt_k_succ_id + (deltaToTake[k]-1)*self.abstr['nr_regions']
                 
                 if actionToTake[k] == -1:
                     
@@ -885,7 +894,7 @@ class MonteCarloSim():
                 belief = kalmanFilter(self.model[delta], cov[k])        
         
                 # Move predicted mean to the future belief to the target point of the next state
-                mu_goal[k+delta] = self.abstr['target']['d'][actionToTake[k]]
+                mu_goal[k+delta] = self.abstr['target'][delta]['d'][actionToTake[k]]
         
                 w = self.noise['w'][delta][r_abs, m, k]
                 v = self.noise['v'][r_abs, m, k]

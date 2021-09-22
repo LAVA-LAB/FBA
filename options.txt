@@ -2,7 +2,7 @@
 scenarios.samples = 25
 scenarios.samples_max = 6400
 scenarios.confidence = 0.1
-mdp.prism_folder = /home/tbadings/Documents/SBA/prism-imc/prism/
+mdp.prism_folder = /home/thom/Documents/prism-imc/prism/
 mdp.mode = interval
 mdp.prism_model_writer = explicit
 mdp.prism_java_memory = 7

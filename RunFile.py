@@ -53,7 +53,6 @@ system = modelClasses[application_id, 1]()
 
 # Create settings object
 setup = settings(application=system.name)
-setup.base_delta = system.base_delta
 
 loadOptions('options.txt', setup)
 
@@ -115,8 +114,15 @@ if setup.main['mode'] == 'Filter':
 else:
     system.setModel(observer=False)
     
-setup.lic = {'jump_factors': [2,4]}
-setup.mdp['k_steady_state'] = 4
+# Let the user determine if 2-phase time horizon should be enabled
+twophase, _ = user_choice( 'Enable the 2-phase time horizon?', [True, False])    
+
+if twophase:    
+    setup.mdp['k_steady_state'], _ = user_choice( \
+                                    'value of k at which the steady state phase starts', 'integer')
+else:
+    setup.mdp['k_steady_state'] = None
+    
 setup.main['covarianceMode'] = ['SDP','iterative'][0]
 setup.main['interval_margin'] = 0.001
 setup.precision = 5

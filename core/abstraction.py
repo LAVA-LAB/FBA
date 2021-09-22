@@ -70,7 +70,7 @@ class Abstraction(object):
         self.N = int(self.system.endTime)
         
         # Reduce step size as much as possible
-        base_delta = self.setup.base_delta
+        base_delta = self.system.base_delta
         self.setup.divide = 1
         
         for div in range(base_delta, 0, -1):
@@ -78,13 +78,13 @@ class Abstraction(object):
                 
                 print(' -- Simplify step size by a factor of',div)
                 self.N = int(self.N / div)
-                self.setup.base_delta  = (np.array(self.setup.base_delta) / div).astype(int)
+                self.system.base_delta  = (np.array(self.system.base_delta) / div).astype(int)
                 self.setup.divide = div
                 
                 break
             
-        self.setup.jump_deltas = self.setup.base_delta * self.setup.lic['jump_factors']
-        self.setup.all_deltas = np.concatenate(([self.setup.base_delta], 
+        self.setup.jump_deltas = self.system.base_delta * self.system.adaptive['rates']
+        self.setup.all_deltas = np.concatenate(([self.system.base_delta], 
                                                 self.setup.jump_deltas)).astype(int)
         
         self.model = dict()
@@ -302,7 +302,7 @@ class Abstraction(object):
         else:
             return False
     
-    def _createTargetPoints(self):
+    def _createTargetPoints(self, delta):
         '''
         Create target points, based on the vertices given
 
@@ -313,9 +313,23 @@ class Abstraction(object):
 
         '''
         
+        print(' ---- Create actions for rate delta =',delta)
+        
         target = dict()
         
-        if self.system.targets['nrPerDim'] != 'auto':
+        if delta != self.system.base_delta:
+            
+            # If not at base delta, use manual list of target points
+            # (for the time being)
+            
+            target['d'] = self.system.adaptive['target_points']
+        
+            '''
+            target['d'] = [region['center'] for region in self.abstr['P'].values() 
+                           if not self._stateInCritical(region['center']) ]
+            '''
+        
+        elif self.system.targets['nrPerDim'] != 'auto':
 
             # Width (span) between target points in every dimension
             if self.system.targets['domain'] != 'auto':
@@ -340,8 +354,6 @@ class Abstraction(object):
             target['d'] = [region['center'] for region in self.abstr['P'].values() 
                            if not self._stateInCritical(region['center']) ] #+ \
                 #[np.array([0,-.1, 0.01, 0.01])]
-        
-        print(target['d'])
         
         targetPointTuples = [tuple(point) for point in target['d']]        
         target['inv'] = dict(zip(targetPointTuples, range(len(target['d']))))
@@ -480,12 +492,12 @@ class Abstraction(object):
         
         enabled_polypoints = dict()
         
-        enabled_in_states = [[] for i in range(self.abstr['nr_actions'])]
+        enabled_in_states = [[] for i in range(self.abstr['nr_actions'][delta])]
         enabled_actions   = [[] for i in range(self.abstr['nr_regions'])]
         
         nr_corners = 2**self.system.LTI['n']
         
-        printEvery = min(100, max(1, int(self.abstr['nr_actions']/10)))
+        printEvery = min(100, max(1, int(self.abstr['nr_actions'][delta]/10)))
         
         # Check if dimension of control area equals that if the state vector
         dimEqual = self.model[delta]['p'] == self.system.LTI['n']
@@ -542,22 +554,23 @@ class Abstraction(object):
                            np.arange(self.abstr['nr_actions']) )))
         '''
         
-        action_range = np.arange(self.abstr['nr_actions']) 
+        action_range = np.arange(self.abstr['nr_actions'][delta]) 
         
-        print('\nStart to compute the set of enabled actions...')
+        print('\nStart to compute the set of enabled actions for delta='+str(delta)+'...')
         
         # For every action
         for action_id in action_range:
             
-            targetPoint = self.abstr['target']['d'][action_id]
+            targetPoint = self.abstr['target'][delta]['d'][action_id]
             
             # If system is 'robot', than only enable jump actions if the velocity
             # is zero
+            '''
             if self.system.name == 'double_integrator' and delta != 1 and targetPoint[1] != 0:
                 continue
             
             # If system is UAV and local information controllers are enabled
-            elif self.system.name == 'UAV' and delta != 1:
+            if self.system.name == 'UAV' and delta != 1:
                 # Skip if any velocity component is notzero (because the 
                 # required waiting will not be enabled anyways)
                 # if self.system.LTI['n'] == 4 and any(targetPoint[[1,3]] != 0) or \
@@ -566,6 +579,7 @@ class Abstraction(object):
                    
                 if action_id not in [772, 1002, 1682, 1692, 1477, 1027, 577]:
                     continue
+            '''
             
             if dimEqual:
             
@@ -650,7 +664,7 @@ class Abstraction(object):
                 enabled_actions[origin] += [action_id]
                 
         enabledActions_inv = [enabled_in_states[i] 
-                              for i in range(self.abstr['nr_actions'])]
+                              for i in range(self.abstr['nr_actions'][delta])]
         
         return total_actions_enabled, enabled_actions, enabledActions_inv
         
@@ -772,8 +786,11 @@ class Abstraction(object):
         print(' -- Number of critical regions:',len(self.abstr['critical']['zero_bound']))
         
         # Create the target point for every action (= every state)
-        self.abstr['target'] = self._createTargetPoints()
-        self.abstr['nr_actions'] = len(self.abstr['target']['d'])
+        self.abstr['target'] = {delta: self._createTargetPoints(delta) for 
+                                delta in self.setup.all_deltas}
+        
+        self.abstr['nr_actions'] = {delta: len(self.abstr['target'][delta]['d']) for
+                                    delta in self.setup.all_deltas}
         
         print(' -- Number of actions (target points):',self.abstr['nr_actions'])
         
@@ -789,6 +806,8 @@ class Abstraction(object):
         self.abstr['actions']     = dict()
         self.abstr['actions_inv'] = dict()
         
+        nr_A_total = 0
+        
         # For every time step grouping value in the list
         for delta in self.setup.all_deltas:
             
@@ -796,10 +815,13 @@ class Abstraction(object):
              self.abstr['actions_inv'][delta] = self._defEnabledActions(delta)
                         
             print(nr_A,'actions enabled')
-            if nr_A == 0:
-                printWarning('No actions enabled at all, so terminate')
-                sys.exit()
-        
+            
+            nr_A_total += nr_A
+            
+        if nr_A_total == 0:
+            printWarning('No actions enabled at all, so terminate')
+            sys.exit()
+    
         self.time['2_enabledActions'] = tocDiff(False)
         print('\nEnabled actions define - time:',self.time['2_enabledActions'])
         

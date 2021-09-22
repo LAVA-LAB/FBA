@@ -22,7 +22,7 @@ import os                       # Import OS to allow creationg of folders
 
 import itertools
 from .commons import table, is_invertible, floor_decimal, confidence_ellipse, \
-    Chi2probability, tocDiff
+    Chi2probability, tocDiff, printWarning
 from scipy.spatial import Delaunay
 from scipy.linalg import sqrtm
 import cvxpy as cp
@@ -192,7 +192,7 @@ def kalmanFilter(model, cov0):
     # Calculate measure on the covariance matrix of the mean of the future belief
     cov_tilde_measure, _ = covarianceEllipseSize( cov_tilde )
     
-    max_error_bound = np.max( minimumEpsilon( cov, beta=0.05, stepSize=0.01, singleParam = True ) )
+    max_error_bound = np.max( minimumEpsilon( cov, beta=0.01, stepSize=0.01, singleParam = True ) )
     
     return {'cov_pred': cov_pred,
             'K_gain': K_gain,
@@ -201,7 +201,7 @@ def kalmanFilter(model, cov0):
             'cov_tilde_measure': cov_tilde_measure,
             'error_bound': max_error_bound}
     
-def minimumEpsilon(cov, beta=0.05, stepSize=0.01, singleParam=True):
+def minimumEpsilon(cov, beta=0.01, stepSize=0.01, singleParam=True):
     
     n = np.shape(cov)[0]
     
@@ -231,7 +231,6 @@ def minimumEpsilon(cov, beta=0.05, stepSize=0.01, singleParam=True):
     else:
         ### Hyper-rectangular method with single parameters
         
-        beta = 0.4
         cumprob = 0
         epsilon = 0
         inf_dims = []
@@ -342,7 +341,7 @@ def steadystateCovariance(covariances, verbose=False):
     
     return {'worst': np.real(worst_cov), 'best': np.real(best_cov)}
 
-def steadystateCovariance_sdp(covariances, verbose=False):
+def steadystateCovariance_sdp(covariances, verbose=True):
 
     print('Compute best/worst-case covariance (SDP method)')    
 
@@ -372,7 +371,8 @@ def steadystateCovariance_sdp(covariances, verbose=False):
         if not is_invertible(cov):
         
             eigvals, eigvecs = np.linalg.eig(cov)
-            eigvals = np.maximum(1e-6, eigvals)
+            
+            eigvals = np.maximum(1e-9, eigvals)
             cov = eigvecs @ np.diag(eigvals) @ np.linalg.inv(eigvecs)
         
         constraints_w += [X_w >> cov]
@@ -397,6 +397,13 @@ def steadystateCovariance_sdp(covariances, verbose=False):
         ax.set_aspect('equal')
         ax.set_title('Semi-definite programming approach')
         plt.show()
+        
+    # Check if best-case covariance was computed incorrectly. If multiple 
+    # covariance matrices are not full-rank (i.e. they are not expressed as an
+    # ellipse, but as a line), this may happen.
+    if len(np.shape(best_cov)) == 0:
+        printWarning('Warning: NoneType best-case covariance. Set arbitrary small covariance.')
+        best_cov = 1e-6*np.eye(n)
     
     return {'worst': worst_cov, 'best': best_cov}
 

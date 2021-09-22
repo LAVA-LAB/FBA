@@ -483,7 +483,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
     # Determine desired state IDs
     if Ab.system.name == 'UAV':
         if Ab.system.modelDim == 2:
-            x_init = setStateBlock(Ab.system.partition, a=[-6], b=[0], c=[-6], d=[0])
+            x_init = setStateBlock(Ab.system.partition, a=[-8], b=[0], c=[-8], d=[0])
             
             cut_value = np.zeros(2)
             for i,d in enumerate(range(1, Ab.system.LTI['n'], 2)):
@@ -578,7 +578,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
         filenames = ['' for i in range(len(plot_times))]
             
         # Create list of error bounds
-        error_bound_list = [dic['error_bound'] if 'error_bound' in dic else 0 for dic in Ab.km[Ab.setup.base_delta].values()]
+        error_bound_list = [dic['error_bound'] if 'error_bound' in dic else 0 for dic in Ab.km[Ab.system.base_delta].values()]
         
         for i,plot_time in enumerate(plot_times):
             filenames[i] = trajectoryPlot2D(i_show, i_hide, plot_time, Ab.N, Ab.setup, 

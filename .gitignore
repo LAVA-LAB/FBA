@@ -4,5 +4,6 @@ __pycache__/
 *.pyo
 *.DS_Store
 
+options.txt
 output/*
 !output/readme.txt
