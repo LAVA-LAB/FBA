@@ -18,6 +18,7 @@ ______________________________________________________________________________
 import numpy as np              # Import Numpy for computations
 import pandas as pd             # Import Pandas to store data in frames
 import matplotlib.pyplot as plt # Import Pyplot to generate plots
+import cv2
 
 # Load main classes and methods
 from matplotlib import cm
@@ -587,8 +588,6 @@ def trajectoryPlot(Ab, case_id, writer = None):
                 error_bound_list, traces, belief_traces)
 
         if animate:
-    
-            import cv2
             
             img_array = []
             for filename in filenames:

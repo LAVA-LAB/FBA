@@ -100,6 +100,7 @@ $ pip3 install -r requirements.txt
 The following packages will be installed:
 
 - cvxpy==1.1.15
+- cv2==4.5.3
 - imageio==2.9.0 (needed for visvis)
 - matplotlib==3.3.4
 - numpy==1.20.1

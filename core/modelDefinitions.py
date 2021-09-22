@@ -146,7 +146,7 @@ class UAV(master.LTI_master):
     
         if self.modelDim == 2:
             
-            self.adaptive = {'rates': [2],
+            self.adaptive = {'rates': [],
                 #'target_points': np.array([[i, 0, j, 0] for i in range(-8,10,4) for j in range(-8,10,4)])
                 'target_points': np.array([[i, x, j, y] for i in [6,8] for j in [-4,-2] for x in [-1.5, 0, 1.5] for y in [-1.5, 0, 1.5]])
                 }
