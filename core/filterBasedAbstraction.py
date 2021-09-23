@@ -63,7 +63,7 @@ class filterBasedAbstraction(Abstraction):
         # Define state space partition
         Abstraction.definePartition(self)
             
-    def _computeProbabilityBounds(self, tab, Sigma_worst, Sigma_best, 
+    def _computeProbabilityBounds(self, tab, mdp_mode, Sigma_worst, Sigma_best, 
                                   abstr, delta, allCenters_asArray,
                                   GOAL, CRITICAL, verbose=True):
         '''
@@ -117,11 +117,6 @@ class filterBasedAbstraction(Abstraction):
         # Initialize switch to show warning only once
         warningSwitch = False
         
-        target_points = abstr['target'][delta]['d']
-        
-        action_distances = [target_points[a] - allCenters_asArray
-                            for a in range(abstr['nr_actions'][delta]) ]
-        
         # For every action (i.e. target point)
         for a in range(len(abstr['actions_inv'][delta])):
             
@@ -133,7 +128,7 @@ class filterBasedAbstraction(Abstraction):
                 prob[a] = dict()
                     
                 # Retrieve and transform mean of distribution
-                mu = target_points[a]
+                mu = abstr['target'][delta]['d'][a]
                 
                 if self.setup.main['skewed']:
                     muCubic = skew2cubic(mu, self.abstr)
@@ -153,9 +148,13 @@ class filterBasedAbstraction(Abstraction):
                 for j in self.abstr['P'].keys():
                     
                     ### 1) Main transition probability
+                    '''
                     # Compute the vector difference between the target point
                     # and the current region
-                    coord_distance = action_distances[a][j]
+                    coord_distance = distances[j]
+                    '''
+                    
+                    coord_distance = mu - allCenters_asArray[j]
                     
                     if any(np.abs(coord_distance) > limit_norm):
                         skipped_counter += 1
@@ -342,18 +341,23 @@ class filterBasedAbstraction(Abstraction):
                 # Compute approximate deadlock transition probabilities
                 deadlock_approx = np.round(1-sum(approx_strings)-goal_approx-critical_approx, nr_decimals)
                 
-                prob[a] = {
-                    'interval_strings': interval_strings,
-                    'interval_idxs': nonzero_idxs,
-                    'approx_strings': approx_strings,
-                    'approx_idxs': nonzero_idxs,
-                    'deadlock_interval_string': deadlock_string,
-                    'deadlock_approx': deadlock_approx,
-                    'goal_interval_string': goal_string,
-                    'goal_approx': goal_approx,
-                    'critical_interval_string': critical_string,
-                    'critical_approx': critical_approx
-                }
+                if mdp_mode == 'interval':
+                    prob[a] = {
+                        'interval_strings': interval_strings,
+                        'interval_idxs': nonzero_idxs,
+                        'deadlock_interval_string': deadlock_string,
+                        'goal_interval_string': goal_string,
+                        'critical_interval_string': critical_string
+                    }
+                    
+                else:
+                    prob[a] = {
+                        'approx_strings': approx_strings,
+                        'approx_idxs': nonzero_idxs,
+                        'deadlock_approx': deadlock_approx,
+                        'goal_approx': goal_approx,
+                        'critical_approx': critical_approx
+                    }
                 
                 # Print normal row in table
                 if a % printEvery == 0 and verbose:
@@ -596,7 +600,8 @@ class filterBasedAbstraction(Abstraction):
             print('Compute transition probabilities for k',k)
             
             self.trans['prob'][1][k_prime] = \
-                self._computeProbabilityBounds(tab, Sigma_worst, Sigma_best, 
+                self._computeProbabilityBounds(tab, self.setup.mdp['mode'],
+                   Sigma_worst, Sigma_best, 
                    self.abstr, 1, allCenters_asArray,
                    goal, critical)
             
@@ -622,7 +627,8 @@ class filterBasedAbstraction(Abstraction):
             # Compute worst/best-case transition probabilities in 
             # steady-state portion of the time horizon
             self.trans['prob'][1][k_prime] = \
-                self._computeProbabilityBounds(tab, Sigma_worst, Sigma_best, 
+                self._computeProbabilityBounds(tab, self.setup.mdp['mode'],
+                   Sigma_worst, Sigma_best, 
                    self.abstr, 1, allCenters_asArray,
                    goal, critical)
                 
@@ -651,7 +657,8 @@ class filterBasedAbstraction(Abstraction):
                 print('Compute transition probabilities for delta',delta)
                 
                 self.trans['prob'][delta][k_prime] = \
-                    self._computeProbabilityBounds(tab, Sigma_worst, Sigma_best, 
+                    self._computeProbabilityBounds(tab, self.setup.mdp['mode'],
+                       Sigma_worst, Sigma_best, 
                        self.abstr, delta, allCenters_asArray,
                        goal, critical)
                 
