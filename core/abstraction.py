@@ -17,7 +17,7 @@ ______________________________________________________________________________
 
 import numpy as np              # Import Numpy for computations
 import pandas as pd             # Import Pandas to store data in frames
-import itertools                # Import to crate iterators
+import itertools                # Import to create iterators
 import copy                     # Import to copy variables in Python
 import sys                      # Allows to terminate the code at sorme point
 from scipy.spatial import Delaunay, ConvexHull # Import to create convex hulls
@@ -554,7 +554,7 @@ class Abstraction(object):
         
         # Put goal regions up front of the list of actions
         '''
-        action_range = f7(np.concatenate(( list(self.abstr['goal']['X'][0].keys()),
+        action_range = f7(np.concatenate(( list(self.abstr['goal'][0].keys()),
                            np.arange(self.abstr['nr_actions']) )))
         '''
         
@@ -635,7 +635,7 @@ class Abstraction(object):
                 # Partition plot for the goal state, also showing pre-image
                 print('Create partition plot...')
                 
-                partitionPlot2D((0,1), (2,3), self.abstr['goal']['X'][0], 
+                partitionPlot2D((0,1), (2,3), self.abstr['goal'][0], 
                     delta, self.setup, self.model[delta], self.system.partition, self.abstr, 
                     self.abstr['allVertices'], predecessor_set)
             
@@ -649,7 +649,7 @@ class Abstraction(object):
             enabled_in_states[action_id] = np.nonzero(enabled_in)[0]
                 
             if action_id % printEvery == 0 or delta > 1:
-                if action_id in self.abstr['goal']['X'][0]:
+                if action_id in self.abstr['goal'][0]:
                     print(' -- GOAL action',str(action_id),'enabled in',
                           str(len(enabled_in_states[action_id])),
                           'states - target point:',
@@ -753,17 +753,17 @@ class Abstraction(object):
                 epsilon = np.zeros(self.system.LTI['n'])
         
             # Determine goal regions
-            self.abstr['goal']['X'][k] = self._defStateLabelSet(
+            self.abstr['goal'][k] = self._defStateLabelSet(
                 self.abstr['allVertices'],
                 self.system.spec['goal'], typ="goal", epsilon=epsilon)
             
             # Determine critical regions
-            self.abstr['critical']['X'][k] = self._defStateLabelSet(
+            self.abstr['critical'][k] = self._defStateLabelSet(
                 self.abstr['allVertices'],
                 self.system.spec['critical'], typ="critical", epsilon=epsilon)
            
-        self.abstr['goal']['X'][0] = self.abstr['goal']['X'][1]
-        self.abstr['critical']['X'][0] = self.abstr['critical']['X'][1]
+        self.abstr['goal'][0] = self.abstr['goal'][1]
+        self.abstr['critical'][0] = self.abstr['critical'][1]
         
         for delta in self.setup.jump_deltas:
             # Compute goal and critical regions for higher delta states

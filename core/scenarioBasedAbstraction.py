@@ -404,7 +404,7 @@ class scenarioBasedAbstraction(Abstraction):
                     # (given by the optimal policy to the MDP)
                     delta = self.results['optimal_delta'][n0,i]
                     
-                    if i in self.abstr['goal']['X'][n0]:
+                    if i in self.abstr['goal'][n0]:
                         # If the initial state is already the goal state, succes
                         # Then abort the current iteration, as we have achieved the goal
                         self.mc['results'][n0][i]['goalReached'][m] = True
@@ -460,7 +460,7 @@ class scenarioBasedAbstraction(Abstraction):
                                 x_region[k] = -1
                             
                             # If current region is the goal state ... 
-                            if x_region[k] in self.abstr['goal']['X'][k]:
+                            if x_region[k] in self.abstr['goal'][k]:
                                 # Then abort the current iteration, as we have achieved the goal
                                 self.mc['results'][n0][i]['goalReached'][m] = True
                                 
@@ -468,7 +468,7 @@ class scenarioBasedAbstraction(Abstraction):
                                     tab.print_row([n0, i, m, k, 'Goal state reached'], sort="Success")
                                 break
                             # If current region is in critical states...
-                            elif x_region[k] in self.abstr['critical']['X'][k]:
+                            elif x_region[k] in self.abstr['critical'][k]:
                                 # Then abort current iteration
                                 if self.setup.main['verbose']:
                                     tab.print_row([n0, i, m, k, 'Critical state reached, so abort'], sort="Warning")

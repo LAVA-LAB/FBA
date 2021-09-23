@@ -21,12 +21,13 @@ import csv                      # Import to create/load CSV files
 import sys                      # Allows to terminate the code at some point
 import os                       # Import OS to allow creationg of folders
 import random                   # Import to use random variables
+import itertools                # Import to create iterators
 from scipy.stats import mvn, norm
 
 from .mainFunctions import defineDistances, \
     computeRegionCenters, cubic2skew, skew2cubic, kalmanFilter, in_hull, \
     steadystateCovariance, steadystateCovariance_sdp, covarianceEllipseSize, \
-    minimumEpsilon
+    minimumEpsilon, getNeighbors
 from .commons import tic, ticDiff, tocDiff, table, printWarning, \
     floor_decimal, extractRowBlockDiag, is_pos_def
 
@@ -62,9 +63,9 @@ class filterBasedAbstraction(Abstraction):
         
         # Define state space partition
         Abstraction.definePartition(self)
-            
+        
     def _computeProbabilityBounds(self, tab, mdp_mode, Sigma_worst, Sigma_best, 
-                                  abstr, delta, allCenters_asArray,
+                                  delta, allCenters_asArray,
                                   GOAL, CRITICAL, verbose=True):
         '''
         Compute transition probability intervals (bounds)
@@ -118,17 +119,17 @@ class filterBasedAbstraction(Abstraction):
         warningSwitch = False
         
         # For every action (i.e. target point)
-        for a in range(len(abstr['actions_inv'][delta])):
+        for a in range(len(self.abstr['actions_inv'][delta])):
             
             skipped_counter = 0
         
             # Check if action a is available in any state at all
-            if len(abstr['actions_inv'][delta][a]) > 0:
+            if len(self.abstr['actions_inv'][delta][a]) > 0:
                     
                 prob[a] = dict()
                     
                 # Retrieve and transform mean of distribution
-                mu = abstr['target'][delta]['d'][a]
+                mu = self.abstr['target'][delta]['d'][a]
                 
                 if self.setup.main['skewed']:
                     muCubic = skew2cubic(mu, self.abstr)
@@ -144,16 +145,26 @@ class filterBasedAbstraction(Abstraction):
                 prob_critical_worst_sum = 0
                 prob_critical_best_sum = 0
                 
+                '''
+                mu_tuple = tuple(mu)
+                if mu_tuple in self.abstr['allCentersCubic']:
+                    
+                    points = getNeighbors(mu, self.system.partition, depth=2)
+                    idxs   = [self.abstr['allCentersCubic'][tuple(point)] 
+                              for point in points 
+                              if tuple(point) in self.abstr['allCentersCubic']] 
+                    
+                else:
+                '''
+                    
+                idxs = self.abstr['P'].keys()
+                    
                 # For every possible resulting region
-                for j in self.abstr['P'].keys():
+                for j in idxs:
                     
                     ### 1) Main transition probability
-                    '''
-                    # Compute the vector difference between the target point
-                    # and the current region
-                    coord_distance = distances[j]
-                    '''
                     
+                    # Compute the vector difference between the target point
                     coord_distance = mu - allCenters_asArray[j]
                     
                     if any(np.abs(coord_distance) > limit_norm):
@@ -414,11 +425,11 @@ class filterBasedAbstraction(Abstraction):
             prob_goal_worst = floor_decimal(sum([mvn.mvnun(
                  list(lims['limits'][:,0]), list(lims['limits'][:,1]), muCubic, SigmaCubic_worst)[0] 
                  for lims in GOAL.values()
-                 ]), 6)
+                 ]), threshold_decimals)
             prob_goal_best = floor_decimal(sum([mvn.mvnun(
                  list(lims['limits'][:,0]), list(lims['limits'][:,1]), muCubic, SigmaCubic_best)[0] 
                  for lims in GOAL.values()
-                 ]), 6)
+                 ]), threshold_decimals)
                 
             prob_goal[j] = min(prob_goal_worst, prob_goal_best)
         
@@ -434,6 +445,11 @@ class filterBasedAbstraction(Abstraction):
                 ]), threshold_decimals)
                
             prob_critical[j] = max(prob_critical_worst, prob_critical_best)
+            
+            # Print normal row in table
+            if j % 100 == 0 and verbose:
+                
+                print(' -- For state',j)
                 
         return {'prob_goal': prob_goal, 'prob_critical': prob_critical}
     
@@ -587,8 +603,8 @@ class filterBasedAbstraction(Abstraction):
         for k in k_range:
             
             k_prime     = k + 1
-            goal        = self.abstr['goal']['X'][k_prime]
-            critical    = self.abstr['critical']['X'][k_prime]
+            goal        = self.abstr['goal'][k_prime]
+            critical    = self.abstr['critical'][k_prime]
             
             Sigma_worst = self.km[1][k_prime]['cov_tilde']
             Sigma_best  = self.km[1][k_prime]['cov_tilde']
@@ -601,8 +617,7 @@ class filterBasedAbstraction(Abstraction):
             
             self.trans['prob'][1][k_prime] = \
                 self._computeProbabilityBounds(tab, self.setup.mdp['mode'],
-                   Sigma_worst, Sigma_best, 
-                   self.abstr, 1, allCenters_asArray,
+                   Sigma_worst, Sigma_best, 1, allCenters_asArray,
                    goal, critical)
             
         # Delete iterable variables
@@ -612,8 +627,8 @@ class filterBasedAbstraction(Abstraction):
         if self.setup.mdp['k_steady_state'] != None:
             
             k_prime     = self.setup.mdp['k_steady_state'] + 1
-            goal        = self.abstr['goal']['X'][k_prime]
-            critical    = self.abstr['critical']['X'][k_prime]
+            goal        = self.abstr['goal'][k_prime]
+            critical    = self.abstr['critical'][k_prime]
             
             Sigma_worst = self.km[1]['steady']['worst']
             Sigma_best  = self.km[1]['steady']['best']
@@ -628,8 +643,7 @@ class filterBasedAbstraction(Abstraction):
             # steady-state portion of the time horizon
             self.trans['prob'][1][k_prime] = \
                 self._computeProbabilityBounds(tab, self.setup.mdp['mode'],
-                   Sigma_worst, Sigma_best, 
-                   self.abstr, 1, allCenters_asArray,
+                   Sigma_worst, Sigma_best, 1, allCenters_asArray,
                    goal, critical)
                 
         ######
@@ -658,8 +672,7 @@ class filterBasedAbstraction(Abstraction):
                 
                 self.trans['prob'][delta][k_prime] = \
                     self._computeProbabilityBounds(tab, self.setup.mdp['mode'],
-                       Sigma_worst, Sigma_best, 
-                       self.abstr, delta, allCenters_asArray,
+                       Sigma_worst, Sigma_best, delta, allCenters_asArray,
                        goal, critical)
                 
             # Delete iterable variables

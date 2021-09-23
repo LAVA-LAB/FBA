@@ -186,7 +186,7 @@ class UAV(master.LTI_master):
             self.control['limits']['uMax'] = [4, 4, 4]
             
             # Partition size
-            self.partition['nrPerDim']  = [7, 5, 7, 5, 7, 5]
+            self.partition['nrPerDim']  = [7, 3, 7, 3, 7, 3]
             self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
             self.partition['origin']    = [0, 0, 0, 0, 0, 0]
             

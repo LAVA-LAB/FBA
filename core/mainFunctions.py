@@ -612,3 +612,13 @@ def computeRegionOverlap(limitsA, limitsB):
     else:
         
         return None
+    
+def getNeighbors(point, partition, depth=1):
+        
+        nr      = partition['nrPerDim']
+        width   = partition['width']
+        dim     = len(nr)
+        
+        prange = np.array([np.arange(-depth, depth+1)*width[i] for i in range(dim)])
+        
+        return point + np.array(list(itertools.product(*prange)))
