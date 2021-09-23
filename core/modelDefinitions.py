@@ -195,18 +195,18 @@ class UAV(master.LTI_master):
             self.targets['domain']      = 'auto'
             
             # Specification information
-            self.spec['goal'] = {1: defSpecBlock(self.partition, a=[4, 6], b=None, c=[4, 6], d=None, e=[4, 6], f=None)}
+            self.spec['goal'] = {1: defSpecBlock(self.partition, a=[3, 7], b=None, c=[3, 7], d=None, e=[3, 7], f=None)}
             
             self.spec['critical']   = {
-                1: defSpecBlock(self.partition, a=[-2,0], b=None, c=[2,6], d=None, e=None, f=None),
-                2: defSpecBlock(self.partition, a=[-6,-4], b=None, c=[4,6], d=None, e=[4,6], f=None),
-                3: defSpecBlock(self.partition, a=[-2,0], b=None, c=[-6,0], d=None, e=[-6,-4], f=None),
-                4: defSpecBlock(self.partition, a=[2,6], b=None, c=[-6,-4], d=None, e=[-6,-4], f=None),
-                5: defSpecBlock(self.partition, a=[-2,0], b=None, c=[-6,-4], d=None, e=[-2,0], f=None)
+                1: defSpecBlock(self.partition, a=[-2,0], b=None, c=[1,7], d=None, e=None, f=None),
+                2: defSpecBlock(self.partition, a=[-7,-3], b=None, c=[3,7], d=None, e=[3,7], f=None),
+                3: defSpecBlock(self.partition, a=[-3,1], b=None, c=[-7,1], d=None, e=[-7,-3], f=None),
+                4: defSpecBlock(self.partition, a=[1,7], b=None, c=[-7,-3], d=None, e=[-7,-5], f=None),
+                5: defSpecBlock(self.partition, a=[-3,1], b=None, c=[-7,-3], d=None, e=[-3,1], f=None)
                 }
             
             # Step-bound on property
-            self.endTime = 16
+            self.endTime = 24
         
         else:
             print('No valid dimension for the drone model was provided')
