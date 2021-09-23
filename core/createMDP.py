@@ -45,6 +45,10 @@ class mdp(object):
         self.N = N
         
         self.nr_regions = len(abstr['P'])
+        
+        # Compute how many states are added to the top of the transition list
+        self.nr_extra_goal_states = max(self.setup.all_deltas)-1
+        self.overhead = 3 + self.nr_extra_goal_states
     
     def writePRISM_specification(self, mode, horizon):
         '''
@@ -176,10 +180,6 @@ class mdp(object):
         self.nr_states_per_delta = np.array([len(i) for i in region_list])
         self.nr_states = np.sum(self.nr_states_per_delta)
         
-        # Compute how many states are added to the top of the transition list
-        nr_extra_goal_states = max(self.setup.all_deltas)-1
-        self.overhead = 3 + nr_extra_goal_states
-        
         DF_DATA = {
             'state': np.arange(self.nr_states) + self.overhead,
             'region': [item for sublist in region_list for item in sublist],
@@ -203,8 +203,8 @@ class mdp(object):
             self.setup.mdp['filename']+"_"+mode+".sta"
         
         state_file_string = '\n'.join(['(x)\n0:(-3)\n1:(-2)\n2:(-1)'] + 
-            [str(3+i)+':('+str(-4-i)+')' for i in range(nr_extra_goal_states)] +
-            [str(i+3+nr_extra_goal_states)+':('+str(i)+')' for i in range(self.nr_states)])
+            [str(3+i)+':('+str(-4-i)+')' for i in range(self.nr_extra_goal_states)] +
+            [str(i+3+self.nr_extra_goal_states)+':('+str(i)+')' for i in range(self.nr_states)])
         
         # Write content to file
         writeFile(PRISM_statefile, 'w', state_file_string)
@@ -380,12 +380,12 @@ class mdp(object):
             firstrow = '0 0 0 [1.0,1.0]\n1 0 1 [1.0,1.0]\n2 0 2 [1.0,1.0]\n' + \
                 '\n'.join([str(3+i)+
                     ' 0 '+str(3+i-1)+
-                    ' [1.0,1.0]' for i in range(nr_extra_goal_states)]) + '\n'
+                    ' [1.0,1.0]' for i in range(self.nr_extra_goal_states)]) + '\n'
         else:
             firstrow = '0 0 0 1.0\n1 0 1 1.0\n2 0 2 1.0\n' + \
                 '\n'.join([str(3+i)+
                     ' 0 '+str(3+i-1)+
-                    ' 1.0' for i in range(nr_extra_goal_states)]) + '\n'
+                    ' 1.0' for i in range(self.nr_extra_goal_states)]) + '\n'
         
         # Write content to file
         writeFile(PRISM_transitionfile, 'w', header+firstrow+transition_file_flat)

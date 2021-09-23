@@ -887,11 +887,17 @@ class Abstraction(object):
         # Solve the MDP in PRISM (which is called via the terminal)
         policy_file, vector_file = self._solveMDPviaPRISM()
         
-        # Load PRISM results back into Python
-        self.loadPRISMresults(policy_file, vector_file)
-            
         self.time['5_MDPsolved'] = tocDiff(False)
         print('MDP solved in',self.time['5_MDPsolved'])
+        
+        # Load PRISM results back into Python
+        self.loadPRISMresults(policy_file, vector_file)
+        
+        df_filename = self.setup.directories['outputFcase'] + "output_dataframe.json"
+        
+        self.mdp.MAIN_DF.to_json(df_filename)
+        
+        print('Results loaded and saved')
         
     def _solveMDPviaPRISM(self):
         '''
@@ -1009,6 +1015,10 @@ class Abstraction(object):
         
         self.mdp.opt_reward = pI_goal + (1-pI_goal-pI_crit)*self.mdp.opt_reward
         
+        opt_reward_df = pd.DataFrame(self.mdp.opt_reward, 
+                                     index=np.arange(self.mdp.nr_regions))
+        self.mdp.MAIN_DF['opt_reward'] = opt_reward_df
+        
         #####
         
         # Initialize policy columns to dataframe
@@ -1026,6 +1036,7 @@ class Abstraction(object):
             self.mdp.MAIN_DF['opt_action'].loc[index]   = split_matrix[0]
             self.mdp.MAIN_DF['opt_delta'].loc[index]    = split_matrix[1]
             self.mdp.MAIN_DF['opt_ksucc_id'].loc[index] = split_matrix[2]
+            
             
                     
     def generatePlots(self, delta_value, max_delta, case_id, writer,

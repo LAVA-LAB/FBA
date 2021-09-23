@@ -169,7 +169,7 @@ class UAV(master.LTI_master):
             
             self.spec['critical'] = {1: defSpecBlock(self.partition, a=[-9.5,-3.5], b=None, c=[-2,3], d=None),
                                      2: defSpecBlock(self.partition, a=[0, 4.5], b=None, c=[-10, -6], d=None),
-                                     3: defSpecBlock(self.partition, a=[-1.2, 5], b=None, c=[-1.5, 3], d=None),
+                                     3: defSpecBlock(self.partition, a=[-1.5, 5], b=None, c=[-1.5, 3], d=None),
                                      4: defSpecBlock(self.partition, a=[1.0, 4], b=None, c=[8, 11], d=None)}
             
             # Step-bound on property
@@ -269,14 +269,14 @@ class UAV(master.LTI_master):
             self.LTI['Q']  = np.array([[0],[0],[0],[0]])
         
             # Covariance of the process noise
-            self.LTI['noise']['w_cov'] = np.diag([0.10, 0.02, 0.10, 0.02])
+            self.LTI['noise']['w_cov'] = 0.1*np.diag([0.10, 0.02, 0.10, 0.02])
         
             if observer:
                 # Observation matrix
                 self.LTI['C']          = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
                 self.LTI['r']          = len(self.LTI['C'])
                 
-                self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.001
+                self.LTI['noise']['v_cov'] = 0.1*np.eye(np.size(self.LTI['C'],0))*0.1
 
                 self.filter = {'cov0': np.diag([4, .01, 4, .01])}
             

@@ -245,7 +245,8 @@ def createProbabilityPlots(setup, modelDim, partition, mdp, abstr, mc):
     # Plot probability reachabilities
     color = next(ax._get_lines.prop_cycler)['color']
     
-    plt.plot(mdp.opt_reward, label='k=0', linewidth=1, color=color)
+    plt.plot(mdp.MAIN_DF['opt_reward'][: abstr['nr_regions']], 
+             label='k=0', linewidth=1, color=color)
     if setup.montecarlo['enabled'] and not setup.montecarlo['init_states']:
         plt.plot(mc['reachability_probability'], label='Monte carlo (k=0)', \
                  linewidth=1, color=color, linestyle='dashed')
@@ -291,7 +292,8 @@ def createProbabilityPlots(setup, modelDim, partition, mdp, abstr, mc):
         ax  = plt.axes(projection='3d')
         
         # Determine matrix of probability values
-        Z   = np.reshape(mdp.opt_reward, (m[0],m[1]))
+        Z   = np.reshape(mdp.MAIN_DF['opt_reward'][:abstr['nr_regions']].to_numpy(), 
+                         (m[0],m[1]))
         
         # Plot the surface
         surf = ax.plot_surface(plot3D['x'], plot3D['y'], Z, 
@@ -528,7 +530,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
     Ab.mc = {'reachability_probability': mc_obj.results['reachability_probability'],
                  'traces': mc_obj.traces }
     
-    PRISM_reach = Ab.mdp.opt_reward[state_idxs]
+    PRISM_reach = Ab.mdp.MAIN_DF['opt_reward'][state_idxs]
     empirical_reach = Ab.mc['reachability_probability']
     
     print('Probabilistic reachability (PRISM): ',PRISM_reach)
@@ -964,7 +966,7 @@ def reachabilityHeatMap(Ab):
         j = i % y_nr
         k = i // y_nr
         
-        cut_values[k,j] = Ab.mdp.opt_reward[idx]
+        cut_values[k,j] = Ab.mdp.MAIN_DF['opt_reward'][idx]
         cut_coords[k,j,:] = center
     
     if Ab.system.name == 'UAV':

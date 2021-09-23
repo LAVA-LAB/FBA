@@ -13,7 +13,6 @@ import numpy as np              # Import Numpy for computations
 import matplotlib.pyplot as plt # Import Pyplot to generate plots
 
 # Load main classes and methods
-from core.preprocessing.user_interface import load_PRISM_result_file
 from core.commons import createDirectory, tocDiff
 from core.mainFunctions import steadystateCovariance, steadystateCovariance_sdp
 
@@ -25,15 +24,23 @@ from core.filterBasedAbstraction import MonteCarloSim
 
 def filterBasedScheme(Ab, case_id):
 
+    # Set name for the seperate output folders of different instances
+    if Ab.setup.main['newRun']:
+        Ab.setup.directories['outputFcase'] = \
+            Ab.setup.directories['outputF']    
+
+    # Save case-specific data in Excel
+    output_file = Ab.setup.directories['outputFcase'] + \
+        Ab.setup.time['datetime'] + '_data_export.xlsx'
+    
+    # Create a Pandas Excel writer using XlsxWriter as the engine
+    writer = pd.ExcelWriter(output_file, engine='xlsxwriter')    
+
     # Only perform code below is a new run is chosen
     if Ab.setup.main['newRun'] is True:
     
         print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
-        print('START FILTER-BASED ABSTRACTION')
-    
-        # Set name for the seperate output folders of different instances
-        Ab.setup.directories['outputFcase'] = \
-            Ab.setup.directories['outputF'] 
+        print('START FILTER-BASED ABSTRACTION') 
         
         # Create folder to save results
         createDirectory( Ab.setup.directories['outputFcase'] )    
@@ -54,13 +61,6 @@ def filterBasedScheme(Ab, case_id):
         
         # Calculate transition probabilities
         Ab.defTransitions()
-        
-        # Save case-specific data in Excel
-        output_file = Ab.setup.directories['outputFcase'] + \
-            Ab.setup.time['datetime'] + '_data_export.xlsx'
-        
-        # Create a Pandas Excel writer using XlsxWriter as the engine
-        writer = pd.ExcelWriter(output_file, engine='xlsxwriter')
         
         # Build MDP
         model_size = Ab.buildMDP()

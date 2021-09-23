@@ -76,7 +76,8 @@ def user_choice(title, items):
             
     return choice, choice_id
 
-def load_PRISM_result_file(mode_prefix, output_folder, model_name, N):
+def load_PRISM_result_file(mode_prefix, output_folder, model_name, 
+                           k_steadystate=0, N=0):
     '''
     Lets the user load results from a set of existing PRISM files
 
@@ -104,31 +105,53 @@ def load_PRISM_result_file(mode_prefix, output_folder, model_name, N):
 
     # Select a suitable results file to load
     folder_list = next(os.walk(output_folder))
-                       
-    for folder in folder_list[1]:
-        if folder.startswith(mode_prefix+'_'+model_name):
-        
-            run_folder = output_folder + folder
-            subfolder_list = next(os.walk(run_folder))
+      
+    if N != 0:
+        # If N is not zero, then scenario-based
+                 
+        for folder in folder_list[1]:
+            if folder.startswith(mode_prefix+'_'+model_name):
             
-            for subfolder in subfolder_list[1]:
-                if subfolder == 'N='+str(N):
-                    suitable_folders += [subfolder_list[0] + '/' + subfolder]
-
-    suitable_folders_trim = [None for i in range(len(suitable_folders))]
-    for i,folder in enumerate(suitable_folders):
-        # Remove prefix of the folder
-        suitable_folders_trim[i] = '/'.join( folder.split('/')[-2:] )
+                run_folder = output_folder + folder
+                subfolder_list = next(os.walk(run_folder))
+                
+                for subfolder in subfolder_list[1]:
+                    if subfolder == 'N='+str(N):
+                        suitable_folders += [subfolder_list[0] + '/' + subfolder]
+    
+        suitable_folders_trim = [None for i in range(len(suitable_folders))]
+        
+        for i,folder in enumerate(suitable_folders):
+            # Remove prefix of the folder
+            suitable_folders_trim[i] = '/'.join( folder.split('/')[-2:] )
+            
+    else:
+        # If N is zero, then filter-based
+        for folder in folder_list[1]:
+            if folder.startswith(mode_prefix+'_'+model_name + \
+                                 '_ksteadystate='+str(k_steadystate)):
+                
+                run_folder = output_folder + folder
+                subfolder_list = next(os.walk(run_folder))
+                
+                suitable_folders += [subfolder_list[0]]
+        
+        suitable_folders_trim = [None for i in range(len(suitable_folders))]
+        
+        for i,folder in enumerate(suitable_folders):
+            # Remove prefix of the folder
+            suitable_folders_trim[i] = '/'.join( folder.split('/')[-2:] )
         
     # If TRUE monte carlo simulations are performed
     _, folder_idx = user_choice( \
         'Choose a folder to load the PRISM results from...', suitable_folders_trim)
         
     folder_to_load = suitable_folders[folder_idx] + '/'
-    os.chdir(folder_to_load)
     
-    policy_files = glob.glob("*policy.csv")
-    vector_files = glob.glob("*vector.csv")
+    #os.chdir(folder_to_load)
+    
+    policy_files = glob.glob(folder_to_load+"*policy.csv")
+    vector_files = glob.glob(folder_to_load+"*vector.csv")
     
     if len(policy_files) > 0 and len(vector_files) > 0:
         

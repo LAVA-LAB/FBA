@@ -76,9 +76,6 @@ if setup.main['mode'] == 'Filter':
 else:
     setup.main['mode_prefix'] = 'ScAb'
 
-setup.directories['outputF']  = setup.directories['output']+setup.main['mode_prefix']+ \
-    '_'+application+'_' + setup.time['datetime']+'/'
-
 print('\n+++++++++++++++++++++++++++++++++++++++++++++++++++++\n')
 
 #-----------------------------------------------------------------------------
@@ -122,6 +119,10 @@ if twophase:
                                     'value of k at which the steady state phase starts', 'integer')
 else:
     setup.mdp['k_steady_state'] = None
+    
+setup.directories['outputF']  = setup.directories['output']+setup.main['mode_prefix'] + \
+    '_'+application+'_' + 'ksteadystate=' + str(setup.mdp['k_steady_state']) + \
+    '_' + setup.time['datetime']+'/'
     
 setup.main['covarianceMode'] = ['SDP','iterative'][0]
 setup.main['interval_margin'] = 0.001
@@ -169,6 +170,38 @@ if Ab.setup.main['newRun'] is True:
 
     # Create actions and determine which ones are enabled
     Ab.defineActions()
+    
+else:
+    # If no new run was chosen, load the results from existing data files
+
+    # Load results from existing PRISM results files
+    output_folder, policy_file, vector_file = load_PRISM_result_file(
+        Ab.setup.main['mode_prefix'], Ab.setup.directories['output'], 
+        Ab.system.name, k_steadystate = Ab.setup.mdp['k_steady_state'])
+    
+    # Retreive output folder
+    Ab.setup.directories['outputFcase'] = output_folder
+    
+    print(' -- Initialize MDP object')
+    
+    from core.createMDP import mdp
+    Ab.mdp = mdp(Ab.setup, Ab.N, Ab.abstr)
+    
+    print(' -- Load dataframe from .json file')
+    
+    Ab.mdp.MAIN_DF = pd.read_json(output_folder+'output_dataframe.json')
+    
+    # Save case-specific data in Excel
+    output_file = Ab.setup.directories['outputFcase'] + \
+        Ab.setup.time['datetime'] + '_data_export.xlsx'
+    
+    '''
+    print(' -- Load policy file:',policy_file)
+    print(' -- Load vector file:',vector_file)
+
+    # Load results
+    Ab.loadPRISMresults(policy_file, vector_file)
+    '''
 
 #-----------------------------------------------------------------------------
 
