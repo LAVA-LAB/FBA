@@ -488,6 +488,8 @@ def trajectoryPlot(Ab, case_id, writer = None):
         if Ab.system.modelDim == 2:
             x_init = setStateBlock(Ab.system.partition, a=[-8], b=[0], c=[-8], d=[0])
             
+            itersToShow = 1
+            
             cut_value = np.zeros(2)
             for i,d in enumerate(range(1, Ab.system.LTI['n'], 2)):
                 if Ab.system.partition['nrPerDim'][d]/2 != round( Ab.system.partition['nrPerDim'][d]/2 ):
@@ -498,6 +500,8 @@ def trajectoryPlot(Ab, case_id, writer = None):
         elif Ab.system.modelDim == 3:
             x_init = setStateBlock(Ab.system.partition, a=[-6], b=[0], c=[6], d=[0], e=[-6], f=[0])
             
+            itersToShow = 10
+            
             cut_value = np.zeros(3)
             for i,d in enumerate(range(1, Ab.system.LTI['n'], 2)):
                 if Ab.system.partition['nrPerDim'][d]/2 != round( Ab.system.partition['nrPerDim'][d]/2 ):
@@ -507,6 +511,8 @@ def trajectoryPlot(Ab, case_id, writer = None):
                     
     elif Ab.system.name == 'shuttle':
         x_init = setStateBlock(Ab.system.partition, a=[-0.65], b=[-0.85], c=[0], d=[0])
+        
+        itersToShow = 10
         
         cut_value = np.array([0.005, 0.005])
             
@@ -540,8 +546,6 @@ def trajectoryPlot(Ab, case_id, writer = None):
                                     'Empirical reachability': empirical_reach.flatten() }, index=[case_id] )
     if writer != None:
         performance_df.to_excel(writer, sheet_name='Performance')
-    
-    itersToShow = 1
     
     traces = []
     
@@ -952,7 +956,7 @@ def reachabilityHeatMap(Ab):
         
     else:
         
-        printWarning('No appropriate model detected')
+        printWarning('No appropriate model detected to plot heatmap')
         return
           
     cut_values = np.zeros((x_nr, y_nr))
