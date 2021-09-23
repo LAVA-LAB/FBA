@@ -358,8 +358,10 @@ class mdp(object):
                  
             transition_file_list[index] = df_row_string
                  
+        '''
         self.dump = transition_file_list
-            
+        '''  
+        
         flatten = lambda t: [item for sublist in t for subsublist in sublist for item in subsublist]
         transition_file_flat = '\n'.join(flatten(transition_file_list))
         

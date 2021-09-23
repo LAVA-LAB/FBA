@@ -355,8 +355,10 @@ class Abstraction(object):
                            if not self._stateInCritical(region['center']) ] #+ \
                 #[np.array([0,-.1, 0.01, 0.01])]
         
+        '''
         targetPointTuples = [tuple(point) for point in target['d']]        
         target['inv'] = dict(zip(targetPointTuples, range(len(target['d']))))
+        '''
         
         return target
     
@@ -527,7 +529,8 @@ class Abstraction(object):
             if verbose:
                 print('Shift of BRS from origin:',predSet_originShift)
             
-            allRegionVertices = self.abstr['allVerticesFlat'] @ parralelo2cube \
+            # Create flat (2D) array of all vertices
+            allRegionVertices = np.concatenate(self.abstr['allVertices']) @ parralelo2cube \
                     - predSet_originShift
             
         else:
@@ -543,7 +546,8 @@ class Abstraction(object):
                   incremental=False, 
                   interior_point=None)
         
-            allRegionVertices = self.abstr['allVerticesFlat'] 
+            # Create flat (2D) array of all vertices
+            allRegionVertices = np.concatenate(self.abstr['allVertices'])
         
         import sys
         np.set_printoptions(threshold=sys.maxsize)
@@ -718,22 +722,33 @@ class Abstraction(object):
             
         self.abstr['basis_vectors_inv'] = np.linalg.inv( self.abstr['basis_vectors'] )
         
+        '''
         # Find biggest cube that fits within a skewed region
         self.abstr['biggest_cube'] = np.array([findMinDiff(self.abstr['allVertices'][0][:,dim]) 
                                                for dim in range(self.system.LTI['n'])])
+        '''
         
         ##########
-        
-        # Create flat (2D) array of all vertices
-        self.abstr['allVerticesFlat'] = np.concatenate(self.abstr['allVertices'])
         
         self.abstr['goal'] = {'X': {}}
         self.abstr['critical'] = {'X': {}}
         
-        for k in range(1,self.N + 1):    
+        # Retreive type of horizon
+        if self.setup.mdp['k_steady_state'] == None:
+            N_max = self.N
+        else:
+            N_max = self.setup.mdp['k_steady_state'] + 1
+        
+        for k in range(1, N_max + 1):    
             
             if self.setup.main['mode'] == 'Filter':
-                epsilon = self.km[1][k]['error_bound']
+                if k == N_max:
+                    # If in steady-state phase compute biggest epsilon
+                    epsilon = max([self.km[1][kk]['error_bound'] 
+                                   for kk in range(k, self.N+1)])
+                else:
+                    # If in transient phase, use current epsilon only
+                    epsilon = self.km[1][k]['error_bound']
             else:
                 epsilon = np.zeros(self.system.LTI['n'])
         
