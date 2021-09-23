@@ -64,18 +64,10 @@ class filterBasedAbstraction(Abstraction):
         Abstraction.definePartition(self)
         
         # Compute array of all region centers
-        allCentersArray = np.array([region['center'] for region in self.abstr['P'].values()])
-        
-        self.abstr['action_distances'] = dict()
-        
-        for delta in self.setup.all_deltas:
-            
-            self.abstr['action_distances'][delta] = {a: self.abstr['target'][delta]['d'][a] - allCentersArray
-                                                     for a in range(self.abstr['nr_actions'][delta])}
-            
+        self.abstr['allCentersArray'] = np.array([region['center'] for region in self.abstr['P'].values()])
             
     def _computeProbabilityBounds(self, tab, Sigma_worst, Sigma_best, 
-                                  actions_inv, action_distances, target_points,
+                                  abstr, delta,
                                   GOAL, CRITICAL, verbose=True):
         '''
         Compute transition probability intervals (bounds)
@@ -128,13 +120,18 @@ class filterBasedAbstraction(Abstraction):
         # Initialize switch to show warning only once
         warningSwitch = False
         
+        target_points = abstr['target'][delta]['d']
+        
+        action_distances = [target_points[a] - abstr['allCentersArray']
+                            for a in range(abstr['nr_actions'][delta]) ]
+        
         # For every action (i.e. target point)
-        for a in range(len(actions_inv)):
+        for a in range(len(abstr['actions_inv'][delta])):
             
             skipped_counter = 0
         
             # Check if action a is available in any state at all
-            if len(actions_inv[a]) > 0:
+            if len(abstr['actions_inv'][delta][a]) > 0:
                     
                 prob[a] = dict()
                     
@@ -600,7 +597,8 @@ class filterBasedAbstraction(Abstraction):
             
             self.trans['prob'][1][k_prime] = \
                 self._computeProbabilityBounds(tab, Sigma_worst, Sigma_best, 
-                   self.abstr['actions_inv'][1], self.abstr['action_distances'][1], self.abstr['target'][1]['d'],
+                   self.abstr, 1,
+                   #self.abstr['actions_inv'][1], self.abstr['action_distances'][1], self.abstr['target'][1]['d'],
                    goal, critical)
             
         # Delete iterable variables
@@ -626,7 +624,8 @@ class filterBasedAbstraction(Abstraction):
             # steady-state portion of the time horizon
             self.trans['prob'][1][k_prime] = \
                 self._computeProbabilityBounds(tab, Sigma_worst, Sigma_best, 
-                   self.abstr['actions_inv'][1], self.abstr['action_distances'][1], self.abstr['target'][1]['d'],
+                   self.abstr, 1,
+                   #self.abstr['actions_inv'][1], self.abstr['action_distances'][1], self.abstr['target'][1]['d'],
                    goal, critical)
                 
         ######
@@ -655,7 +654,8 @@ class filterBasedAbstraction(Abstraction):
                 
                 self.trans['prob'][delta][k_prime] = \
                     self._computeProbabilityBounds(tab, Sigma_worst, Sigma_best, 
-                       self.abstr['actions_inv'][delta], self.abstr['action_distances'][delta], self.abstr['target'][delta]['d'], 
+                       self.abstr, delta,
+                       #self.abstr['actions_inv'][delta], self.abstr['action_distances'][delta], self.abstr['target'][delta]['d'], 
                        goal, critical)
                 
             # Delete iterable variables
