@@ -133,11 +133,13 @@ _, choice = user_choice( \
     ['New abstraction', 'Load existing results'])
 setup.main['newRun'] = not choice
 
+'''
 if setup.main['newRun'] is True:
     # Create noise samples
     if system.name in ['UAV'] and system.modelDim == 3:
         setup.setOptions(category='scenarios', gaussian=False)
         system.setTurbulenceNoise(setup.scenarios['samples_max'])
+'''
 
 if setup.main['iterative'] is True and setup.main['newRun'] is False:
     printWarning("Iterative scheme cannot be combined with loading existing "+

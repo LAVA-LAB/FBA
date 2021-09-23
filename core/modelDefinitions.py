@@ -172,6 +172,9 @@ class UAV(master.LTI_master):
                                      3: defSpecBlock(self.partition, a=[-1.2, 5], b=None, c=[-1.5, 3], d=None),
                                      4: defSpecBlock(self.partition, a=[1.0, 4], b=None, c=[8, 11], d=None)}
             
+            # Step-bound on property
+            self.endTime = 24
+            
         elif self.modelDim == 3:
             
             self.adaptive = {'rates': [],
@@ -192,22 +195,22 @@ class UAV(master.LTI_master):
             self.targets['domain']      = 'auto'
             
             # Specification information
-            self.spec['goal'] = setStateBlock(self.partition, a=[4,6], b=[None], c=[4,6], d=[None], e=[4,6], f=[None])
+            self.spec['goal'] = {1: defSpecBlock(self.partition, a=[4, 6], b=None, c=[4, 6], d=None, e=[4, 6], f=None)}
             
-            self.spec['critical']   = np.vstack((
-                setStateBlock(self.partition, a=[-2,0], b=[None], c=[2,4,6], d=[None], e=[None], f=[None]),
-                setStateBlock(self.partition, a=[-6,-4], b=[None], c=[4,6], d=[None], e=[4,6], f=[None]),
-                setStateBlock(self.partition, a=[-2,0], b=[None], c=[-6,-4,-2,0], d=[None], e=[-6,-4], f=[None]),
-                setStateBlock(self.partition, a=[2,4,6], b=[None], c=[-6,-4], d=[None], e=[-6,-4], f=[None]),
-                setStateBlock(self.partition, a=[-2,0], b=[None], c=[-6,-4], d=[None], e=[-2,0], f=[None])
-                ))
+            self.spec['critical']   = {
+                1: defSpecBlock(self.partition, a=[-2,0], b=None, c=[2,6], d=None, e=None, f=None),
+                2: defSpecBlock(self.partition, a=[-6,-4], b=None, c=[4,6], d=None, e=[4,6], f=None),
+                3: defSpecBlock(self.partition, a=[-2,0], b=None, c=[-6,0], d=None, e=[-6,-4], f=None),
+                4: defSpecBlock(self.partition, a=[2,6], b=None, c=[-6,-4], d=None, e=[-6,-4], f=None),
+                5: defSpecBlock(self.partition, a=[-2,0], b=None, c=[-6,-4], d=None, e=[-2,0], f=None)
+                }
+            
+            # Step-bound on property
+            self.endTime = 16
         
         else:
             print('No valid dimension for the drone model was provided')
             sys.exit()
-        
-        # Step-bound on property
-        self.endTime = 24
 
     def setModel(self, observer):
         '''
@@ -246,14 +249,17 @@ class UAV(master.LTI_master):
             # Disturbance matrix
             self.LTI['Q']  = np.array([[0],[0],[0],[0],[0],[0]])
             
+            # Covariance of the process noise
+            self.LTI['noise']['w_cov'] = np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
+            
             if observer:
                 # Observation matrix
                 self.LTI['C']          = np.array([[1,0,0,0,0,0], [0,0,1,0,0,0], [0,0,0,0,1,0]])
                 self.LTI['r']          = len(self.LTI['C'])
                 
-                self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.15
+                self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.1
                 
-            self.filter = {'cov0': np.diag([1, .01, 1, .01, 1, .01])}
+                self.filter = {'cov0': np.diag([1, .01, 1, .01, 1, .01])}
                 
         else:
             self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock)
