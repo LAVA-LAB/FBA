@@ -125,7 +125,8 @@ else:
     
 setup.main['covarianceMode'] = ['SDP','iterative'][0]
 setup.main['interval_margin'] = 0.001
-setup.precision = 5
+setup.floating_point_precision = 5
+setup.MDP_prob_decimals = 5 # Number of decimals to round off on
 
 # If TRUE monte carlo simulations are performed
 _, choice = user_choice( \

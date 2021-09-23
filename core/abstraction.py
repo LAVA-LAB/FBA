@@ -167,7 +167,7 @@ class Abstraction(object):
         abstr['nr_regions'] = len(abstr['P'])
         abstr['origin'] = self.system.partition['origin']
         
-        centerTuples = [tuple(np.round(region['center'], self.setup.precision)) 
+        centerTuples = [tuple(np.round(region['center'], self.setup.floating_point_precision)) 
                               for region in abstr['P'].values()] 
         
         abstr['allCentersCubic'] = dict(zip(centerTuples, 

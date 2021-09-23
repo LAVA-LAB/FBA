@@ -86,8 +86,9 @@ class filterBasedAbstraction(Abstraction):
         d = self.system.base_delta
         printEvery = min(100, max(1, int(self.abstr['nr_actions'][d]/10)))
 
-        nr_decimals = 5 # Number of decimals to round off on
-        threshold_decimals = 4 # Minimum probability to model
+        # Number of decimals to round off on
+        nr_decimals = self.setup.MDP_prob_decimals 
+        threshold_decimals = self.setup.MDP_prob_decimals - 1
                 
         # Transform covariance back to hypercubic partition
         if self.setup.main['skewed']:
@@ -220,17 +221,17 @@ class filterBasedAbstraction(Abstraction):
                                 floor_decimal(sum([mvn.mvnun(
                                  list(lims[:,0]), list(lims[:,1]), muCubic, SigmaCubic_worst)[0] 
                                  for lims in all_limits.values()
-                                 ]), 6)     
+                                 ]), threshold_decimals)     
                     
                         else:
                             prob_goal_worst = floor_decimal(sum([mvn.mvnun(
                                 list(lims[:,0]), list(lims[:,1]), muCubic, SigmaCubic_worst)[0] 
                                 for lims in all_limits.values()
-                                ]), 6)
+                                ]), threshold_decimals)
                             prob_goal_best = floor_decimal(sum([mvn.mvnun(
                                 list(lims[:,0]), list(lims[:,1]), muCubic, SigmaCubic_best)[0] 
                                 for lims in all_limits.values()
-                                ]), 6)
+                                ]), threshold_decimals)
                             
                     else:
                         prob_goal_worst = 0
@@ -394,7 +395,7 @@ class filterBasedAbstraction(Abstraction):
 
         '''
 
-        threshold_decimals = 4 # Minimum probability to model
+        threshold_decimals = self.setup.MDP_prob_decimals
                 
         # Transform covariance back to hypercubic partition
         if self.setup.main['skewed']:
@@ -826,13 +827,13 @@ class MonteCarloSim():
             x_cubic = skew2cubic(x[k], self.abstr)
             
             cubic_center_x = computeRegionCenters(x_cubic, 
-                    self.system.partition, self.setup.precision).flatten()
+                    self.system.partition, self.setup.floating_point_precision).flatten()
             
             # Determine in which region the BELIEF MEAN is
             mu_cubic = skew2cubic(mu[k], self.abstr)
             
             cubic_center_mu = computeRegionCenters(mu_cubic, 
-                    self.system.partition, self.setup.precision).flatten()
+                    self.system.partition, self.setup.floating_point_precision).flatten()
             
             # Check if the state is in a goal region
             if self._stateInGoal( point=x_cubic ):

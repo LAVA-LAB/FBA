@@ -509,7 +509,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
         cut_value = np.array([0.005, 0.005])
             
     # Compute all centers of regions associated with points
-    x_init_centers = computeRegionCenters(np.array(x_init), Ab.system.partition, Ab.setup.precision)
+    x_init_centers = computeRegionCenters(np.array(x_init), Ab.system.partition, Ab.setup.floating_point_precision)
     
     # Filter to only keep unique centers
     x_init_unique = np.unique(x_init_centers, axis=0)

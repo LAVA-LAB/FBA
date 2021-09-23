@@ -276,7 +276,7 @@ class UAV(master.LTI_master):
                 self.LTI['C']          = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
                 self.LTI['r']          = len(self.LTI['C'])
                 
-                self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.01
+                self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.001
 
                 self.filter = {'cov0': np.diag([4, .01, 4, .01])}
             

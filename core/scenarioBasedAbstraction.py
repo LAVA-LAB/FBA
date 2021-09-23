@@ -150,7 +150,7 @@ class scenarioBasedAbstraction(Abstraction):
         counts = dict()
         
         # Compute to which regions the samples belong
-        centers_cubic = computeRegionCenters(samples, partition, setup.precision)
+        centers_cubic = computeRegionCenters(samples, partition, setup.floating_point_precision)
         
         for s in range(Nsamples):
             
@@ -448,7 +448,7 @@ class scenarioBasedAbstraction(Abstraction):
                             x_cubic = skew2cubic(x[k], self.abstr)
                             
                             cubic_center = computeRegionCenters(x_cubic, 
-                                self.system.partition, self.setup.precision).flatten()
+                                self.system.partition, self.setup.floating_point_precision).flatten()
                             
                             if tuple(cubic_center) in self.abstr['allCentersCubic']:
                                 # Save that state is currently in region ii
