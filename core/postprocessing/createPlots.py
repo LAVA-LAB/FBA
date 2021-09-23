@@ -530,7 +530,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
     Ab.mc = {'reachability_probability': mc_obj.results['reachability_probability'],
                  'traces': mc_obj.traces }
     
-    PRISM_reach = Ab.mdp.MAIN_DF['opt_reward'][state_idxs]
+    PRISM_reach = Ab.mdp.MAIN_DF['opt_reward'][state_idxs].to_numpy()
     empirical_reach = Ab.mc['reachability_probability']
     
     print('Probabilistic reachability (PRISM): ',PRISM_reach)

@@ -169,7 +169,7 @@ class UAV(master.LTI_master):
             
             self.spec['critical'] = {1: defSpecBlock(self.partition, a=[-9.5,-3.5], b=None, c=[-2,3], d=None),
                                      2: defSpecBlock(self.partition, a=[0, 4.5], b=None, c=[-10, -6], d=None),
-                                     3: defSpecBlock(self.partition, a=[-1.5, 5], b=None, c=[-1.5, 3], d=None),
+                                     3: defSpecBlock(self.partition, a=[-0.7, 5], b=None, c=[-1.5, 3], d=None),
                                      4: defSpecBlock(self.partition, a=[1.0, 4], b=None, c=[8, 11], d=None)}
             
             # Step-bound on property
