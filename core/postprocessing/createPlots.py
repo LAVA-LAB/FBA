@@ -939,7 +939,7 @@ def reachabilityHeatMap(Ab):
                Ab.system.partition['width'], 
                Ab.system.partition['origin'], onlyCenter=True)
         
-    elif Ab.system.name == 'UAV':
+    elif Ab.system.name == 'UAV' and Ab.system.modelDim == 2:
         
         x_nr = Ab.system.partition['nrPerDim'][0]
         y_nr = Ab.system.partition['nrPerDim'][2]

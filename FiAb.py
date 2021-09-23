@@ -103,9 +103,9 @@ def filterBasedScheme(Ab, case_id):
     
     # Plot results
     Ab.generatePlots( delta_value = 1, 
-                       max_delta = max(Ab.setup.all_deltas),
-                       case_id = case_id,
-                       writer = writer)
+                      max_delta = max(Ab.setup.all_deltas),
+                      case_id = case_id,
+                      writer = writer)
     
     # %%
     
