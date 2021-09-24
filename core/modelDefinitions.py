@@ -55,8 +55,8 @@ class double_integrator(master.LTI_master):
         self.control['limits']['uMax'] =  [5]
         
         # Partition size
-        self.partition['nrPerDim']  = [21, 21]
-        self.partition['width']     = [2, 2] 
+        self.partition['nrPerDim']  = [41, 41]
+        self.partition['width']     = [1, 1] 
         self.partition['origin']    = [0, 0]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
