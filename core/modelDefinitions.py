@@ -60,9 +60,10 @@ class double_integrator(master.LTI_master):
         # Partition size
         if partition == 0:
             self.partition['nrPerDim']  = [21, 21]
+            self.partition['width']     = [2, 2] 
         else:
             self.partition['nrPerDim']  = [41, 41]
-        self.partition['width']     = [1, 1] 
+            self.partition['width']     = [1, 1] 
         self.partition['origin']    = [0, 0]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
