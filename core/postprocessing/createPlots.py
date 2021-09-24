@@ -512,7 +512,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
                     cut_value[i] = Ab.system.partition['width'][d] / 2                
             
         elif Ab.system.modelDim == 3:
-            x_init = setStateBlock(Ab.system.partition, a=[-11], b=[0], c=[5], d=[0], e=[-5], f=[0])
+            x_init = Ab.system.x0 #setStateBlock(Ab.system.partition, a=[-11], b=[0], c=[5], d=[0], e=[-5], f=[0])
             
             itersToShow = 10
             
