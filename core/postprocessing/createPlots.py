@@ -458,6 +458,20 @@ def policyPlot(setup, model, partition, results, abstr):
         
     plt.show()
         
+def UAV_3D_plotLayout(Ab):
+    '''
+    Create a plot that shows the layout of the UAV problem
+    '''
+    
+    cut_value = np.zeros(3)
+    for i,d in enumerate(range(1, Ab.system.LTI['n'], 2)):
+        if Ab.system.partition['nrPerDim'][d]/2 != round( Ab.system.partition['nrPerDim'][d]/2 ):
+            cut_value[i] = 0
+        else:
+            cut_value[i] = Ab.system.partition['width'][d] / 2    
+    
+    UAVplot3d_visvis( Ab.setup, Ab.system.spec, cut_value, traces=[] ) 
+    
 def trajectoryPlot(Ab, case_id, writer = None):
     '''
     Create the trajectory plots for the UAV benchmarks
@@ -615,8 +629,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
         if Ab.setup.main['iterative'] is False and Ab.setup.plotting['3D_UAV']:
         
             # Only plot trajectory plot in non-iterative mode (because it pauses the script)
-            UAVplot3d_visvis( Ab.setup, Ab.model[min_delta], 
-                 Ab.system.partition, Ab.abstr, traces, cut_value ) 
+            UAVplot3d_visvis( Ab.setup, Ab.system.spec, cut_value, traces ) 
     
     return performance_df, traces
     
@@ -789,7 +802,7 @@ def trajectoryPlot2D(i_show, i_hide, plot_time, N, setup, model, partition, spec
     
     return filename+'.png'
     
-def UAVplot3d_visvis(setup, model, partition, abstr, traces, cut_value):
+def UAVplot3d_visvis(setup, spec, cut_value, traces):
     '''
     Create 3D trajectory plots for the 3D UAV benchmark
 
@@ -825,34 +838,30 @@ def UAVplot3d_visvis(setup, model, partition, abstr, traces, cut_value):
     iy = 2
     iz = 4
     
-    regionWidth_xyz = np.array([partition['width'][0], 
-                                partition['width'][2], 
-                                partition['width'][4]])    
-    
     # Draw goal states
-    for goal in abstr['goal']['zero_bound']:
+    for region in spec['goal'].values():
         
-        goalState = abstr['P'][goal]
-        if goalState['center'][1] == cut_value[0] and goalState['center'][3] == cut_value[1] and goalState['center'][5] == cut_value[2]:
+        center = np.mean( region['limits'], axis=1 )
+        size   = (region['limits'][:,1] - region['limits'][:,0])[[0,2,4]]
         
-            center_xyz = np.array([goalState['center'][0], 
-                                   goalState['center'][2], 
-                                   goalState['center'][4]])
+        if center[1] == cut_value[0] and center[3] == cut_value[1] and center[5] == cut_value[2]:
+        
+            center_xyz = center[[0,2,4]]
             
-            goal = vv.solidBox(tuple(center_xyz), scaling=tuple(regionWidth_xyz))
+            goal = vv.solidBox(tuple(center_xyz), scaling=tuple(size))
             goal.faceColor = (0,1,0,0.5)
             
     # Draw critical states
-    for crit in abstr['critical']['zero_bound']:
+    for region in spec['critical'].values():
         
-        critState = abstr['P'][crit]
-        if critState['center'][1] == cut_value[0] and critState['center'][3] == cut_value[1] and critState['center'][5] == cut_value[2]:
+        center = np.mean( region['limits'], axis=1 )
+        size   = (region['limits'][:,1] - region['limits'][:,0])[[0,2,4]]
         
-            center_xyz = np.array([critState['center'][0], 
-                                   critState['center'][2], 
-                                   critState['center'][4]])    
+        if center[1] == cut_value[0] and center[3] == cut_value[1] and center[5] == cut_value[2]:
         
-            critical = vv.solidBox(tuple(center_xyz), scaling=tuple(regionWidth_xyz))
+            center_xyz = center[[0,2,4]]
+            
+            critical = vv.solidBox(tuple(center_xyz), scaling=tuple(size))
             critical.faceColor = (1,0,0,0.5)
     
     # Add traces

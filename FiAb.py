@@ -24,11 +24,6 @@ from core.filterBasedAbstraction import MonteCarloSim
 
 def filterBasedScheme(Ab, case_id):
 
-    # Set name for the seperate output folders of different instances
-    if Ab.setup.main['newRun']:
-        Ab.setup.directories['outputFcase'] = \
-            Ab.setup.directories['outputF']    
-
     # Save case-specific data in Excel
     output_file = Ab.setup.directories['outputFcase'] + \
         Ab.setup.time['datetime'] + '_data_export.xlsx'

@@ -185,6 +185,8 @@ class UAV(master.LTI_master):
             self.control['limits']['uMin'] = [-4, -4, -4]
             self.control['limits']['uMax'] = [4, 4, 4]
             
+            #######################################
+            
             # Partition size
             self.partition['nrPerDim']  = [7, 5, 7, 5, 7, 5]
             self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
@@ -204,6 +206,25 @@ class UAV(master.LTI_master):
                 4: defSpecBlock(self.partition, a=[1,7], b=None, c=[-7,-3], d=None, e=[-7,-5], f=None),
                 5: defSpecBlock(self.partition, a=[-3,1], b=None, c=[-7,-3], d=None, e=[-3,1], f=None)
                 }
+            
+            #######################################
+            
+            # Partition size
+            self.partition['nrPerDim']  = [13, 3, 7, 3, 7, 3]
+            self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
+            self.partition['origin']    = [0, 0, 0, 0, 0, 0]
+            
+            # Specification information
+            self.spec['goal'] = {1: defSpecBlock(self.partition, a=[9, 13], b=None, c=[3, 7], d=None, e=[4, 7], f=None)}
+            
+            self.spec['critical']   = {
+                1: defSpecBlock(self.partition, a=[2, 7], b=None, c=[2, 7], d=None, e=[-7 ,5], f=None),
+                2: defSpecBlock(self.partition, a=[8,13], b=None, c=[-7, 0], d=None, e=[-7, -1], f=None),
+                3: defSpecBlock(self.partition, a=[-8, -2], b=None, c=[1,7], d=None, e=[-7,1], f=None),
+                4: defSpecBlock(self.partition, a=[-12,1], b=None, c=[-7,-3], d=None, e=[-7,-3], f=None)
+                }
+            
+            #######################################
             
             # Step-bound on property
             self.endTime = 24

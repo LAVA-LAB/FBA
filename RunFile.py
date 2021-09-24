@@ -152,6 +152,12 @@ if setup.main['iterative'] is True and setup.main['newRun'] is False:
 # Create the main object for the current instance
 if setup.main['mode'] == 'Filter':
     Ab = filterBasedAbstraction(setup=setup, system=system)
+    
+    # Set name for the seperate output folders of different instances
+    if Ab.setup.main['newRun']:
+        Ab.setup.directories['outputFcase'] = \
+            Ab.setup.directories['outputF']    
+    
 else:
     Ab = scenarioBasedAbstraction(setup=setup, system=system)
 
