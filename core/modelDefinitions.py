@@ -58,7 +58,7 @@ class double_integrator(master.LTI_master):
                                    ['21x21', '41x41'])
         
         # Partition size
-        if partition == 1:
+        if partition == 0:
             self.partition['nrPerDim']  = [21, 21]
         else:
             self.partition['nrPerDim']  = [41, 41]
