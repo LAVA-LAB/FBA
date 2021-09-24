@@ -6,3 +6,4 @@ mdp.prism_folder = /home/tbadings/Documents/SBA/prism-imc/prism/
 mdp.mode = interval
 mdp.prism_model_writer = explicit
 mdp.prism_java_memory = 7
+mdp.prism_java_memory = 24

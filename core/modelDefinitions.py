@@ -54,8 +54,14 @@ class double_integrator(master.LTI_master):
         self.control['limits']['uMin'] =  [-5]
         self.control['limits']['uMax'] =  [5]
         
+        _, partition  = ui.user_choice('partition size (number of regions)', \
+                                   ['21x21', '41x41'])
+        
         # Partition size
-        self.partition['nrPerDim']  = [41, 41]
+        if partition == 1:
+            self.partition['nrPerDim']  = [21, 21]
+        else:
+            self.partition['nrPerDim']  = [41, 41]
         self.partition['width']     = [1, 1] 
         self.partition['origin']    = [0, 0]
         
