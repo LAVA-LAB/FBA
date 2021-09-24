@@ -256,7 +256,7 @@ class UAV(master.LTI_master):
                     2: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-7, -1.5], f=None),
                     3: defSpecBlock(self.partition, a=[-11, -9], b=None, c=[-2, 2], d=None, e=[-7, -4], f=None),
                     4: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-11, -4], d=None, e=[4,7], f=None),
-                    5: defSpecBlock(self.partition, a=[6, 10], b=None, c=[-10, -6], d=None, e=[-7, 2], f=None),
+                    5: defSpecBlock(self.partition, a=[6, 10], b=None, c=[-11, -7], d=None, e=[-7, 2], f=None),
                     6: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-6.5, -2.5], d=None, e=[-7,-1], f=None)
                     }
                 
