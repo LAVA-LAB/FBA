@@ -612,7 +612,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
             out.release()
             
     elif Ab.system.modelDim == 3:
-        if Ab.setup.main['iterative'] is False or Ab.setup.plotting['3D_UAV']:
+        if Ab.setup.main['iterative'] is False and Ab.setup.plotting['3D_UAV']:
         
             # Only plot trajectory plot in non-iterative mode (because it pauses the script)
             UAVplot3d_visvis( Ab.setup, Ab.model[min_delta], 
