@@ -47,7 +47,7 @@ class double_integrator(master.LTI_master):
                                    [[],[2],[2,4],[2,4,6]])
         
         self.adaptive = {'rates': rates,
-                         'target_points': np.array([[i, j] for i in range(-20,21,4) for j in range(-8,10,8)])
+                         'target_points': np.array([[i, j] for i in range(-20,21,2) for j in range(-8,10,4)])
                          }
         
         # Authority limit for the control u, both positive and negative
@@ -107,7 +107,7 @@ class double_integrator(master.LTI_master):
             
             self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.25
             
-            self.filter = {'cov0': np.diag([2, 2])}
+            self.filter = {'cov0': np.diag([2, 1])}
         
         # Disturbance matrix
         self.LTI['Q']  = np.array([[0],[0]])
@@ -215,12 +215,12 @@ class UAV(master.LTI_master):
             self.partition['origin']    = [0, 0, 0, 0, 0, 0]
             
             # Specification information
-            self.spec['goal'] = {1: defSpecBlock(self.partition, a=[9, 13], b=None, c=[3, 7], d=None, e=[4, 7], f=None)}
+            self.spec['goal'] = {1: defSpecBlock(self.partition, a=[9, 13], b=None, c=[3, 7], d=None, e=[-7, -4], f=None)}
             
             self.spec['critical']   = {
                 1: defSpecBlock(self.partition, a=[2, 7], b=None, c=[2, 7], d=None, e=[-7 ,5], f=None),
                 2: defSpecBlock(self.partition, a=[8,13], b=None, c=[-7, 0], d=None, e=[-7, -1], f=None),
-                3: defSpecBlock(self.partition, a=[-8, -2], b=None, c=[1,7], d=None, e=[-7,1], f=None),
+                3: defSpecBlock(self.partition, a=[-6, -1], b=None, c=[-1,5], d=None, e=[-7,1], f=None),
                 4: defSpecBlock(self.partition, a=[-12,1], b=None, c=[-7,-3], d=None, e=[-7,-3], f=None)
                 }
             
@@ -307,7 +307,7 @@ class UAV(master.LTI_master):
                 
                 self.LTI['noise']['v_cov'] = noiseStrength * np.eye(np.size(self.LTI['C'],0))*0.1
 
-                self.filter = {'cov0': np.diag([4, .01, 4, .01])}
+                self.filter = {'cov0': np.diag([2, 1, 2, 1])}
             
         # Determine system dimensions
         self.LTI['n'] = np.size(self.LTI['A'],1)

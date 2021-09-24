@@ -468,7 +468,7 @@ class filterBasedAbstraction(Abstraction):
         # List to compute best-case covariance
         covsTilde = []
         covsPred  = []
-        covs      = []
+        covs      = [self.system.filter['cov0']]
         
         # Kalman filter list definitions
         self.km[1] = {}#[dict() for i in range(self.N+1)]
@@ -520,7 +520,7 @@ class filterBasedAbstraction(Abstraction):
                         jump_km[gamma]['cov_pred']    += [belief['cov_pred']]
                         jump_km[gamma]['cov_tilde']   += [belief['cov_tilde']]
                         jump_km[gamma]['error_bound'] += [belief['error_bound']]
-                 
+                        
                 self.km[delta] = [dict() for g in range(self.km['waiting_time']+2)]
                 for gamma in range(0, self.km['waiting_time'] + 2):
                     
@@ -604,8 +604,8 @@ class filterBasedAbstraction(Abstraction):
         for k in k_range:
             
             k_prime     = k + 1
-            goal        = self.abstr['goal'][k_prime]
-            critical    = self.abstr['critical'][k_prime]
+            goal        = self.abstr['goal'][1][k_prime]
+            critical    = self.abstr['critical'][1][k_prime]
             
             Sigma_worst = self.km[1][k_prime]['cov_tilde']
             Sigma_best  = self.km[1][k_prime]['cov_tilde']
@@ -628,8 +628,8 @@ class filterBasedAbstraction(Abstraction):
         if self.setup.mdp['k_steady_state'] != None:
             
             k_prime     = self.setup.mdp['k_steady_state'] + 1
-            goal        = self.abstr['goal'][k_prime]
-            critical    = self.abstr['critical'][k_prime]
+            goal        = self.abstr['goal'][1][k_prime]
+            critical    = self.abstr['critical'][1][k_prime]
             
             Sigma_worst = self.km[1]['steady']['worst']
             Sigma_best  = self.km[1]['steady']['best']

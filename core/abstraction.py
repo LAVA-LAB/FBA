@@ -238,9 +238,11 @@ class Abstraction(object):
                         if region not in limits_overlap:
                             limits_overlap[region] = {}
                         
-                        limits_overlap[region][bl] = computeRegionOverlap(limits_region, limits_eps)
+                        limits = computeRegionOverlap(limits_region, limits_eps)
                         
-                        if typ == "goal" and limits_overlap[region][bl] is not None:
+                        if limits is not None:
+                            limits_overlap[region][bl] = limits
+                            
                             goalAnywhere = True
                         
         if typ == "goal" and goalAnywhere is False:
@@ -554,7 +556,7 @@ class Abstraction(object):
         
         # Put goal regions up front of the list of actions
         '''
-        action_range = f7(np.concatenate(( list(self.abstr['goal'][0].keys()),
+        action_range = f7(np.concatenate(( list(self.abstr['goal'][1][0].keys()),
                            np.arange(self.abstr['nr_actions']) )))
         '''
         
@@ -635,7 +637,7 @@ class Abstraction(object):
                 # Partition plot for the goal state, also showing pre-image
                 print('Create partition plot...')
                 
-                partitionPlot2D((0,1), (2,3), self.abstr['goal'][0], 
+                partitionPlot2D((0,1), (2,3), self.abstr['goal'][1][0], 
                     delta, self.setup, self.model[delta], self.system.partition, self.abstr, 
                     self.abstr['allVertices'], predecessor_set)
             
@@ -649,7 +651,7 @@ class Abstraction(object):
             enabled_in_states[action_id] = np.nonzero(enabled_in)[0]
                 
             if action_id % printEvery == 0 or delta > 1:
-                if action_id in self.abstr['goal'][0]:
+                if action_id in self.abstr['goal'][1][0]:
                     print(' -- GOAL action',str(action_id),'enabled in',
                           str(len(enabled_in_states[action_id])),
                           'states - target point:',
@@ -730,8 +732,8 @@ class Abstraction(object):
         
         ##########
         
-        self.abstr['goal'] = {'X': {}}
-        self.abstr['critical'] = {'X': {}}
+        self.abstr['goal'] = {1: {}}
+        self.abstr['critical'] = {1: {}}
         
         # Retreive type of horizon
         if self.setup.mdp['k_steady_state'] == None:
@@ -739,6 +741,7 @@ class Abstraction(object):
         else:
             N_max = self.setup.mdp['k_steady_state'] + 1
         
+        # At base rate delta=1
         for k in range(1, N_max + 1):    
             
             if self.setup.main['mode'] == 'Filter':
@@ -753,23 +756,25 @@ class Abstraction(object):
                 epsilon = np.zeros(self.system.LTI['n'])
         
             # Determine goal regions
-            self.abstr['goal'][k] = self._defStateLabelSet(
+            self.abstr['goal'][1][k] = self._defStateLabelSet(
                 self.abstr['allVertices'],
                 self.system.spec['goal'], typ="goal", epsilon=epsilon)
             
             # Determine critical regions
-            self.abstr['critical'][k] = self._defStateLabelSet(
+            self.abstr['critical'][1][k] = self._defStateLabelSet(
                 self.abstr['allVertices'],
                 self.system.spec['critical'], typ="critical", epsilon=epsilon)
            
-        self.abstr['goal'][0] = self.abstr['goal'][1]
-        self.abstr['critical'][0] = self.abstr['critical'][1]
+        self.abstr['goal'][1][0] = self.abstr['goal'][1][1]
+        self.abstr['critical'][1][0] = self.abstr['critical'][1][1]
+        
+        ######
         
         for delta in self.setup.jump_deltas:
             # Compute goal and critical regions for higher delta states
             
-            self.abstr['goal'][delta] = dict()
-            self.abstr['critical'][delta] = dict()
+            self.abstr['goal'][delta] = {}
+            self.abstr['critical'][delta] = {}
             
             for gamma in range(0, self.km['waiting_time'] + 1):
             
