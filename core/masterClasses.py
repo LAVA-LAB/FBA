@@ -185,7 +185,7 @@ class settings(object):
         plot = dict()
         # TRUE/FALSE setup whether plots should be generated
         plot['partitionPlot']           = False
-        plot['3D_UAV']                  = True
+        plot['3D_UAV']                  = False
         plot['partitionPlot_plotHull']  = True
         plot['probabilityPlots']        = True
         plot['exportFormats']           = ['pdf','png']
