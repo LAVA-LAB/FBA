@@ -257,7 +257,7 @@ class UAV(master.LTI_master):
                     3: defSpecBlock(self.partition, a=[-11, -9], b=None, c=[-2, 2], d=None, e=[-7, -4], f=None),
                     4: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-11, -4], d=None, e=[4,7], f=None),
                     5: defSpecBlock(self.partition, a=[6, 10], b=None, c=[-10, -6], d=None, e=[-7, 2], f=None),
-                    6: defSpecBlock(self.partition, a=[-3, 1], b=None, c=[-6.5, -2.5], d=None, e=[-7,-3], f=None)
+                    6: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-6.5, -2.5], d=None, e=[-7,-1], f=None)
                     }
                 
                 self.x0 = np.array([[-9.5, 0, 9.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
