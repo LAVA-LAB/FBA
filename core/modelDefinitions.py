@@ -47,7 +47,7 @@ class double_integrator(master.LTI_master):
                                    [[],[2],[2,4],[2,4,6]])
         
         self.adaptive = {'rates': rates,
-                         'target_points': np.array([[i, j] for i in range(-20,21,2) for j in range(-8,10,4)])
+                         'target_points': np.array([[i, j] for i in range(-20,21,4) for j in range(-8,10,4)])
                          }
         
         # Authority limit for the control u, both positive and negative
