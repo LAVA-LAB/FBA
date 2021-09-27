@@ -22,7 +22,7 @@ import os                       # Import OS to allow creationg of folders
 
 import itertools
 from .commons import table, is_invertible, floor_decimal, confidence_ellipse, \
-    Chi2probability, tocDiff, printWarning
+    Chi2probability, tocDiff, printWarning, maxDictKey
 from scipy.spatial import Delaunay
 from scipy.linalg import sqrtm
 import cvxpy as cp
@@ -622,3 +622,33 @@ def getNeighbors(point, partition, depth=1):
         prange = np.array([np.arange(-depth, depth+1)*width[i] for i in range(dim)])
         
         return point + np.array(list(itertools.product(*prange)))
+    
+def mergePolys(polys, verbose=False):
+    
+    overlap_dict = {}
+    zeroOverlap = True
+    
+    for (i1, i2) in itertools.combinations(range(len(polys)), 2):
+        
+        volume = np.round( polys[i1].intersect(polys[i2]).volume, 5)
+        
+        overlap_dict[(i1,i2)] = volume
+        
+        if volume > 0:
+            zeroOverlap = False
+    
+    if not zeroOverlap:
+    
+        idxs = maxDictKey(overlap_dict)
+        
+        if verbose:
+            print(' ---- Merge polytope',idxs[0],'with',idxs[1])
+        
+        region = polys[idxs[0]].union(polys[idxs[1]], check_convex=True)
+        polys_new = np.array(region.list_poly)
+        
+        other_polys = [poly for i,poly in enumerate(polys) if i not in idxs]
+        
+        polys = np.concatenate((other_polys, polys_new))
+    
+    return polys, zeroOverlap

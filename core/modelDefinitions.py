@@ -177,7 +177,8 @@ class UAV(master.LTI_master):
             self.spec['critical'] = {1: defSpecBlock(self.partition, a=[-9.5,-3.5], b=None, c=[-2,3], d=None),
                                      2: defSpecBlock(self.partition, a=[0, 4.5], b=None, c=[-10, -6], d=None),
                                      3: defSpecBlock(self.partition, a=[-0.7, 5], b=None, c=[-1.5, 3], d=None),
-                                     4: defSpecBlock(self.partition, a=[1.0, 4], b=None, c=[8, 11], d=None)}
+                                     4: defSpecBlock(self.partition, a=[1.0, 4], b=None, c=[8, 11], d=None),
+                                     5: defSpecBlock(self.partition, a=[4.5, 7], b=None, c=[-11, -6], d=None)}
             
             # Step-bound on property
             self.endTime = 24
@@ -343,7 +344,7 @@ class UAV(master.LTI_master):
                 
                 self.LTI['noise']['v_cov'] = noiseStrength * np.eye(np.size(self.LTI['C'],0))*0.1
 
-                self.filter = {'cov0': np.diag([2, 1, 2, 1])}
+                self.filter = {'cov0': np.diag([2, .01, 2, .01])}
             
         # Determine system dimensions
         self.LTI['n'] = np.size(self.LTI['A'],1)

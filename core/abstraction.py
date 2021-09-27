@@ -22,9 +22,11 @@ import copy                     # Import to copy variables in Python
 import sys                      # Allows to terminate the code at sorme point
 from scipy.spatial import Delaunay, ConvexHull # Import to create convex hulls
 from scipy.spatial.qhull import _Qhull
+import polytope as pc 
 
 from .mainFunctions import definePartitions, computeRegionOverlap, \
-    in_hull, makeModelFullyActuated, cubic2skew, skew2cubic, point_in_hull
+    in_hull, makeModelFullyActuated, cubic2skew, skew2cubic, point_in_hull, \
+    mergePolys
 from .commons import tocDiff, printWarning, findMinDiff, tic, ticDiff, \
     extractRowBlockDiag
 from .postprocessing.createPlots import partitionPlot2D, partitionPlot3D
@@ -175,7 +177,7 @@ class Abstraction(object):
         
         return abstr
     
-    def _defStateLabelSet(self, allVertices, blocks, typ="goal", epsilon=0):
+    def _defStateLabelSet(self, allVertices, regions, typ="goal", epsilon=0):
         '''
         Returns the indices of regions associated with the unique centers.
 
@@ -193,17 +195,19 @@ class Abstraction(object):
 
         '''
         
-        if len(blocks) == 0:
+        if len(regions) == 0:
             return {}
         
         else:
             
-            limits_overlap = {}
+            # 1) Inflate/deflate all goal/critical regions by 'epsilon'
             
-            for bl,block in blocks.items():
+            polys = []
+            
+            for r,region in regions.items():
                 
                 # Account for maximum error bound (epsilon)
-                limits = block['limits']
+                box = region['limits']
                 
                 if typ == "goal":
                     
@@ -213,7 +217,7 @@ class Abstraction(object):
                     # contained in the specified region (we want to have
                     # a convervative under-approximation)
                     
-                    limits_eps = np.vstack((limits[:,0] + epsilon, limits[:,1] - epsilon)).T
+                    R = np.vstack((box[:,0] + epsilon, box[:,1] - epsilon)).T
                     
                 elif typ == "critical":
                     
@@ -221,34 +225,53 @@ class Abstraction(object):
                     # part of the specified region (we want to have a
                     # convervative over-approximation)
                     
-                    limits_eps = np.vstack((limits[:,0] - epsilon, limits[:,1] + epsilon)).T
+                    R = np.vstack((box[:,0] - epsilon, box[:,1] + epsilon)).T
                     
-                if any(limits[:,1] - limits[:,0] <= 0):
-                    return {}
+                # Only store the augmented region if it is valid
+                if not any(box[:,1] - box[:,0] <= 0):
+                    polys += [pc.box2poly(R)]
+                else:
+                    printWarning('Warning: augmented '+str(typ)+' region '+str(r)+ \
+                                 ' is deflated too much, so it is skipped at all')
                     
-                for region,vertices in enumerate(allVertices):
+            # 2) Remove any overlap between the critical regions
+            
+            done = False
+            while not done:
+                polys, done = mergePolys(polys, verbose=True)
+                
+            print(' -- After removing overlap, number of regions is:',len(polys))
+                
+            # Convert back from polytopes objects to simple arrays
+            R_noOverlap = [np.hstack(poly.bounding_box) for poly in polys]
+            
+            # 3) Determine overlap between goal/critical regions and partition
+            
+            intersections = {}
+            
+            for region,vertices in enumerate(allVertices):
+                intersections[region] = {}
+                
+                limits_region = np.vstack((self.abstr['P'][region]['low'],
+                                           self.abstr['P'][region]['upp'])).T
+                
+                for R in R_noOverlap:
                     
-                    if all([    any(lims[0] < vertices[:,row]) 
-                            and any(lims[1] > vertices[:,row]) 
-                            for row,lims in enumerate(limits_eps) ]):
+                    # if all([    any(lims[0] < vertices[:,row]) 
+                    #         and any(lims[1] > vertices[:,row]) 
+                    #         for row,lims in enumerate(R) ]):
                         
-                        limits_region = np.vstack((self.abstr['P'][region]['low'],
-                                                  self.abstr['P'][region]['upp'])).T
+                    intersect = computeRegionOverlap(limits_region, R)
+                    
+                    if intersect is not None:
+                        intersections[region][r] = intersect
                         
-                        if region not in limits_overlap:
-                            limits_overlap[region] = {}
-                        
-                        limits = computeRegionOverlap(limits_region, limits_eps)
-                        
-                        if limits is not None:
-                            limits_overlap[region][bl] = limits
-                            
-                            goalAnywhere = True
+                        goalAnywhere = True
                         
         if typ == "goal" and goalAnywhere is False:
             printWarning('Warning: the augmented goal region is not contained in any region (epsilon='+str(epsilon)+')')
         
-        return limits_overlap
+        return intersections
     
     def _defAllVertices(self):
         '''
@@ -741,6 +764,8 @@ class Abstraction(object):
         else:
             N_max = self.setup.mdp['k_steady_state'] + 1
         
+        print( ' - Compute augmented regions at base rate')
+        
         # At base rate delta=1
         for k in range(1, N_max + 1):    
             
@@ -773,6 +798,8 @@ class Abstraction(object):
         for delta in self.setup.jump_deltas:
             # Compute goal and critical regions for higher delta states
             
+            print( ' - Compute augmented regions at adaptive rate of',delta)
+            
             self.abstr['goal'][delta] = {}
             self.abstr['critical'][delta] = {}
             
@@ -792,6 +819,8 @@ class Abstraction(object):
                 self.abstr['critical'][delta][gamma] = self._defStateLabelSet(
                     self.abstr['allVertices'],
                     self.system.spec['critical'], typ="critical", epsilon=epsilon)
+            
+        print( ' - Compute non-augmented regions')
             
         # Compute goal and critical regions without augmented bounds (for plotting)
         self.abstr['goal']['zero_bound'] = self._defStateLabelSet(
