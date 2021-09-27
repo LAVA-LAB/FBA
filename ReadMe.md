@@ -105,6 +105,7 @@ The following packages will be installed:
 - matplotlib==3.3.4
 - numpy==1.20.1
 - pandas==1.3.2
+- polytope==0.2.3
 - pyopengl==3.1.5 (needed for visvis)
 - pyqt5==5.15.4 (needed for visvis)
 - scipy==1.6.2
