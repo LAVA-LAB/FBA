@@ -177,8 +177,8 @@ class UAV(master.LTI_master):
             self.spec['critical'] = {1: defSpecBlock(self.partition, a=[-9.5,-3.5], b=None, c=[-2,3], d=None),
                                      2: defSpecBlock(self.partition, a=[0, 4.5], b=None, c=[-10, -6], d=None),
                                      3: defSpecBlock(self.partition, a=[-0.7, 5], b=None, c=[-1.5, 3], d=None),
-                                     4: defSpecBlock(self.partition, a=[1.0, 4], b=None, c=[8, 11], d=None),
-                                     5: defSpecBlock(self.partition, a=[4.5, 7], b=None, c=[-11, -6], d=None)}
+                                     4: defSpecBlock(self.partition, a=[1.0, 4], b=None, c=[8, 11], d=None) }#,
+                                     #5: defSpecBlock(self.partition, a=[4.5, 7], b=None, c=[-11, -6], d=None)}
             
             # Step-bound on property
             self.endTime = 24
@@ -212,7 +212,7 @@ class UAV(master.LTI_master):
                 self.spec['goal'] = {1: defSpecBlock(self.partition, a=[3, 7], b=None, c=[3, 7], d=None, e=[3, 7], f=None)}
                 
                 self.spec['critical']   = {
-                    1: defSpecBlock(self.partition, a=[-2,0], b=None, c=[1,7], d=None, e=None, f=None),
+                    1: defSpecBlock(self.partition, a=[-3,1], b=None, c=[1,7], d=None, e=[-7,7], f=None),
                     2: defSpecBlock(self.partition, a=[-7,-3], b=None, c=[3,7], d=None, e=[3,7], f=None),
                     3: defSpecBlock(self.partition, a=[-3,1], b=None, c=[-7,1], d=None, e=[-7,-3], f=None),
                     4: defSpecBlock(self.partition, a=[1,7], b=None, c=[-7,-3], d=None, e=[-7,-5], f=None),
@@ -335,14 +335,14 @@ class UAV(master.LTI_master):
             self.LTI['Q']  = np.array([[0],[0],[0],[0]])
         
             # Covariance of the process noise
-            self.LTI['noise']['w_cov'] = noiseStrength * np.diag([0.10, 0.02, 0.10, 0.02])
+            self.LTI['noise']['w_cov'] = noise_factor * np.diag([0.10, 0.02, 0.10, 0.02])
         
             if observer:
                 # Observation matrix
                 self.LTI['C']          = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
                 self.LTI['r']          = len(self.LTI['C'])
                 
-                self.LTI['noise']['v_cov'] = noiseStrength * np.eye(np.size(self.LTI['C'],0))*0.1
+                self.LTI['noise']['v_cov'] = noise_factor * np.eye(np.size(self.LTI['C'],0))*0.1
 
                 self.filter = {'cov0': np.diag([2, .01, 2, .01])}
             

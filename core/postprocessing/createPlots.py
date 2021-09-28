@@ -758,6 +758,8 @@ def trajectoryPlot2D(i_show, i_hide, plot_time, N, setup, model, partition, spec
                 row_idx = col_idx = np.array([is1, is2])
                 cov = belief_traces['cov'][i][j][ row_idx[:, None], col_idx ]
                 
+                print('cov is:',cov)
+                
                 confidence_ellipse(mean, cov, ax, n_std=1, edgecolor='gold',
                                    facecolor='gold', alpha=0.6)
         
@@ -796,6 +798,7 @@ def trajectoryPlot2D(i_show, i_hide, plot_time, N, setup, model, partition, spec
     
     for form in formats:
         if form != 'pdf' or plot_time == N:
+            
             plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight', dpi=300)
         
     plt.show()
