@@ -8,10 +8,11 @@
 |______________________________________|
 
 Implementation of the method proposed in the paper:
- "Sampling-Based Robust Control of Autonomous Systems with Non-Gaussian Noise"
+ "Filter-Based Abstractions for Safe Planning of Partially Observable 
+  Autonomous Systems"
 
-Originally coded by:        <anonymized>
-Contact e-mail address:     <anonymized>
+Originally coded by:        Thom S. Badings
+Contact e-mail address:     thom.badings@ru.nl
 ______________________________________________________________________________
 """
 
