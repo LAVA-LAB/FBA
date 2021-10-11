@@ -199,7 +199,7 @@ class UAV(master.LTI_master):
             self.targets['domain']      = 'auto'
             
             # Let the user make a choice for the model dimension
-            _, scenario = ui.user_choice('Choose a planning scenario',['Cube','City','Maze'])
+            _, scenario = ui.user_choice('Choose a planning scenario',['Cube','City','Maze','Maze small'])
             
             #######################################
             
@@ -254,15 +254,44 @@ class UAV(master.LTI_master):
                 self.spec['goal'] = {1: defSpecBlock(self.partition, a=[3, 7], b=None, c=[6, 10], d=None, e=[-7, -4], f=None)}
                 
                 self.spec['critical']   = {
-                    1: defSpecBlock(self.partition, a=[-5, -1.5], b=None, c=[1, 11], d=None, e=[-7 ,7], f=None),
-                    2: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-7, -1.5], f=None),
-                    3: defSpecBlock(self.partition, a=[-11, -9], b=None, c=[-2, 2], d=None, e=[-7, -4], f=None),
-                    4: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-11, -4], d=None, e=[4,7], f=None),
-                    5: defSpecBlock(self.partition, a=[6, 10], b=None, c=[-11, -7], d=None, e=[-7, 2], f=None),
-                    6: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-6.5, -2.5], d=None, e=[-7,-1], f=None)
+                    1: defSpecBlock(self.partition, a=[-5, -1.5], b=None, c=[1, 11], d=None, e=[-7, -2], f=None),
+                    2: defSpecBlock(self.partition, a=[-5, -1.5], b=None, c=[1, 4], d=None, e=[-2, 2], f=None),
+                    3: defSpecBlock(self.partition, a=[-5, -1.5], b=None, c=[8, 11], d=None, e=[-2, 2], f=None),
+                    4: defSpecBlock(self.partition, a=[-5, -1.5], b=None, c=[1, 11], d=None, e=[2, 7], f=None),
+                    #
+                    5: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-7, -1.5], f=None),
+                    6: defSpecBlock(self.partition, a=[-11, -9], b=None, c=[-2, 2], d=None, e=[-7, -4], f=None),
+                    7: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-11, -4], d=None, e=[4,7], f=None),
+                    8: defSpecBlock(self.partition, a=[6, 10], b=None, c=[-11, -7], d=None, e=[-7, 2], f=None),
+                    9: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-6.5, -2.5], d=None, e=[-7,-1], f=None)
                     }
                 
                 self.x0 = np.array([[-9.5, 0, 9.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
+            
+            elif scenario == 3:
+                # Partition size
+                self.partition['nrPerDim']  = [11, 3, 9, 3, 5, 3]
+                self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
+                self.partition['origin']    = [0, 0, 0, 0, 0, 0]
+                
+                # Specification information
+                self.spec['goal'] = {1: defSpecBlock(self.partition, a=[6, 10], b=None, c=[5, 9], d=None, e=[-5, -2], f=None)}
+                
+                self.spec['critical']   = {
+                    1: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 9], d=None, e=[-5, -2], f=None),
+                    2: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 5], d=None, e=[-2, 2], f=None),
+                    3: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[7, 9], d=None, e=[-2, 2], f=None),
+                    4: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 9], d=None, e=[2, 5], f=None),
+                    #
+                    5: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-5, -1.5], f=None),
+                    6: defSpecBlock(self.partition, a=[-11, -9], b=None, c=[-2, 2], d=None, e=[-5, -3], f=None),
+                    7: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-9, -4], d=None, e=[3, 5], f=None),
+                    8: defSpecBlock(self.partition, a=[6, 10], b=None, c=[-9, -7], d=None, e=[-5, 2], f=None),
+                    9: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-6.5, -2.5], d=None, e=[-5,-1], f=None)
+                    }
+                
+                self.x0 = np.array([[-9.5, 0, 9.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
+            
             
             # Step-bound on property
             self.endTime = 24

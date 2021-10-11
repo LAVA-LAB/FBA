@@ -850,7 +850,7 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
             center_xyz = center[[0,2,4]]
             
             goal = vv.solidBox(tuple(center_xyz), scaling=tuple(size))
-            goal.faceColor = (0,1,0,0.5)
+            goal.faceColor = (0,0.8,0,0.8)
             
     # Draw critical states
     for region in spec['critical'].values():
@@ -863,7 +863,7 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
             center_xyz = center[[0,2,4]]
             
             critical = vv.solidBox(tuple(center_xyz), scaling=tuple(size))
-            critical.faceColor = (1,0,0,0.5)
+            critical.faceColor = (0.8,0,0,0.8)
     
     # Add traces
     for i,trace in enumerate(traces):
@@ -882,7 +882,7 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
         points = np.array([x,y,z]).T
         
         # Plot precise points
-        vv.plot(x,y,z, lw=0, mc='b', ms='.')
+        vv.plot(x,y,z, lw=0, mc=(102/255, 178/255, 255/255), ms='.', mw=12)
         
         # Linear length along the line:
         distance = np.cumsum( np.sqrt(np.sum( np.diff(points, axis=0)**2, axis=1 )) )
@@ -899,7 +899,7 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
         zp = interpolated_points[:,2]
         
         # Plot trace
-        vv.plot(xp,yp,zp, lw=1, lc='b')
+        vv.plot(xp,yp,zp, lw=5, lc=(102/255, 178/255, 255/255))
     
     ax.axis.xLabel = 'X'
     ax.axis.yLabel = 'Y'
@@ -909,9 +909,12 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
     f.relativeFontSize = 1.6
     # ax.position.Correct(dh=-5)
     vv.axis('tight', axes=ax)
-    fig.position.w = 700
-    fig.position.h = 600
+    
+    fig.position.w = 1000
+    fig.position.h = 750
+    
     im = vv.getframe(vv.gcf())
+    
     ax.SetView({'zoom':0.042, 'elevation':25, 'azimuth':-35})
     
     filename = setup.directories['outputFcase'] + 'UAV_paths_screenshot.png'

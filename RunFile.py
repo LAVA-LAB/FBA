@@ -20,9 +20,6 @@ ______________________________________________________________________________
 from datetime import datetime   # Import Datetime to get current date/time
 import pandas as pd             # Import Pandas to store data in frames
 import numpy as np              # Import Numpy for computations
-import math                     # Import Math for mathematical operations
-import matplotlib.pyplot as plt # Import Pyplot to generate plots
-
 from inspect import getmembers, isclass # To get list of all available models
 
 # Load main classes and methods
