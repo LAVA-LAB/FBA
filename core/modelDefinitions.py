@@ -290,7 +290,7 @@ class UAV(master.LTI_master):
                     9: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-6.5, -2.5], d=None, e=[-5,-1], f=None)
                     }
                 
-                self.x0 = np.array([[-9.5, 0, 9.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
+                self.x0 = np.array([[-9.5, 0, 7.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
             
             
             # Step-bound on property

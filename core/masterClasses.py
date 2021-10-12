@@ -187,7 +187,7 @@ class settings(object):
         # TRUE/FALSE setup whether plots should be generated
         plot['partitionPlot']           = False
         plot['3D_UAV']                  = False
-        plot['partitionPlot_plotHull']  = True
+        plot['partitionPlot_plotHull']  = False
         plot['probabilityPlots']        = True
         plot['exportFormats']           = ['pdf','png']
         
@@ -203,6 +203,8 @@ class settings(object):
         main['iterative']           = False
         main['skewed']              = False
         main['model']               = ['Filter','Scenario'][1]
+        main['covarianceMode']      = ['SDP','iterative'][0]
+        main['interval_margin']     = 0.001
         
         self.mdp = mdp
         self.plotting = plot

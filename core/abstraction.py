@@ -87,8 +87,8 @@ class Abstraction(object):
                 break
             
         self.setup.jump_deltas = self.system.base_delta * self.system.adaptive['rates']
-        self.setup.all_deltas = np.concatenate(([self.system.base_delta], 
-                                                self.setup.jump_deltas)).astype(int)
+        self.setup.all_deltas = list(np.concatenate(([self.system.base_delta], 
+                                                self.setup.jump_deltas)).astype(int))
         
         self.model = dict()
         for delta in self.setup.all_deltas:

@@ -78,7 +78,7 @@ def user_choice(title, items):
     return choice, choice_id
 
 def load_PRISM_result_file(mode_prefix, output_folder, model_name, 
-                           k_steadystate=0, N=0):
+                           N=0):
     '''
     Lets the user load results from a set of existing PRISM files
 
@@ -129,8 +129,7 @@ def load_PRISM_result_file(mode_prefix, output_folder, model_name,
     else:
         # If N is zero, then filter-based
         for folder in folder_list[1]:
-            if folder.startswith(mode_prefix+'_'+model_name + \
-                                 '_ksteadystate='+str(k_steadystate)):
+            if folder.startswith(mode_prefix+'_'+model_name):
                 
                 run_folder = output_folder + folder
                 subfolder_list = next(os.walk(run_folder))
