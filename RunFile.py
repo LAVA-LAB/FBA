@@ -99,6 +99,8 @@ else:
         
     # Overwrite setting that we're not creating a new abstraction
     setup.main['newRun'] = False
+    
+    setup.directories['outputFcase'] = output_folder
 
 # If TRUE monte carlo simulations are performed
 setup.montecarlo['enabled'], _ = user_choice( \

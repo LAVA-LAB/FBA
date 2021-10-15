@@ -353,7 +353,7 @@ class UAV(master.LTI_master):
             
             _, noiseStrength  = ui.user_choice('Process/measurement noise strength',['low','high'])
             
-            if noiseStrength == 1:
+            if noiseStrength == 0:
                 noise_factor = 0.1
             else:
                 noise_factor = 1
