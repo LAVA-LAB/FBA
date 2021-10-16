@@ -279,8 +279,8 @@ class UAV(master.LTI_master):
                 
                 self.spec['critical']   = {
                     1: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 9], d=None, e=[-5, -2], f=None),
-                    2: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 5], d=None, e=[-2, 2], f=None),
-                    3: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[7, 9], d=None, e=[-2, 2], f=None),
+                    2: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 4.5], d=None, e=[-2, 2], f=None),
+                    3: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[7.5, 9], d=None, e=[-2, 2], f=None),
                     4: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 9], d=None, e=[2, 5], f=None),
                     #
                     5: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-5, -1.5], f=None),
