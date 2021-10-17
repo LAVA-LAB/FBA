@@ -578,6 +578,11 @@ def trajectoryPlot(Ab, case_id, writer = None):
     else:
         belief_traces = None
     
+    alltraces = []
+    for i in state_idxs:
+        for j in range(Ab.setup.montecarlo['iterations']):
+            alltraces += [Ab.mc['traces'][i][j]['x']]
+    
     min_delta = int(min(Ab.setup.all_deltas))
     
     if Ab.system.modelDim == 2:
@@ -631,6 +636,9 @@ def trajectoryPlot(Ab, case_id, writer = None):
         
             # Only plot trajectory plot in non-iterative mode (because it pauses the script)
             UAVplot3d_visvis( Ab.setup, Ab.system.spec, cut_value, traces ) 
+    
+    traces_df = pd.DataFrame(alltraces)
+    traces_df.to_pickle(ScAb.setup.directories['outputFcase']+'traces.pickle')
     
     return performance_df, traces
     
@@ -918,6 +926,179 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
     ax.SetView({'zoom':0.042, 'elevation':25, 'azimuth':-35})
     
     filename = setup.directories['outputFcase'] + 'UAV_paths_screenshot.png'
+    
+    vv.screenshot(filename, sf=3, bg='w', ob=vv.gcf())
+    app.Run()
+    
+def load_traces_manual(Ab, paths, labels, idxs=0):
+    '''
+    Function to plot 3D UAV benhmark with multiple distinct cases
+
+    Parameters
+    ----------
+    Ab : abstraction instance
+        Full object of the abstraction being plotted for
+    paths : list of string
+        Paths to pickles file describing traces.
+    labels : list of strings
+        Labels for the instances to plot
+    idxs : list of ints, optional
+        Index of traces to be plotted. The default is 0.
+
+    Returns
+    -------
+    None.
+
+    '''
+    
+    if len(paths) != len(idxs):
+        idxs = np.zeros(len(paths))
+    
+    traces = [list(pd.read_pickle(path).loc[idxs[i]].dropna()) 
+              for i,path in enumerate(paths)]
+    
+    cut_value = np.zeros(3)
+    for i,d in enumerate(range(1, Ab.system.LTI['n'], 2)):
+        if Ab.system.partition['nrPerDim'][d]/2 != round( Ab.system.partition['nrPerDim'][d]/2 ):
+            cut_value[i] = 0
+        else:
+            cut_value[i] = Ab.system.partition['width'][d] / 2
+    
+    UAVplot3d_visvis_multi( Ab.setup, Ab.system.spec, cut_value, traces, labels) 
+    
+def UAVplot3d_visvis_multi(setup, spec, cut_value, traces_multi, traces_labels):
+    '''
+    Create 3D trajectory plots for the 3D UAV benchmark
+
+    Parameters
+    ----------
+    setup : dict
+        Setup dictionary.
+    model : dict
+        Main dictionary of the LTI system model.
+    abstr : dict
+        Dictionay containing all information of the finite-state abstraction.
+    cut_value : array
+        Values to create the cross-section for
+    traces_multi : list
+        Nested list containing the trajectories (traces) to plot for
+    traces_labels : list of string
+        Legend labels for the instances to plot 
+
+    Returns
+    -------
+    None.
+
+    '''
+    
+    from scipy.interpolate import interp1d
+    import visvis as vv
+    
+    fig = vv.figure()
+    f = vv.clf()
+    a = vv.cla()
+    fig = vv.gcf()
+    ax = vv.gca()
+    
+    ix = 0
+    iy = 2
+    iz = 4
+    
+    # Draw goal states
+    for region in spec['goal'].values():
+        
+        center = np.mean( region['limits'], axis=1 )
+        size   = (region['limits'][:,1] - region['limits'][:,0])[[0,2,4]]
+        
+        if center[1] == cut_value[0] and center[3] == cut_value[1] and center[5] == cut_value[2]:
+        
+            center_xyz = center[[0,2,4]]
+            
+            goal = vv.solidBox(tuple(center_xyz), scaling=tuple(size))
+            goal.faceColor = (0,0.8,0,0.8)
+            
+    # Draw critical states
+    for region in spec['critical'].values():
+        
+        center = np.mean( region['limits'], axis=1 )
+        size   = (region['limits'][:,1] - region['limits'][:,0])[[0,2,4]]
+        
+        if center[1] == cut_value[0] and center[3] == cut_value[1] and center[5] == cut_value[2]:
+        
+            center_xyz = center[[0,2,4]]
+            
+            critical = vv.solidBox(tuple(center_xyz), scaling=tuple(size))
+            critical.faceColor = (0.8,0,0,0.8)
+        
+    trace_colors = [(102/255, 178/255, 255/255),
+                    (204/255, 153/255, 255/255),
+                    (255/255, 204/255, 229/255)]
+    trace_styles = ['.', 'x', '*']
+    trace_labels = tuple(np.repeat(traces_labels), 2)
+    ("Low noise", "Low noise", "High noise", "High noise")
+    
+    for i,trace in enumerate(traces_multi):
+        
+        if len(trace) < 3:
+            printWarning('Warning: trace '+str(i)+' has length of '+str(len(trace)))
+            continue
+        
+        # Convert nested list to 2D array
+        trace_array = np.array(trace)
+        
+        # Extract x,y coordinates of trace
+        x = trace_array[:, ix]
+        y = trace_array[:, iy]
+        z = trace_array[:, iz]
+        points = np.array([x,y,z]).T
+        
+        # Plot precise points
+        vv.plot(x,y,z, lw=0, mc=trace_colors[i], ms=trace_styles[i], mw=12)
+        
+        # Linear length along the line:
+        distance = np.cumsum( np.sqrt(np.sum( np.diff(points, axis=0)**2, axis=1 )) )
+        distance = np.insert(distance, 0, 0)/distance[-1]
+        
+        # Interpolation for different methods:
+        alpha = np.linspace(0, 1, 75)
+        
+        interpolator =  interp1d(distance, points, kind='quadratic', axis=0)
+        interpolated_points = interpolator(alpha)
+        
+        xp = interpolated_points[:,0]
+        yp = interpolated_points[:,1]
+        zp = interpolated_points[:,2]
+        
+        # Plot trace
+        vv.plot(xp,yp,zp, lw=5, lc=trace_colors[i])
+        
+    ax.axis.xLabel = 'X'
+    ax.axis.yLabel = 'Y'
+    ax.axis.zLabel = 'Z'
+    
+    app = vv.use()
+    
+    f.relativeFontSize = 1.6
+    # ax.position.Correct(dh=-5)
+    vv.axis('tight', axes=ax)
+    
+    fig.position.w = 1000
+    fig.position.h = 750
+    
+    im = vv.getframe(vv.gcf())
+    
+    #ax.SetView({'zoom':0.03, 'elevation':55, 'azimuth':-20})
+    ax.SetView({'zoom':0.03, 'elevation':70, 'azimuth':20})
+    
+    ax.legend = trace_labels
+    
+    if 'outputFcase' in setup.directories:
+    
+        filename = setup.directories['outputFcase']+'UAV_multi_instances.png'
+        
+    else:
+        
+        filename = setup.directories['outputF'] + 'UAV_multi_instances.png'
     
     vv.screenshot(filename, sf=3, bg='w', ob=vv.gcf())
     app.Run()
