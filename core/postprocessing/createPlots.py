@@ -583,6 +583,9 @@ def trajectoryPlot(Ab, case_id, writer = None):
         for j in range(Ab.setup.montecarlo['iterations']):
             alltraces += [Ab.mc['traces'][i][j]['x']]
     
+    traces_df = pd.DataFrame(alltraces)
+    traces_df.to_pickle(Ab.setup.directories['outputFcase']+'traces.pickle')
+    
     min_delta = int(min(Ab.setup.all_deltas))
     
     if Ab.system.modelDim == 2:
@@ -636,9 +639,6 @@ def trajectoryPlot(Ab, case_id, writer = None):
         
             # Only plot trajectory plot in non-iterative mode (because it pauses the script)
             UAVplot3d_visvis( Ab.setup, Ab.system.spec, cut_value, traces ) 
-    
-    traces_df = pd.DataFrame(alltraces)
-    traces_df.to_pickle(ScAb.setup.directories['outputFcase']+'traces.pickle')
     
     return performance_df, traces
     
@@ -930,7 +930,9 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
     vv.screenshot(filename, sf=3, bg='w', ob=vv.gcf())
     app.Run()
     
-def load_traces_manual(Ab, paths, labels, idxs=0):
+# load_traces_manual(Ab, ['/home/thom/Documents/Abstractions/pyabstract/output/FiAb_UAV_ksteadystate=3_10-17-2021_14-29-06 (low noise)', 'output//FiAb_UAV_ksteadystate=3_10-16-2021_15-56-58 (medium noise)', 'output//FiAb_UAV_ksteadystate=3_10-16-2021_15-10-42 (high noise)'], ['Low noise', 'Medium noise', 'High noise'])
+    
+def load_traces_manual(Ab, paths, labels, idxs=[0]):
     '''
     Function to plot 3D UAV benhmark with multiple distinct cases
 
@@ -954,7 +956,7 @@ def load_traces_manual(Ab, paths, labels, idxs=0):
     if len(paths) != len(idxs):
         idxs = np.zeros(len(paths))
     
-    traces = [list(pd.read_pickle(path).loc[idxs[i]].dropna()) 
+    traces = [list(pd.read_pickle(path+'//traces.pickle').loc[idxs[i]].dropna()) 
               for i,path in enumerate(paths)]
     
     cut_value = np.zeros(3)
@@ -1034,7 +1036,7 @@ def UAVplot3d_visvis_multi(setup, spec, cut_value, traces_multi, traces_labels):
                     (204/255, 153/255, 255/255),
                     (255/255, 204/255, 229/255)]
     trace_styles = ['.', 'x', '*']
-    trace_labels = tuple(np.repeat(traces_labels), 2)
+    trace_labels = tuple(np.repeat(traces_labels, 2))
     ("Low noise", "Low noise", "High noise", "High noise")
     
     for i,trace in enumerate(traces_multi):
