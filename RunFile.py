@@ -37,7 +37,7 @@ from core.masterClasses import settings, loadOptions
 #-----------------------------------------------------------------------------
 
 preset = {
-    'application_id': 3,
+    'application_id': 1,
     'scenario': 3,          # Planning scenario for 3D UAV case
     'wFactor': 1,           # Process noise strength for UAV cases
     'vFactor': 1,           # Measurement noise strength for UAV cases
