@@ -110,7 +110,7 @@ class settings(object):
             
         setattr(self, category, category_upd)
     
-    def __init__(self, application):
+    def __init__(self):
         '''
         Initialize 'options' object
 

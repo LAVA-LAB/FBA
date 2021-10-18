@@ -593,24 +593,6 @@ class Abstraction(object):
             
             targetPoint = self.abstr['target'][delta]['d'][action_id]
             
-            # If system is 'robot', than only enable jump actions if the velocity
-            # is zero
-            '''
-            if self.system.name == 'double_integrator' and delta != 1 and targetPoint[1] != 0:
-                continue
-            
-            # If system is UAV and local information controllers are enabled
-            if self.system.name == 'UAV' and delta != 1:
-                # Skip if any velocity component is notzero (because the 
-                # required waiting will not be enabled anyways)
-                # if self.system.LTI['n'] == 4 and any(targetPoint[[1,3]] != 0) or \
-                #    self.system.LTI['n'] == 6 and any(targetPoint[[1,3,5]] != 0):
-                #        continue
-                   
-                if action_id not in [772, 1002, 1682, 1692, 1477, 1027, 577]:
-                    continue
-            '''
-            
             if dimEqual:
             
                 # Shift the origin points (instead of the target point)
@@ -1109,7 +1091,7 @@ class Abstraction(object):
             printWarning("Omit probability plots (nr. of regions too large)")
             
         # The code below plots the trajectories
-        if self.system.name in ['UAV', 'shuttle']:
+        if self.system.name in ['UAV_2D', 'UAV_3D', 'shuttle']:
             
             from core.postprocessing.createPlots import trajectoryPlot
         
@@ -1121,8 +1103,7 @@ class Abstraction(object):
                     [iterative_results['performance'], performance_df], axis=0)
     
         # The code below plots the heat map
-        if self.system.name in ['building_1room','building_2room','double_integrator','UAV'] or \
-            (self.system.name == 'UAV' and self.system.modelDim == 2):
+        if self.system.name in ['building_1room','building_2room','double_integrator','UAV_2D']:
             
             from core.postprocessing.createPlots import reachabilityHeatMap
             

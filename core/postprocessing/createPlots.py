@@ -499,20 +499,19 @@ def trajectoryPlot(Ab, case_id, writer = None):
     from ..filterBasedAbstraction import MonteCarloSim
     
     # Determine desired state IDs
-    if Ab.system.name == 'UAV':
-        if Ab.system.modelDim == 2:
-            x_init = setStateBlock(Ab.system.partition, a=[-8], b=[0], c=[-8], d=[0])
+    if Ab.system.name == 'UAV_2D':
+        x_init = setStateBlock(Ab.system.partition, a=[-8], b=[0], c=[-8], d=[0])
+        
+        itersToShow = 1
+        
+        cut_value = np.zeros(2)
+        for i,d in enumerate(range(1, Ab.system.LTI['n'], 2)):
+            if Ab.system.partition['nrPerDim'][d]/2 != round( Ab.system.partition['nrPerDim'][d]/2 ):
+                cut_value[i] = 0
+            else:
+                cut_value[i] = Ab.system.partition['width'][d] / 2                
             
-            itersToShow = 1
-            
-            cut_value = np.zeros(2)
-            for i,d in enumerate(range(1, Ab.system.LTI['n'], 2)):
-                if Ab.system.partition['nrPerDim'][d]/2 != round( Ab.system.partition['nrPerDim'][d]/2 ):
-                    cut_value[i] = 0
-                else:
-                    cut_value[i] = Ab.system.partition['width'][d] / 2                
-            
-        elif Ab.system.modelDim == 3:
+    elif Ab.system.name == 'UAV_3D':
             x_init = Ab.system.x0 #setStateBlock(Ab.system.partition, a=[-11], b=[0], c=[5], d=[0], e=[-5], f=[0])
             
             itersToShow = 10
@@ -588,7 +587,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
     
     min_delta = int(min(Ab.setup.all_deltas))
     
-    if Ab.system.modelDim == 2:
+    if Ab.system.name == 'UAV_2D':
         
         animate = True
         
@@ -597,13 +596,8 @@ def trajectoryPlot(Ab, case_id, writer = None):
         else:        
             plot_times = [Ab.N]
         
-        if Ab.system.name == 'UAV':
-            i_show = (0,2)
-            i_hide = (1,3)
-            
-        elif Ab.system.name == 'shuttle':
-            i_show = (0,1)
-            i_hide = (2,3)
+        i_show = (0,2)
+        i_hide = (1,3)
         
         filenames = ['' for i in range(len(plot_times))]
             
@@ -634,7 +628,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
                 out.write(img_array[i])
             out.release()
             
-    elif Ab.system.modelDim == 3:
+    elif Ab.system.name == 'UAV_3D':
         if Ab.setup.main['iterative'] is False and Ab.setup.plotting['3D_UAV']:
         
             # Only plot trajectory plot in non-iterative mode (because it pauses the script)
@@ -1146,7 +1140,7 @@ def reachabilityHeatMap(Ab):
                Ab.system.partition['width'], 
                Ab.system.partition['origin'], onlyCenter=True)
         
-    elif Ab.system.name == 'UAV' and Ab.system.modelDim == 2:
+    elif Ab.system.name == 'UAV_2D':
         
         x_nr = Ab.system.partition['nrPerDim'][0]
         y_nr = Ab.system.partition['nrPerDim'][2]
@@ -1174,7 +1168,7 @@ def reachabilityHeatMap(Ab):
         cut_values[k,j] = Ab.mdp.MAIN_DF['opt_reward'][idx]
         cut_coords[k,j,:] = center
     
-    if Ab.system.name == 'UAV':
+    if Ab.system.name == 'UAV_2D':
         cut_df = pd.DataFrame( cut_values, index=cut_coords[:,0,0], columns=cut_coords[0,:,2] )
     else:
         cut_df = pd.DataFrame( cut_values, index=cut_coords[:,0,0], columns=cut_coords[0,:,1] )

@@ -32,10 +32,35 @@ from core.commons import printWarning, createDirectory
 from core import modelDefinitions
 from core.masterClasses import settings, loadOptions
 
+#-----------------------------------------------------------------------------
+# Set override settings (preset)
+#-----------------------------------------------------------------------------
+
+preset = {
+    'application_id': 3,
+    'scenario': 3,          # Planning scenario for 3D UAV case
+    'wFactor': 1,           # Process noise strength for UAV cases
+    'vFactor': 1,           # Measurement noise strength for UAV cases
+    'new': True,
+    '2phase': True,
+    'k_steady_state': 3,
+    'montecarlo': False,
+    'mc_iterations': 0,
+    'partition_size_id': 0, # For double integrator and 1-room building
+    'adaptive_rate': [2]    # Adaptive rates for double integrator case
+    }
+
+#-----------------------------------------------------------------------------
+# Load model classes and set random seed
+#-----------------------------------------------------------------------------
+
 # Retreive a list of all available models
 modelClasses = np.array(getmembers(modelDefinitions, isclass))
-application, application_id  = user_choice('application',
-                                           list(modelClasses[:,0]))
+
+if 'application_id' not in preset:
+    
+    _, preset['application_id']  = user_choice('application',
+                                               list(modelClasses[:,0]))
 
 np.random.seed(10)
 
@@ -44,14 +69,14 @@ np.random.seed(10)
 #-----------------------------------------------------------------------------
 
 # Create model object
-system = modelClasses[application_id, 1]()
+system = modelClasses[preset['application_id'], 1](preset)
 
 #-----------------------------------------------------------------------------
 # Create settings object + change manual settings
 #-----------------------------------------------------------------------------
 
 # Create settings object
-setup = settings(application=system.name)
+setup = settings()
 
 setup.setOptions(category='main',
         skewed=False,
@@ -60,30 +85,41 @@ setup.setOptions(category='main',
 if setup.main['mode'] == 'Filter':
     # Filter-based abstraction
     setup.main['mode_prefix'] = 'FiAb'
-    system.setModel(observer=True)
+    system.setModel(observer=True, preset=preset)
 else:
     # Scenario-based abstraction
     setup.main['mode_prefix'] = 'ScAb'
-    system.setModel(observer=False)
+    system.setModel(observer=False, preset=preset)
     
 #-----------------------------------------------------------------------------
 # Create new vs. load existing abstraction
 #-----------------------------------------------------------------------------
 
 # If TRUE create a new abstraction; load existing abstraction otherwise
-_, choice = user_choice( \
-    'Start a new abstraction or load existing PRISM results?', 
-    ['New abstraction', 'Load existing results'])
-setup.main['newRun'] = not choice
+if 'new' not in preset:
+    _, choice = user_choice( \
+        'Start a new abstraction or load existing PRISM results?', 
+        ['New abstraction', 'Load existing results'])
+    setup.main['newRun'] = not choice
+else:
+    setup.main['newRun'] = preset['new']
+
+#-----------------------------------------------------------------------------
+# Other settings
+#-----------------------------------------------------------------------------
 
 if setup.main['newRun']:
         
     # Let the user determine if 2-phase time horizon should be enabled
-    twophase, _ = user_choice( 'Enable the 2-phase time horizon?', [True, False])    
+    if '2phase' not in preset:
+        preset['2phase'], _ = user_choice( 'Enable the 2-phase time horizon?', [True, False])    
     
-    if twophase:    
-        setup.mdp['k_steady_state'], _ = user_choice( \
-                                        'value of k at which the steady state phase starts', 'integer')
+    if preset['2phase']:   
+        if 'k_steady_state' not in preset:
+            setup.mdp['k_steady_state'], _ = user_choice( \
+                                            'value of k at which the steady state phase starts', 'integer')
+        else:
+            setup.mdp['k_steady_state'] = preset['k_steady_state']
     else:
         setup.mdp['k_steady_state'] = None
         
@@ -103,11 +139,18 @@ else:
     setup.directories['outputFcase'] = output_folder
 
 # If TRUE monte carlo simulations are performed
-setup.montecarlo['enabled'], _ = user_choice( \
-                                'Monte Carlo simulations', [True, False])
+if 'montecarlo' not in preset:
+    setup.montecarlo['enabled'], _ = user_choice( \
+                                    'Monte Carlo simulations', [True, False])
+else:
+    setup.montecarlo['enabled'] = preset['montecarlo']
+    
 if setup.montecarlo['enabled']:
-    setup.montecarlo['iterations'], _ = user_choice( \
+    if 'mc_iterations' not in preset:
+        setup.montecarlo['iterations'], _ = user_choice( \
                                 'Monte Carlo iterations', 'integer')
+    else:
+        setup.montecarlo['iterations'] = preset['mc_iterations']
 else:
     setup.montecarlo['iterations'] = 0
 
@@ -130,11 +173,12 @@ if setup.main['iterative'] is False:
 Ab = dict()
     
 setup.directories['outputF']  = setup.directories['output']+setup.main['mode_prefix'] + \
-    '_'+application+'_' + 'ksteadystate=' + str(setup.mdp['k_steady_state']) + \
+    '_'+system.name+'_' + 'ksteadystate=' + str(setup.mdp['k_steady_state']) + \
     '_' + setup.time['datetime']+'/'
     
+# Number of decimals to round off on
 setup.floating_point_precision = 5
-setup.MDP_prob_decimals = 5 # Number of decimals to round off on
+setup.MDP_prob_decimals = 5
 
 '''
 if setup.main['newRun'] is True:

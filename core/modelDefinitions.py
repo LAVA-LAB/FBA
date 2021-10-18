@@ -27,7 +27,7 @@ from .commons import setStateBlock, defSpecBlock
 
 class double_integrator(master.LTI_master):
     
-    def __init__(self):
+    def __init__(self, preset):
         '''
         Initialize double_integrator class, which is a 1D dummy problem
 
@@ -44,8 +44,11 @@ class double_integrator(master.LTI_master):
         # Used to make the model fully actuated
         self.base_delta = 2
         
-        rates, _  = ui.user_choice('adaptive measurement rate', \
-                                   [[],[2],[2,4],[2,4,6]])
+        if 'adaptive_rate' not in preset:
+            rates, _  = ui.user_choice('adaptive measurement rate', \
+                                       [[],[2],[2,4],[2,4,6]])
+        else:
+            rates = preset['adaptive_rate']
         
         self.adaptive = {'rates': rates,
                          'target_points': np.array([[i, j] for i in range(-20,21,4) for j in range(-8,10,4)])
@@ -55,8 +58,11 @@ class double_integrator(master.LTI_master):
         self.control['limits']['uMin'] =  [-5]
         self.control['limits']['uMax'] =  [5]
         
-        _, partition  = ui.user_choice('partition size (number of regions)', \
-                                   ['21x21', '41x41'])
+        if 'partition_size_id' not in preset:
+            _, partition  = ui.user_choice('partition size (number of regions)', \
+                                       ['21x21', '41x41'])
+        else:
+            partition = preset['partition_size_id']
         
         # Partition size
         if partition == 0:
@@ -78,7 +84,7 @@ class double_integrator(master.LTI_master):
         # Step-bound on property
         self.endTime = 32#64
     
-    def setModel(self, observer):
+    def setModel(self, observer, preset):
         '''
         Set linear dynamical system.
 
@@ -126,14 +132,12 @@ class double_integrator(master.LTI_master):
         
         # Covariance of the process noise
         self.LTI['noise']['w_cov'] = np.eye(np.size(self.LTI['A'],1))*0.25
-
         
-class UAV(master.LTI_master):
+class UAV_2D(master.LTI_master):
     
-    def __init__(self):
+    def __init__(self, preset):
         '''
-        Initialize the UAV model class, which can be 2D or 3D. The 3D case
-        corresponds to the UAV benchmark in the paper.
+        Initialize the 2D UAV model class.
 
         Returns
         -------
@@ -146,164 +150,39 @@ class UAV(master.LTI_master):
         
         # Set value of delta (how many time steps are grouped together)
         # Used to make the model fully actuated
-        #self.deltas = [2,3]#,4]
         self.base_delta = 2
         
-        # Let the user make a choice for the model dimension
-        self.modelDim, _  = ui.user_choice('model dimension',[2,3])
-    
-        if self.modelDim == 2:
-            
-            self.adaptive = {'rates': [],
-                #'target_points': np.array([[i, 0, j, 0] for i in range(-8,10,4) for j in range(-8,10,4)])
-                'target_points': np.array([[i, x, j, y] for i in [6,8] for j in [-4,-2] for x in [-1.5, 0, 1.5] for y in [-1.5, 0, 1.5]])
-                }
-    
-            # Authority limit for the control u, both positive and negative
-            self.control['limits']['uMin'] = [-4, -4]
-            self.control['limits']['uMax'] = [4, 4]        
-    
-            # Partition size
-            self.partition['nrPerDim']  = [11,5,11,5]
-            self.partition['width']     = [2, 1.5, 2, 1.5]
-            self.partition['origin']    = [0, 0, 0, 0]
-            
-            # Number of actions per dimension (if 'auto', then equal to nr of regions)
-            self.targets['nrPerDim']    = 'auto'
-            self.targets['domain']      = 'auto'
-            
-            # Specification information
-            self.spec['goal']     = {1: defSpecBlock(self.partition, a=[-11, -5], b=None, c=[5, 11], d=None)}
-            
-            self.spec['critical'] = {1: defSpecBlock(self.partition, a=[-9.5,-3.5], b=None, c=[-2,3], d=None),
-                                     2: defSpecBlock(self.partition, a=[0, 4.5], b=None, c=[-10, -6], d=None),
-                                     3: defSpecBlock(self.partition, a=[-0.7, 5], b=None, c=[-1.5, 3], d=None),
-                                     4: defSpecBlock(self.partition, a=[1.0, 4], b=None, c=[8, 11], d=None) }#,
-                                     #5: defSpecBlock(self.partition, a=[4.5, 7], b=None, c=[-11, -6], d=None)}
-            
-            # Step-bound on property
-            self.endTime = 24
-            
-        elif self.modelDim == 3:
-            
-            self.adaptive = {'rates': [],
-                'target_points': np.array([])
-                }
-            
-            # Authority limit for the control u, both positive and negative
-            self.control['limits']['uMin'] = [-4, -4, -4]
-            self.control['limits']['uMax'] = [4, 4, 4]
-            
-            # Number of actions per dimension (if 'auto', then equal to nr of regions)
-            self.targets['nrPerDim']    = 'auto'
-            self.targets['domain']      = 'auto'
-            
-            # Let the user make a choice for the model dimension
-            _, scenario = ui.user_choice('Choose a planning scenario',['Cube','City','Maze','Maze small'])
-            
-            #######################################
-            
-            if scenario == 0:
-                # Partition size
-                self.partition['nrPerDim']  = [7, 3, 7, 3, 7, 3]
-                self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
-                self.partition['origin']    = [0, 0, 0, 0, 0, 0]
-                
-                # Specification information
-                self.spec['goal'] = {1: defSpecBlock(self.partition, a=[3, 7], b=None, c=[3, 7], d=None, e=[3, 7], f=None)}
-                
-                self.spec['critical']   = {
-                    1: defSpecBlock(self.partition, a=[-3,1], b=None, c=[1,7], d=None, e=[-7,7], f=None),
-                    2: defSpecBlock(self.partition, a=[-7,-3], b=None, c=[3,7], d=None, e=[3,7], f=None),
-                    3: defSpecBlock(self.partition, a=[-3,1], b=None, c=[-7,1], d=None, e=[-7,-3], f=None),
-                    4: defSpecBlock(self.partition, a=[1,7], b=None, c=[-7,-3], d=None, e=[-7,-5], f=None),
-                    5: defSpecBlock(self.partition, a=[-3,1], b=None, c=[-7,-3], d=None, e=[-3,1], f=None)
-                    }
-                
-                self.x0 = np.array([[-6, 0, 6, 0, -6, 0]])#setStateBlock(Ab.system.partition, a=[-6], b=[0], c=[6], d=[0], e=[-6], f=[0])
-            
-            #######################################
-            
-            elif scenario == 1:
-                # Partition size
-                self.partition['nrPerDim']  = [13, 3, 7, 3, 7, 3]
-                self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
-                self.partition['origin']    = [0, 0, 0, 0, 0, 0]
-                
-                # Specification information
-                self.spec['goal'] = {1: defSpecBlock(self.partition, a=[9, 13], b=None, c=[3, 7], d=None, e=[-7, -4], f=None)}
-                
-                self.spec['critical']   = {
-                    1: defSpecBlock(self.partition, a=[2, 7], b=None, c=[2, 7], d=None, e=[-7 ,5], f=None),
-                    2: defSpecBlock(self.partition, a=[8,13], b=None, c=[-7, 0], d=None, e=[-7, -1], f=None),
-                    3: defSpecBlock(self.partition, a=[-6, -1], b=None, c=[-1,5], d=None, e=[-7,1], f=None),
-                    4: defSpecBlock(self.partition, a=[-12,1], b=None, c=[-7,-3], d=None, e=[-7,-3], f=None)
-                    }
-                
-                self.x0 = np.array([[-11, 0, 5, 0, -5, 0]])#setStateBlock(Ab.system.partition, a=[-11], b=[0], c=[5], d=[0], e=[-5], f=[0])
-                
-            #######################################
-            
-            elif scenario == 2:
-                # Partition size
-                self.partition['nrPerDim']  = [11, 3, 11, 3, 7, 3]
-                self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
-                self.partition['origin']    = [0, 0, 0, 0, 0, 0]
-                
-                # Specification information
-                self.spec['goal'] = {1: defSpecBlock(self.partition, a=[3, 7], b=None, c=[6, 10], d=None, e=[-7, -4], f=None)}
-                
-                self.spec['critical']   = {
-                    1: defSpecBlock(self.partition, a=[-5, -1.5], b=None, c=[1, 11], d=None, e=[-7, -2], f=None),
-                    2: defSpecBlock(self.partition, a=[-5, -1.5], b=None, c=[1, 4], d=None, e=[-2, 2], f=None),
-                    3: defSpecBlock(self.partition, a=[-5, -1.5], b=None, c=[8, 11], d=None, e=[-2, 2], f=None),
-                    4: defSpecBlock(self.partition, a=[-5, -1.5], b=None, c=[1, 11], d=None, e=[2, 7], f=None),
-                    #
-                    5: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-7, -1.5], f=None),
-                    6: defSpecBlock(self.partition, a=[-11, -9], b=None, c=[-2, 2], d=None, e=[-7, -4], f=None),
-                    7: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-11, -4], d=None, e=[4,7], f=None),
-                    8: defSpecBlock(self.partition, a=[6, 10], b=None, c=[-11, -7], d=None, e=[-7, 2], f=None),
-                    9: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-6.5, -2.5], d=None, e=[-7,-1], f=None)
-                    }
-                
-                self.x0 = np.array([[-9.5, 0, 9.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
-            
-            elif scenario == 3:
-                # Partition size
-                self.partition['nrPerDim']  = [11, 3, 9, 3, 5, 3]
-                self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
-                self.partition['origin']    = [0, 0, 0, 0, 0, 0]
-                
-                # Specification information
-                self.spec['goal'] = {1: defSpecBlock(self.partition, a=[6, 10], b=None, c=[5, 9], d=None, e=[-5, -2], f=None)}
-                
-                self.spec['critical']   = {
-                    1: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 9], d=None, e=[-5, -2], f=None),
-                    2: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 4.5], d=None, e=[-2, 2], f=None),
-                    3: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[7.5, 9], d=None, e=[-2, 2], f=None),
-                    4: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 9], d=None, e=[2, 5], f=None),
-                    #
-                    5: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-5, -0.2], f=None),
-                    #
-                    6: defSpecBlock(self.partition, a=[-11, -9], b=None, c=[-2, 2], d=None, e=[-5, -3], f=None),
-                    7: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-9, -4], d=None, e=[-5, -3], f=None),
-                    #
-                    8: defSpecBlock(self.partition, a=[6, 10], b=None, c=[-9, -3.6], d=None, e=[-5, -1], f=None),
-                    #
-                    9: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-3.4, -0.5], d=None, e=[-5,-1], f=None)
-                    }
-                
-                self.x0 = np.array([[-9.5, 0, 7.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
-            
-            
-            # Step-bound on property
-            self.endTime = 24
-        
-        else:
-            print('No valid dimension for the drone model was provided')
-            sys.exit()
+        self.adaptive = {'rates': [],
+            #'target_points': np.array([[i, 0, j, 0] for i in range(-8,10,4) for j in range(-8,10,4)])
+            'target_points': np.array([[i, x, j, y] for i in [6,8] for j in [-4,-2] for x in [-1.5, 0, 1.5] for y in [-1.5, 0, 1.5]])
+            }
 
-    def setModel(self, observer):
+        # Authority limit for the control u, both positive and negative
+        self.control['limits']['uMin'] = [-4, -4]
+        self.control['limits']['uMax'] = [4, 4]        
+
+        # Partition size
+        self.partition['nrPerDim']  = [11,5,11,5]
+        self.partition['width']     = [2, 1.5, 2, 1.5]
+        self.partition['origin']    = [0, 0, 0, 0]
+        
+        # Number of actions per dimension (if 'auto', then equal to nr of regions)
+        self.targets['nrPerDim']    = 'auto'
+        self.targets['domain']      = 'auto'
+        
+        # Specification information
+        self.spec['goal']     = {1: defSpecBlock(self.partition, a=[-11, -5], b=None, c=[5, 11], d=None)}
+        
+        self.spec['critical'] = {1: defSpecBlock(self.partition, a=[-9.5,-3.5], b=None, c=[-2,3], d=None),
+                                 2: defSpecBlock(self.partition, a=[0, 4.5], b=None, c=[-10, -6], d=None),
+                                 3: defSpecBlock(self.partition, a=[-0.7, 5], b=None, c=[-1.5, 3], d=None),
+                                 4: defSpecBlock(self.partition, a=[1.0, 4], b=None, c=[8, 11], d=None) }#,
+                                 #5: defSpecBlock(self.partition, a=[4.5, 7], b=None, c=[-11, -6], d=None)}
+        
+        # Step-bound on property
+        self.endTime = 24
+            
+    def setModel(self, observer, preset):
         '''
         Set linear dynamical system.
 
@@ -333,48 +212,219 @@ class UAV(master.LTI_master):
         Bblock = np.array([[self.LTI['tau']**2/2],
                            [self.LTI['tau']]])
         
-        wFactor, _  = ui.user_choice('Process noise strength',[0.1, 0.5, 1, 2])
+        if 'wFactor' not in preset:
+            preset['wFactor'], _  = ui.user_choice('Process noise strength',[0.1, 0.5, 1, 2])
+        if 'vFactor' not in preset and observer:
+            preset['vFactor'], _  = ui.user_choice('Masurement noise strength',[0.1, 0.5, 1, 2])
+        
+        self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock)
+        self.LTI['B']  = scipy.linalg.block_diag(Bblock, Bblock)
+    
+        # Disturbance matrix
+        self.LTI['Q']  = np.array([[0],[0],[0],[0]])
+    
+        # Covariance of the process noise
+        self.LTI['noise']['w_cov'] = preset['wFactor'] * np.diag([0.10, 0.02, 0.10, 0.02])
+    
         if observer:
-            vFactor, _  = ui.user_choice('Masurement noise strength',[0.1, 0.5, 1, 2])
-        
-        if self.modelDim==3:
-            self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock, Ablock)
-            self.LTI['B']  = scipy.linalg.block_diag(Bblock, Bblock, Bblock)
+            # Observation matrix
+            self.LTI['C']          = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
+            self.LTI['r']          = len(self.LTI['C'])
             
-            # Disturbance matrix
-            self.LTI['Q']  = np.array([[0],[0],[0],[0],[0],[0]])
-            
-            # Covariance of the process noise
-            self.LTI['noise']['w_cov'] = wFactor * np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
-            
-            if observer:
-                # Observation matrix
-                self.LTI['C']          = np.array([[1,0,0,0,0,0], [0,0,1,0,0,0], [0,0,0,0,1,0]])
-                self.LTI['r']          = len(self.LTI['C'])
-                
-                self.LTI['noise']['v_cov'] = vFactor * np.eye(np.size(self.LTI['C'],0))*0.1
-                
-                self.filter = {'cov0': np.diag([.5, .01, .5, .01, .5, .01])}
-                
-        else:
-            
-            self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock)
-            self.LTI['B']  = scipy.linalg.block_diag(Bblock, Bblock)
-        
-            # Disturbance matrix
-            self.LTI['Q']  = np.array([[0],[0],[0],[0]])
-        
-            # Covariance of the process noise
-            self.LTI['noise']['w_cov'] = wFactor * np.diag([0.10, 0.02, 0.10, 0.02])
-        
-            if observer:
-                # Observation matrix
-                self.LTI['C']          = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
-                self.LTI['r']          = len(self.LTI['C'])
-                
-                self.LTI['noise']['v_cov'] = vFactor * np.eye(np.size(self.LTI['C'],0))*0.1
+            self.LTI['noise']['v_cov'] = preset['vFactor'] * np.eye(np.size(self.LTI['C'],0))*0.1
 
-                self.filter = {'cov0': np.diag([2, .01, 2, .01])}
+            self.filter = {'cov0': np.diag([2, .01, 2, .01])}
+            
+        # Determine system dimensions
+        self.LTI['n'] = np.size(self.LTI['A'],1)
+        self.LTI['p'] = np.size(self.LTI['B'],1)
+
+class UAV_3D(master.LTI_master):
+    
+    def __init__(self, preset):
+        '''
+        Initialize the 3D UAV model class.
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        # Initialize superclass
+        master.LTI_master.__init__(self)
+        
+        # Set value of delta (how many time steps are grouped together)
+        # Used to make the model fully actuated
+        #self.deltas = [2,3]#,4]
+        self.base_delta = 2
+            
+        self.adaptive = {'rates': [],
+            'target_points': np.array([])
+            }
+        
+        # Authority limit for the control u, both positive and negative
+        self.control['limits']['uMin'] = [-4, -4, -4]
+        self.control['limits']['uMax'] = [4, 4, 4]
+        
+        # Number of actions per dimension (if 'auto', then equal to nr of regions)
+        self.targets['nrPerDim']    = 'auto'
+        self.targets['domain']      = 'auto'
+        
+        # Let the user make a choice for the model dimension
+        if 'scenario' not in preset:
+            _, preset['scenario'] = ui.user_choice('Choose a planning scenario',['Cube','City','Maze','Maze small'])
+        
+        #######################################
+        
+        if preset['scenario'] == 0:
+            # Partition size
+            self.partition['nrPerDim']  = [7, 3, 7, 3, 7, 3]
+            self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
+            self.partition['origin']    = [0, 0, 0, 0, 0, 0]
+            
+            # Specification information
+            self.spec['goal'] = {1: defSpecBlock(self.partition, a=[3, 7], b=None, c=[3, 7], d=None, e=[3, 7], f=None)}
+            
+            self.spec['critical']   = {
+                1: defSpecBlock(self.partition, a=[-3,1], b=None, c=[1,7], d=None, e=[-7,7], f=None),
+                2: defSpecBlock(self.partition, a=[-7,-3], b=None, c=[3,7], d=None, e=[3,7], f=None),
+                3: defSpecBlock(self.partition, a=[-3,1], b=None, c=[-7,1], d=None, e=[-7,-3], f=None),
+                4: defSpecBlock(self.partition, a=[1,7], b=None, c=[-7,-3], d=None, e=[-7,-5], f=None),
+                5: defSpecBlock(self.partition, a=[-3,1], b=None, c=[-7,-3], d=None, e=[-3,1], f=None)
+                }
+            
+            self.x0 = np.array([[-6, 0, 6, 0, -6, 0]])#setStateBlock(Ab.system.partition, a=[-6], b=[0], c=[6], d=[0], e=[-6], f=[0])
+        
+        #######################################
+        
+        elif preset['scenario'] == 1:
+            # Partition size
+            self.partition['nrPerDim']  = [13, 3, 7, 3, 7, 3]
+            self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
+            self.partition['origin']    = [0, 0, 0, 0, 0, 0]
+            
+            # Specification information
+            self.spec['goal'] = {1: defSpecBlock(self.partition, a=[9, 13], b=None, c=[3, 7], d=None, e=[-7, -4], f=None)}
+            
+            self.spec['critical']   = {
+                1: defSpecBlock(self.partition, a=[2, 7], b=None, c=[2, 7], d=None, e=[-7 ,5], f=None),
+                2: defSpecBlock(self.partition, a=[8,13], b=None, c=[-7, 0], d=None, e=[-7, -1], f=None),
+                3: defSpecBlock(self.partition, a=[-6, -1], b=None, c=[-1,5], d=None, e=[-7,1], f=None),
+                4: defSpecBlock(self.partition, a=[-12,1], b=None, c=[-7,-3], d=None, e=[-7,-3], f=None)
+                }
+            
+            self.x0 = np.array([[-11, 0, 5, 0, -5, 0]])#setStateBlock(Ab.system.partition, a=[-11], b=[0], c=[5], d=[0], e=[-5], f=[0])
+            
+        #######################################
+        
+        elif preset['scenario'] == 2:
+            # Partition size
+            self.partition['nrPerDim']  = [11, 3, 11, 3, 7, 3]
+            self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
+            self.partition['origin']    = [0, 0, 0, 0, 0, 0]
+            
+            # Specification information
+            self.spec['goal'] = {1: defSpecBlock(self.partition, a=[3, 7], b=None, c=[6, 10], d=None, e=[-7, -4], f=None)}
+            
+            self.spec['critical']   = {
+                1: defSpecBlock(self.partition, a=[-5, -1.5], b=None, c=[1, 11], d=None, e=[-7, -2], f=None),
+                2: defSpecBlock(self.partition, a=[-5, -1.5], b=None, c=[1, 4], d=None, e=[-2, 2], f=None),
+                3: defSpecBlock(self.partition, a=[-5, -1.5], b=None, c=[8, 11], d=None, e=[-2, 2], f=None),
+                4: defSpecBlock(self.partition, a=[-5, -1.5], b=None, c=[1, 11], d=None, e=[2, 7], f=None),
+                #
+                5: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-7, -1.5], f=None),
+                6: defSpecBlock(self.partition, a=[-11, -9], b=None, c=[-2, 2], d=None, e=[-7, -4], f=None),
+                7: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-11, -4], d=None, e=[4,7], f=None),
+                8: defSpecBlock(self.partition, a=[6, 10], b=None, c=[-11, -7], d=None, e=[-7, 2], f=None),
+                9: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-6.5, -2.5], d=None, e=[-7,-1], f=None)
+                }
+            
+            self.x0 = np.array([[-9.5, 0, 9.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
+        
+        elif preset['scenario'] == 3:
+            # Partition size
+            self.partition['nrPerDim']  = [11, 3, 9, 3, 5, 3]
+            self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
+            self.partition['origin']    = [0, 0, 0, 0, 0, 0]
+            
+            # Specification information
+            self.spec['goal'] = {1: defSpecBlock(self.partition, a=[6, 10], b=None, c=[5, 9], d=None, e=[-5, -2], f=None)}
+            
+            self.spec['critical']   = {
+                1: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 9], d=None, e=[-5, -2], f=None),
+                2: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 4.5], d=None, e=[-2, 2], f=None),
+                3: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[7.5, 9], d=None, e=[-2, 2], f=None),
+                4: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 9], d=None, e=[2, 5], f=None),
+                #
+                5: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-5, -0.2], f=None),
+                #
+                6: defSpecBlock(self.partition, a=[-11, -9], b=None, c=[-2, 2], d=None, e=[-5, -3], f=None),
+                7: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-9, -4], d=None, e=[-5, -3], f=None),
+                #
+                8: defSpecBlock(self.partition, a=[6, 10], b=None, c=[-9, -3.6], d=None, e=[-5, -1], f=None),
+                #
+                9: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-3.4, -0.5], d=None, e=[-5,-1], f=None)
+                }
+            
+            self.x0 = np.array([[-9.5, 0, 7.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
+        
+        
+        # Step-bound on property
+        self.endTime = 24
+
+    def setModel(self, observer, preset):
+        '''
+        Set linear dynamical system.
+
+        Parameters
+        ----------
+        observer : Boolean
+            If True, an observer is created for the model.
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        self.LTI = {}
+        
+        # Discretization step size
+        self.LTI['tau'] = 1.0
+        
+        self.LTI['noise'] = dict()
+        
+        # State transition matrix
+        Ablock = np.array([[1, self.LTI['tau']],
+                          [0, 1]])
+        
+        # Input matrix
+        Bblock = np.array([[self.LTI['tau']**2/2],
+                           [self.LTI['tau']]])
+        
+        self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock, Ablock)
+        self.LTI['B']  = scipy.linalg.block_diag(Bblock, Bblock, Bblock)
+        
+        # Disturbance matrix
+        self.LTI['Q']  = np.array([[0],[0],[0],[0],[0],[0]])
+        
+        if 'wFactor' not in preset:
+            preset['wFactor'], _  = ui.user_choice('Process noise strength',[0.1, 0.5, 1, 2])
+        if 'vFactor' not in preset and observer:
+            preset['vFactor'], _  = ui.user_choice('Masurement noise strength',[0.1, 0.5, 1, 2])
+        
+        # Covariance of the process noise
+        self.LTI['noise']['w_cov'] = preset['wFactor'] * np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
+        
+        if observer:
+            # Observation matrix
+            self.LTI['C']          = np.array([[1,0,0,0,0,0], [0,0,1,0,0,0], [0,0,0,0,1,0]])
+            self.LTI['r']          = len(self.LTI['C'])
+            
+            self.LTI['noise']['v_cov'] = preset['vFactor'] * np.eye(np.size(self.LTI['C'],0))*0.1
+            
+            self.filter = {'cov0': np.diag([.5, .01, .5, .01, .5, .01])}
             
         # Determine system dimensions
         self.LTI['n'] = np.size(self.LTI['A'],1)
@@ -401,7 +451,7 @@ class UAV(master.LTI_master):
         
 class building_2room(master.LTI_master):
     
-    def __init__(self):
+    def __init__(self, preset):
         '''
         Initialize the 2-zone building automation system (BAS) model class,
         which corresponds to the BAS benchmark in the paper.
@@ -455,7 +505,7 @@ class building_2room(master.LTI_master):
         # Step-bound on property
         self.endTime = 32
 
-    def setModel(self, observer):           
+    def setModel(self, observer, preset):           
         '''
         Set linear dynamical system.
 
@@ -572,7 +622,7 @@ class building_2room(master.LTI_master):
         
 class building_1room(master.LTI_master):
     
-    def __init__(self):
+    def __init__(self, preset):
         '''
         Initialize the 1-zone building automation system (BAS) model class.
         Note that this is a downscaled version of the 2-zone model above.
@@ -595,13 +645,16 @@ class building_1room(master.LTI_master):
                 }
         
         # Let the user make a choice for the model dimension
-        _, gridType  = ui.user_choice('grid size',['19x20','40x40'])
+        if 'partition_size_id' not in preset:
+            _, partition  = ui.user_choice('grid size',['19x20','40x40'])
+        else:
+            partition = preset['partition_size_id']
         
         # Authority limit for the control u, both positive and negative
         self.control['limits']['uMin'] = [14, -10]
         self.control['limits']['uMax'] = [28, 10]
             
-        if gridType == 0:
+        if partition == 0:
             nrPerDim = [19, 20]
             width = [0.2, 0.2]
             goal = [20.6,21.4]#[20.9, 21.1]
@@ -627,7 +680,7 @@ class building_1room(master.LTI_master):
         # Step-bound on property
         self.endTime = 16#64
 
-    def setModel(self, observer):           
+    def setModel(self, observer, preset):           
         '''
         Set linear dynamical system.
 
@@ -708,7 +761,7 @@ class building_1room(master.LTI_master):
 
 class shuttle(master.LTI_master):
     
-    def __init__(self):
+    def __init__(self, preset):
         '''
         Initialize the spaceshuttle rendezvous model class.
 
@@ -766,10 +819,8 @@ class shuttle(master.LTI_master):
         
         # Step-bound on property
         self.endTime = 16
-        
-        self.modelDim = 2
 
-    def setModel(self, observer):           
+    def setModel(self, observer, preset):           
         '''
         Set linear dynamical system.
 
@@ -821,7 +872,7 @@ class shuttle(master.LTI_master):
                
 class anaesthesia(master.LTI_master):
     
-    def __init__(self):
+    def __init__(self, preset):
         '''
         Initialize the sanaesthesia delivery model class.
 
@@ -861,10 +912,8 @@ class anaesthesia(master.LTI_master):
         
         # Step-bound on property
         self.endTime = 16
-        
-        self.modelDim = 3
 
-    def setModel(self, observer):           
+    def setModel(self, observer, preset):           
         '''
         Set linear dynamical system.
 
