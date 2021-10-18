@@ -333,7 +333,7 @@ class UAV(master.LTI_master):
         Bblock = np.array([[self.LTI['tau']**2/2],
                            [self.LTI['tau']]])
         
-        wFactor = 0.1 #wFactor, _  = ui.user_choice('Process noise strength',[0.1, 0.5, 1, 2])
+        wFactor, _  = ui.user_choice('Process noise strength',[0.1, 0.5, 1, 2])
         if observer:
             vFactor, _  = ui.user_choice('Masurement noise strength',[0.1, 0.5, 1, 2])
         

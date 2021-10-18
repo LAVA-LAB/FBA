@@ -135,7 +135,6 @@ setup.directories['outputF']  = setup.directories['output']+setup.main['mode_pre
     
 setup.floating_point_precision = 5
 setup.MDP_prob_decimals = 5 # Number of decimals to round off on
-setup.plotting['3D_UAV'] = True
 
 '''
 if setup.main['newRun'] is True:
