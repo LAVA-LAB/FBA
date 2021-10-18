@@ -283,7 +283,7 @@ class UAV(master.LTI_master):
                     3: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[7.5, 9], d=None, e=[-2, 2], f=None),
                     4: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 9], d=None, e=[2, 5], f=None),
                     #
-                    5: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-5, -1.5], f=None),
+                    5: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-5, -0.2], f=None),
                     #
                     6: defSpecBlock(self.partition, a=[-11, -9], b=None, c=[-2, 2], d=None, e=[-5, -3], f=None),
                     7: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-9, -4], d=None, e=[-5, -3], f=None),
@@ -333,16 +333,9 @@ class UAV(master.LTI_master):
         Bblock = np.array([[self.LTI['tau']**2/2],
                            [self.LTI['tau']]])
         
-        _, noiseStrength  = ui.user_choice('Process/measurement noise strength',['low','medium','high','extra high'])
-            
-        if noiseStrength == 0:
-            noise_factor = 0.1
-        elif noiseStrength == 1:
-            noise_factor = 0.5
-        elif noiseStrength == 2:
-            noise_factor = 1
-        else:
-            noise_factor = 2
+        wFactor = 0.1 #wFactor, _  = ui.user_choice('Process noise strength',[0.1, 0.5, 1, 2])
+        if observer:
+            vFactor, _  = ui.user_choice('Masurement noise strength',[0.1, 0.5, 1, 2])
         
         if self.modelDim==3:
             self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock, Ablock)
@@ -352,16 +345,16 @@ class UAV(master.LTI_master):
             self.LTI['Q']  = np.array([[0],[0],[0],[0],[0],[0]])
             
             # Covariance of the process noise
-            self.LTI['noise']['w_cov'] = noise_factor * np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
+            self.LTI['noise']['w_cov'] = wFactor * np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
             
             if observer:
                 # Observation matrix
                 self.LTI['C']          = np.array([[1,0,0,0,0,0], [0,0,1,0,0,0], [0,0,0,0,1,0]])
                 self.LTI['r']          = len(self.LTI['C'])
                 
-                self.LTI['noise']['v_cov'] = noise_factor * np.eye(np.size(self.LTI['C'],0))*0.1
+                self.LTI['noise']['v_cov'] = vFactor * np.eye(np.size(self.LTI['C'],0))*0.1
                 
-                self.filter = {'cov0': np.diag([1, .01, 1, .01, 1, .01])}
+                self.filter = {'cov0': np.diag([.5, .01, .5, .01, .5, .01])}
                 
         else:
             
@@ -372,14 +365,14 @@ class UAV(master.LTI_master):
             self.LTI['Q']  = np.array([[0],[0],[0],[0]])
         
             # Covariance of the process noise
-            self.LTI['noise']['w_cov'] = noise_factor * np.diag([0.10, 0.02, 0.10, 0.02])
+            self.LTI['noise']['w_cov'] = wFactor * np.diag([0.10, 0.02, 0.10, 0.02])
         
             if observer:
                 # Observation matrix
                 self.LTI['C']          = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
                 self.LTI['r']          = len(self.LTI['C'])
                 
-                self.LTI['noise']['v_cov'] = noise_factor * np.eye(np.size(self.LTI['C'],0))*0.1
+                self.LTI['noise']['v_cov'] = vFactor * np.eye(np.size(self.LTI['C'],0))*0.1
 
                 self.filter = {'cov0': np.diag([2, .01, 2, .01])}
             

@@ -933,8 +933,8 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
 '''
 load_traces_manual(Ab, ['output//FiAb_UAV_ksteadystate=3_10-18-2021_08-45-47 (Low noise)', 
                         'output//FiAb_UAV_ksteadystate=3_10-17-2021_16-22-04 (Medium noise)', 
-                        'output//FiAb_UAV_ksteadystate=3_10-18-2021_07-49-37 (High noise)'], 
-                       ['Low noise', 'Medium noise', 'High noise'], [0,1,1])
+                        'output//FiAb_UAV_ksteadystate=3_10-18-2021_10-15-07 (Very high noise)'], 
+                       ['Low noise', 'Medium noise', 'High noise'], [0,1,10])
 '''
     
 def load_traces_manual(Ab, paths, labels, idxs=[0]):
