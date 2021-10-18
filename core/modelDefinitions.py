@@ -339,8 +339,10 @@ class UAV(master.LTI_master):
             noise_factor = 0.1
         elif noiseStrength == 1:
             noise_factor = 0.5
-        else:
+        elif noiseStrength == 2:
             noise_factor = 1
+        else:
+            noise_factor = 2
         
         if self.modelDim==3:
             self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock, Ablock)

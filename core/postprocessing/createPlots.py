@@ -930,7 +930,12 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
     vv.screenshot(filename, sf=3, bg='w', ob=vv.gcf())
     app.Run()
     
-# load_traces_manual(Ab, ['/home/thom/Documents/Abstractions/pyabstract/output/FiAb_UAV_ksteadystate=3_10-17-2021_14-29-06 (low noise)', 'output//FiAb_UAV_ksteadystate=3_10-16-2021_15-56-58 (medium noise)', 'output//FiAb_UAV_ksteadystate=3_10-16-2021_15-10-42 (high noise)'], ['Low noise', 'Medium noise', 'High noise'])
+'''
+load_traces_manual(Ab, ['output//FiAb_UAV_ksteadystate=3_10-18-2021_08-45-47 (Low noise)', 
+                        'output//FiAb_UAV_ksteadystate=3_10-17-2021_16-22-04 (Medium noise)', 
+                        'output//FiAb_UAV_ksteadystate=3_10-18-2021_07-49-37 (High noise)'], 
+                       ['Low noise', 'Medium noise', 'High noise'], [0,1,1])
+'''
     
 def load_traces_manual(Ab, paths, labels, idxs=[0]):
     '''
