@@ -225,6 +225,7 @@ class UAV_2D(master.LTI_master):
     
         # Covariance of the process noise
         self.LTI['noise']['w_cov'] = preset['wFactor'] * np.diag([0.10, 0.02, 0.10, 0.02])
+        self.LTI['noise']['wFactor'] = preset['wFactor']
     
         if observer:
             # Observation matrix
@@ -232,6 +233,7 @@ class UAV_2D(master.LTI_master):
             self.LTI['r']          = len(self.LTI['C'])
             
             self.LTI['noise']['v_cov'] = preset['vFactor'] * np.eye(np.size(self.LTI['C'],0))*0.1
+            self.LTI['noise']['vFactor'] = preset['vFactor']
 
             self.filter = {'cov0': np.diag([2, .01, 2, .01])}
             
@@ -275,9 +277,11 @@ class UAV_3D(master.LTI_master):
         if 'scenario' not in preset:
             _, preset['scenario'] = ui.user_choice('Choose a planning scenario',['Cube','City','Maze','Maze small'])
         
+        self.scenario = preset['scenario']
+        
         #######################################
         
-        if preset['scenario'] == 0:
+        if self.scenario == 0:
             # Partition size
             self.partition['nrPerDim']  = [7, 3, 7, 3, 7, 3]
             self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
@@ -298,7 +302,7 @@ class UAV_3D(master.LTI_master):
         
         #######################################
         
-        elif preset['scenario'] == 1:
+        elif self.scenario == 1:
             # Partition size
             self.partition['nrPerDim']  = [13, 3, 7, 3, 7, 3]
             self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
@@ -318,7 +322,7 @@ class UAV_3D(master.LTI_master):
             
         #######################################
         
-        elif preset['scenario'] == 2:
+        elif self.scenario == 2:
             # Partition size
             self.partition['nrPerDim']  = [11, 3, 11, 3, 7, 3]
             self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
@@ -342,7 +346,7 @@ class UAV_3D(master.LTI_master):
             
             self.x0 = np.array([[-9.5, 0, 9.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
         
-        elif preset['scenario'] == 3:
+        elif self.scenario == 3:
             # Partition size
             self.partition['nrPerDim']  = [11, 3, 9, 3, 5, 3]
             self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
@@ -416,6 +420,7 @@ class UAV_3D(master.LTI_master):
         
         # Covariance of the process noise
         self.LTI['noise']['w_cov'] = preset['wFactor'] * np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
+        self.LTI['noise']['wFactor'] = preset['wFactor']
         
         if observer:
             # Observation matrix
@@ -423,6 +428,7 @@ class UAV_3D(master.LTI_master):
             self.LTI['r']          = len(self.LTI['C'])
             
             self.LTI['noise']['v_cov'] = preset['vFactor'] * np.eye(np.size(self.LTI['C'],0))*0.1
+            self.LTI['noise']['vFactor'] = preset['vFactor']
             
             self.filter = {'cov0': np.diag([.5, .01, .5, .01, .5, .01])}
             
