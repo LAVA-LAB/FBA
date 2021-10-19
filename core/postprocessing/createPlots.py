@@ -925,10 +925,15 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
     app.Run()
     
 '''
-load_traces_manual(Ab, ['output//FiAb_UAV_ksteadystate=3_10-18-2021_08-45-47 (Low noise)', 
-                        'output//FiAb_UAV_ksteadystate=3_10-17-2021_16-22-04 (Medium noise)', 
-                        'output//FiAb_UAV_ksteadystate=3_10-18-2021_10-15-07 (Very high noise)'], 
-                       ['Low noise', 'Medium noise', 'High noise'], [0,1,10])
+load_traces_manual(Ab, ['output//FiAb_UAV_3D_ksteadystate=3_wFact=0.1_vFact=0.1_layout=3', 
+                        'output//FiAb_UAV_3D_ksteadystate=3_wFact=0.5_vFact=0.1_layout=3', 
+                        'output//FiAb_UAV_3D_ksteadystate=3_wFact=2_vFact=0.1_layout=3'], 
+                       ['Low process noise', 'Medium process noise', 'High process noise'], [np.arange(5),np.arange(5),np.arange(5)])
+
+load_traces_manual(Ab, ['output//FiAb_UAV_3D_ksteadystate=3_wFact=1_vFact=0.1_layout=3', 
+                        'output//FiAb_UAV_3D_ksteadystate=3_wFact=1_vFact=0.5_layout=3', 
+                        'output//FiAb_UAV_3D_ksteadystate=3_wFact=1_vFact=2_layout=3'], 
+                       ['Low measurement noise', 'Medium measurement noise', 'High measurement noise'], [np.arange(5),np.arange(5),np.arange(5)])
 '''
     
 def load_traces_manual(Ab, paths, labels, idxs=[0]):
@@ -955,8 +960,12 @@ def load_traces_manual(Ab, paths, labels, idxs=[0]):
     if len(paths) != len(idxs):
         idxs = np.zeros(len(paths))
     
-    traces = [list(pd.read_pickle(path+'//traces.pickle').loc[idxs[i]].dropna()) 
-              for i,path in enumerate(paths)]
+    traces_all = {}
+    
+    for i,path in enumerate(paths):
+        traces_file = pd.read_pickle(path+'//traces.pickle')
+        
+        traces_all[i] = traces_file.loc[idxs[i]]
     
     cut_value = np.zeros(3)
     for i,d in enumerate(range(1, Ab.system.LTI['n'], 2)):
@@ -964,10 +973,10 @@ def load_traces_manual(Ab, paths, labels, idxs=[0]):
             cut_value[i] = 0
         else:
             cut_value[i] = Ab.system.partition['width'][d] / 2
+        
+    UAVplot3d_visvis_multi( Ab.setup, Ab.system.spec, cut_value, traces_all, labels) 
     
-    UAVplot3d_visvis_multi( Ab.setup, Ab.system.spec, cut_value, traces, labels) 
-    
-def UAVplot3d_visvis_multi(setup, spec, cut_value, traces_multi, traces_labels):
+def UAVplot3d_visvis_multi(setup, spec, cut_value, traces_all, traces_labels):
     '''
     Create 3D trajectory plots for the 3D UAV benchmark
 
@@ -1036,42 +1045,48 @@ def UAVplot3d_visvis_multi(setup, spec, cut_value, traces_multi, traces_labels):
                     (255/255, 204/255, 229/255)]
     trace_styles = ['.', 'x', '*']
     trace_labels = tuple(np.repeat(traces_labels, 2))
-    ("Low noise", "Low noise", "High noise", "High noise")
     
-    for i,trace in enumerate(traces_multi):
+    for j in range(max(len(traces) for traces in traces_all.values())):
+    
+        for i,traces in traces_all.items():
         
-        if len(trace) < 3:
-            printWarning('Warning: trace '+str(i)+' has length of '+str(len(trace)))
-            continue
+            if len(traces) <= j:
+                continue
+            else:
+                trace = list(traces.loc[j].dropna())   
         
-        # Convert nested list to 2D array
-        trace_array = np.array(trace)
-        
-        # Extract x,y coordinates of trace
-        x = trace_array[:, ix]
-        y = trace_array[:, iy]
-        z = trace_array[:, iz]
-        points = np.array([x,y,z]).T
-        
-        # Plot precise points
-        vv.plot(x,y,z, lw=0, mc=trace_colors[i], ms=trace_styles[i], mw=12)
-        
-        # Linear length along the line:
-        distance = np.cumsum( np.sqrt(np.sum( np.diff(points, axis=0)**2, axis=1 )) )
-        distance = np.insert(distance, 0, 0)/distance[-1]
-        
-        # Interpolation for different methods:
-        alpha = np.linspace(0, 1, 75)
-        
-        interpolator =  interp1d(distance, points, kind='quadratic', axis=0)
-        interpolated_points = interpolator(alpha)
-        
-        xp = interpolated_points[:,0]
-        yp = interpolated_points[:,1]
-        zp = interpolated_points[:,2]
-        
-        # Plot trace
-        vv.plot(xp,yp,zp, lw=5, lc=trace_colors[i])
+            if len(trace) < 3:
+                printWarning('Warning: trace '+str(i)+' has length of '+str(len(trace)))
+                continue
+            
+            # Convert nested list to 2D array
+            trace_array = np.array(trace)
+            
+            # Extract x,y coordinates of trace
+            x = trace_array[:, ix]
+            y = trace_array[:, iy]
+            z = trace_array[:, iz]
+            points = np.array([x,y,z]).T
+            
+            # Plot precise points
+            vv.plot(x,y,z, lw=0, mc=trace_colors[i], ms=trace_styles[i], mw=12, label='test')
+            
+            # Linear length along the line:
+            distance = np.cumsum( np.sqrt(np.sum( np.diff(points, axis=0)**2, axis=1 )) )
+            distance = np.insert(distance, 0, 0)/distance[-1]
+            
+            # Interpolation for different methods:
+            alpha = np.linspace(0, 1, 75)
+            
+            interpolator =  interp1d(distance, points, kind='quadratic', axis=0)
+            interpolated_points = interpolator(alpha)
+            
+            xp = interpolated_points[:,0]
+            yp = interpolated_points[:,1]
+            zp = interpolated_points[:,2]
+            
+            # Plot trace
+            vv.plot(xp,yp,zp, lw=5, lc=trace_colors[i])
         
     ax.axis.xLabel = 'X'
     ax.axis.yLabel = 'Y'
@@ -1102,7 +1117,7 @@ def UAVplot3d_visvis_multi(setup, spec, cut_value, traces_multi, traces_labels):
         filename = setup.directories['outputF'] + 'UAV_multi_instances.png'
     
     vv.screenshot(filename, sf=3, bg='w', ob=vv.gcf())
-    app.Run()
+    #app.Run()
     
 def reachabilityHeatMap(Ab):
     '''
