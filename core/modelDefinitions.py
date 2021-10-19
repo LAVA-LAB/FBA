@@ -363,12 +363,12 @@ class UAV_3D(master.LTI_master):
                 #
                 5: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-5, -0.2], f=None),
                 #
-                6: defSpecBlock(self.partition, a=[-11, -9], b=None, c=[-2, 2], d=None, e=[-5, -3], f=None),
+                6: defSpecBlock(self.partition, a=[-11, -9], b=None, c=[-2, 2], d=None, e=[-5, -1], f=None),
                 7: defSpecBlock(self.partition, a=[-6, 2], b=None, c=[-9, -4], d=None, e=[-5, -3], f=None),
                 #
                 8: defSpecBlock(self.partition, a=[6, 10], b=None, c=[-9, -3.6], d=None, e=[-5, -1], f=None),
                 #
-                9: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-3.4, -0.5], d=None, e=[-5,1], f=None)
+                9: defSpecBlock(self.partition, a=[-4, 1], b=None, c=[-3.4, -0.5], d=None, e=[-5,0], f=None)
                 }
             
             self.x0 = np.array([[-9.5, 0, 7.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
@@ -419,7 +419,7 @@ class UAV_3D(master.LTI_master):
             preset['vFactor'], _  = ui.user_choice('Masurement noise strength',[0.1, 0.5, 1, 2])
         
         # Covariance of the process noise
-        self.LTI['noise']['w_cov'] = preset['wFactor'] * np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
+        self.LTI['noise']['w_cov'] = preset['wFactor'] * np.diag([0.10, 0.02, 0.10, 0.02, 0.30, 0.02])
         self.LTI['noise']['wFactor'] = preset['wFactor']
         
         if observer:

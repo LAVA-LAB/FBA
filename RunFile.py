@@ -40,10 +40,10 @@ for wFactor in [0.1, 0.5, 1, 2]:
     #-----------------------------------------------------------------------------
     
     preset = {
-        'application_id': 0,
+        'application_id': 1,
         'scenario': 3,          # Planning scenario for 3D UAV case
-        'wFactor': wFactor,           # Process noise strength for UAV cases
-        'vFactor': vFactor,           # Measurement noise strength for UAV cases
+        'wFactor': wFactor,     # Process noise strength for UAV cases
+        'vFactor': vFactor,     # Measurement noise strength for UAV cases
         'new': True,
         '2phase': True,
         'k_steady_state': 3,

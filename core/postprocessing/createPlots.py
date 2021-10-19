@@ -922,7 +922,7 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
     filename = setup.directories['outputFcase'] + 'UAV_paths_screenshot.png'
     
     vv.screenshot(filename, sf=3, bg='w', ob=vv.gcf())
-    app.Run()
+    # app.Run()
     
 '''
 load_traces_manual(Ab, ['output//FiAb_UAV_3D_ksteadystate=3_wFact=0.1_vFact=0.1_layout=3', 
