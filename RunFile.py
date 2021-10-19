@@ -32,7 +32,7 @@ from core.commons import printWarning, createDirectory
 from core import modelDefinitions
 from core.masterClasses import settings, loadOptions
 
-for wFactor in [1]:
+for wFactor in [0.1, 0.5, 1, 2]:
   for vFactor in [0.1, 0.5, 1, 2]:
 
     #-----------------------------------------------------------------------------
@@ -40,7 +40,7 @@ for wFactor in [1]:
     #-----------------------------------------------------------------------------
     
     preset = {
-        'application_id': 1,
+        'application_id': 0,
         'scenario': 3,          # Planning scenario for 3D UAV case
         'wFactor': wFactor,           # Process noise strength for UAV cases
         'vFactor': vFactor,           # Measurement noise strength for UAV cases
