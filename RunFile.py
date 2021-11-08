@@ -32,8 +32,8 @@ from core.commons import printWarning, createDirectory
 from core import modelDefinitions
 from core.masterClasses import settings, loadOptions
 
-for wFactor in [0.1, 0.5, 1, 2]:
-  for vFactor in [0.1, 0.5, 1, 2]:
+for wFactor in [[0.1,0.1,0.1], [1,1,1]]:
+  for vFactor in [[0.1,0.1,0.1], [0.1,0.1,1], [0.1,1,0.1]]:
 
     #-----------------------------------------------------------------------------
     # Set override settings (preset)

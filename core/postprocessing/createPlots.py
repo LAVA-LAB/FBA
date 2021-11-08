@@ -928,12 +928,12 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
 load_traces_manual(Ab, ['output//FiAb_UAV_3D_ksteadystate=3_wFact=0.1_vFact=0.1_layout=3', 
                         'output//FiAb_UAV_3D_ksteadystate=3_wFact=0.5_vFact=0.1_layout=3', 
                         'output//FiAb_UAV_3D_ksteadystate=3_wFact=2_vFact=0.1_layout=3'], 
-                       ['Low process noise', 'Medium process noise', 'High process noise'], [np.arange(5),np.arange(5),np.arange(5)])
+                       ['Low process noise', 'Medium process noise', 'High process noise'], [np.arange(3),np.arange(3),np.arange(3)])
 
-load_traces_manual(Ab, ['output//FiAb_UAV_3D_ksteadystate=3_wFact=1_vFact=0.1_layout=3', 
-                        'output//FiAb_UAV_3D_ksteadystate=3_wFact=1_vFact=0.5_layout=3', 
-                        'output//FiAb_UAV_3D_ksteadystate=3_wFact=1_vFact=2_layout=3'], 
-                       ['Low measurement noise', 'Medium measurement noise', 'High measurement noise'], [np.arange(5),np.arange(5),np.arange(5)])
+load_traces_manual(Ab, ['output//FiAb_UAV_3D_ksteadystate=3_wFact=0.5_vFact=0.1_layout=3', 
+                        'output//FiAb_UAV_3D_ksteadystate=3_wFact=0.5_vFact=0.5_layout=3', 
+                        'output//FiAb_UAV_3D_ksteadystate=3_wFact=0.5_vFact=1_layout=3'], 
+                       ['Low measurement noise', 'Medium measurement noise', 'High measurement noise'], [np.arange(3),np.arange(3),np.arange(3)])
 '''
     
 def load_traces_manual(Ab, paths, labels, idxs=[0]):

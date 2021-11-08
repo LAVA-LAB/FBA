@@ -213,9 +213,9 @@ class UAV_2D(master.LTI_master):
                            [self.LTI['tau']]])
         
         if 'wFactor' not in preset:
-            preset['wFactor'], _  = ui.user_choice('Process noise strength',[0.1, 0.5, 1, 2])
+            preset['wFactor'], _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
         if 'vFactor' not in preset and observer:
-            preset['vFactor'], _  = ui.user_choice('Masurement noise strength',[0.1, 0.5, 1, 2])
+            preset['vFactor'], _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
         
         self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock)
         self.LTI['B']  = scipy.linalg.block_diag(Bblock, Bblock)
@@ -224,7 +224,7 @@ class UAV_2D(master.LTI_master):
         self.LTI['Q']  = np.array([[0],[0],[0],[0]])
     
         # Covariance of the process noise
-        self.LTI['noise']['w_cov'] = preset['wFactor'] * np.diag([0.10, 0.02, 0.10, 0.02])
+        self.LTI['noise']['w_cov'] = np.repeat(preset['wFactor'], 2) * np.diag([0.10, 0.02, 0.10, 0.02])
         self.LTI['noise']['wFactor'] = preset['wFactor']
     
         if observer:
@@ -348,27 +348,27 @@ class UAV_3D(master.LTI_master):
         
         elif self.scenario == 3:
             # Partition size
-            self.partition['nrPerDim']  = [11, 3, 9, 3, 5, 3]
+            self.partition['nrPerDim']  = [11, 3, 9, 3, 7, 3]
             self.partition['width']     = [2, 1.5, 2, 1.5, 2, 1.5]
-            self.partition['origin']    = [0, 0, 0, 0, 0, 0]
+            self.partition['origin']    = [0, 0, 0, 0, 2, 0]
             
             # Specification information
             self.spec['goal'] = {1: defSpecBlock(self.partition, a=[6, 10], b=None, c=[5, 9], d=None, e=[-5, -2], f=None)}
             
             self.spec['critical']   = {
                 1: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 9], d=None, e=[-5, -2], f=None),
-                2: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 4.5], d=None, e=[-2, 2], f=None),
-                3: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[7.5, 9], d=None, e=[-2, 2], f=None),
-                4: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 9], d=None, e=[2, 5], f=None),
+                2: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 4.5], d=None, e=[-2, 6], f=None),
+                3: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[7.5, 9], d=None, e=[-2, 6], f=None),
+                4: defSpecBlock(self.partition, a=[-5, 0], b=None, c=[1, 9], d=None, e=[6, 9], f=None),
                 #
-                5: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-5, -0.2], f=None),
+                5: defSpecBlock(self.partition, a=[0.5, 5.5], b=None, c=[1, 4], d=None, e=[-5, 3], f=None),
                 #
                 6: defSpecBlock(self.partition, a=[-11, -9], b=None, c=[-2, 2], d=None, e=[-5, -1], f=None),
-                7: defSpecBlock(self.partition, a=[-6, 2], b=None, c=[-9, -4], d=None, e=[-5, -3], f=None),
+                7: defSpecBlock(self.partition, a=[-6, 2], b=None, c=[-9, -4], d=None, e=[-5, -1], f=None),
                 #
                 8: defSpecBlock(self.partition, a=[6, 10], b=None, c=[-9, -3.6], d=None, e=[-5, -1], f=None),
                 #
-                9: defSpecBlock(self.partition, a=[-4, 1], b=None, c=[-3.4, -0.5], d=None, e=[-5,0], f=None)
+                9: defSpecBlock(self.partition, a=[-4, 1], b=None, c=[-3.4, -0.5], d=None, e=[-5,4], f=None)
                 }
             
             self.x0 = np.array([[-9.5, 0, 7.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
@@ -414,12 +414,12 @@ class UAV_3D(master.LTI_master):
         self.LTI['Q']  = np.array([[0],[0],[0],[0],[0],[0]])
         
         if 'wFactor' not in preset:
-            preset['wFactor'], _  = ui.user_choice('Process noise strength',[0.1, 0.5, 1, 2])
+            preset['wFactor'], _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1,0.1], [0.5,0.5,0.5], [1,1,1], [2,2,2]])
         if 'vFactor' not in preset and observer:
-            preset['vFactor'], _  = ui.user_choice('Masurement noise strength',[0.1, 0.5, 1, 2])
+            preset['vFactor'], _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1,0.1], [0.5,0.5,0.5], [1,1,1], [2,2,2]])
         
         # Covariance of the process noise
-        self.LTI['noise']['w_cov'] = preset['wFactor'] * np.diag([0.10, 0.02, 0.10, 0.02, 0.30, 0.02])
+        self.LTI['noise']['w_cov'] = np.repeat(preset['wFactor'], 2) * np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
         self.LTI['noise']['wFactor'] = preset['wFactor']
         
         if observer:
