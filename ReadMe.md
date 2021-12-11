@@ -1,8 +1,8 @@
 # Introduction of this ReadMe file
 
-This artefact contains the source code for paper submission 10143 to NeurIPS 2021, with the title:
+This artefact contains the source code for the paper:
 
-**<center>Sampling-Based Robust Control of Autonomous Systems with Non-Gaussian Noise</center>**
+**<center>Filder-Based Abstractions for Safe Planning of Partially Observable Dynamical Systems</center>**
 
 The files in this repository contain everything that is needed to replicate the results presented in the paper. Our simulations ran on a Linux machine with 32 3.7GHz cores and 64 GB of RAM. Using the instructions below, the experiments may be replicated on a virtual machine, or on your own machine.
 
@@ -101,7 +101,7 @@ The following packages will be installed:
 
 - cvxopt==1.2.7
 - cvxpy==1.1.15
-- cv2==4.5.3
+- opencv-python==4.5.3.56
 - imageio==2.9.0 (needed for visvis)
 - matplotlib==3.3.4
 - numpy==1.20.1
@@ -125,9 +125,6 @@ To ensure that PRISM can be found by the script, **you need to modify the PRISM 
 
 If desired, you may also make other changes in the configuration of the script in the `options.txt` file. An overview of the most important settings is given below:
 
-- `scenarios.samples` : the number of samples the script uses in the first iteration
-- `scenarios.samples_max` : the number of samples after which the iterative scheme is terminated
-- `scenarios.confidence` : the confidence level used for computing transition probability intervals
 - `mdp.prism_folder` : folder where PRISM is located; should end with `/prism/` (the folder in which the `bin/` folder is located)
 - `mdp.mode` : if “*interval*”, an interval MDP is created. If “*estimate*”, a regular MDP is created
 - `mdp .prism_model_writer` : if “*explicit*”, a PRISM model is created in explicit form. If “*default*”, a standard PRISM model is created. See the PRISM documentation for more details.
@@ -138,10 +135,10 @@ If desired, you may also make other changes in the configuration of the script i
 
 ## 6. Run the script
 
-Run the `SBA-RunFile.py` file to execute the program, by typing the command:
+Run the `RunFile.py` file to execute the program, by typing the command:
 
 ```bash
-$ python SBA-RunFile.py
+$ python RunFile.py
 ```
 
 You will be asked to make a number of choices:
@@ -158,7 +155,7 @@ The user can recreate the results presented in the paper, by choosing the **3D U
 
 ## 7. Inspect the results 
 
-All results are stored in the `output/` folder. When running `SBA-RunFile.py` for a new abstraction, a new folder is created that contains the application name and the current datetime, such as `ScAb_UAV_06-02-2021_13-46-29/`.
+All results are stored in the `output/` folder. When running `RunFile.py` for a new abstraction, a new folder is created that contains the application name and the current datetime, such as `ScAb_UAV_06-02-2021_13-46-29/`.
 
 Results that apply to all iterations of the iterative abstraction scheme are saved directly in this folder. This includes an Excel file describing all model sizes, run times, etc.
 
@@ -202,7 +199,6 @@ where:
 - `A` is an n x n matrix.
 - `B` is an n x p matrix.
 - `Q` is a n x 1 column vector that reflects the additive deterministic disturbance (q-term in the equation above).
-- If Gaussian noise is used, `noise['w_cov']` is the covariance matrix of the w-term in the equation above. Note that non-Gaussian noise (from the Dryden gust model) is used for the UAV case.
 
 Note that is the current version of the codes is not compatible (yet) with partial observability (i.e. defining an observer). Thus, make sure to set the argument `observer = False`.
 
@@ -220,17 +216,3 @@ where subscript c indicates that these matrices and vectors differ from the ones
 ------
 
 
-
-# Ancillary scripts
-
-In addition to the main Python program which is executed using `SBA-RunFile.py`, there are two ancillary scripts contained in the folder:
-
-### MatLab code to tabulate probability intervals
-
-We provide a convenient MatLab script, called `Tabulate-RunFile.m`, which can be used to tabulate all possible transition probability intervals for a given value of `N` (total number of samples) and `beta` (the confidence level). For more details on how the transition probability intervals are computed, please consult the main paper (and in particular Theorem 1).
-
-For every combination of `N` and `beta`, the script creates a `.csv` file, that contains the tabulated transition probability intervals, e.g., named `probabilityTable_N=3200_beta=0.01.csv`. When running the main Python program for these values of `N` and `beta`, the tabulated data is loaded into Python, to compute the transition probability intervals of the interval MDP.
-
-### Python code to create turbulence samples
-
-The Python script `createTurbulenceSamples` can be used to create (non-Gaussian) noise samples for the 3D UAV case. The source code for the Dryden gust model used to create these samples, can be found in `core/UAV/dryden.py`. The script stored the samples in the `input/` folder, in a `.csv` file that contains the number of samples is contain in its name, e.g., `TurbulenceNoise_N=100.csv`.
