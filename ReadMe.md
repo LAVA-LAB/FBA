@@ -2,7 +2,7 @@
 
 This artefact contains the source code for the paper:
 
-**<center>Filder-Based Abstractions for Safe Planning of Partially Observable Dynamical Systems</center>**
+**<center>Filter-Based Abstractions for Safe Planning of Partially Observable Dynamical Systems</center>**
 
 The files in this repository contain everything that is needed to replicate the results presented in the paper. Our simulations ran on a Linux machine with 32 3.7GHz cores and 64 GB of RAM. Using the instructions below, the experiments may be replicated on a virtual machine, or on your own machine.
 
