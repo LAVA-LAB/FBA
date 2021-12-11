@@ -9,7 +9,7 @@
 
 Implementation of the method proposed in the paper:
  "Filter-Based Abstractions for Safe Planning of Partially Observable 
-  Autonomous Systems"
+  Dynamical Systems"
 
 Originally coded by:        Thom S. Badings
 Contact e-mail address:     thom.badings@ru.nl
@@ -203,6 +203,27 @@ def kalmanFilter(model, cov0):
             'error_bound': max_error_bound}
     
 def minimumEpsilon(cov, beta=0.01, stepSize=0.01, singleParam=True):
+    '''
+    Compute the minimum error bound (epsilon) by which regions are augmented
+
+    Parameters
+    ----------
+    cov : 2d array
+        Covariance matrix.
+    beta : float, optional
+        Confidence probability. The default is 0.01.
+    stepSize : float, optional
+        Step size by which error bound is increased. The default is 0.01.
+    singleParam : boolean, optional
+        If true, than a single epsilon is used in all dimensions. 
+        The default is True.
+
+    Returns
+    -------
+    max_error_bound : array (length equal to dimension of state space)
+        Error bound by which regions are augmented.
+
+    '''
     
     n = np.shape(cov)[0]
     
@@ -267,11 +288,10 @@ def steadystateCovariance(covariances, verbose=False):
     ----------
     covariances : list of arrays
         List of numpy arrays describing the covariances.
-
+        
     Returns
     -------
-    smallest_cov : array
-        Numpy array describing the covariances that contains all given inputs
+    Dictionary containing the best- and worst-case covariance matrices
 
     '''
     
@@ -343,7 +363,21 @@ def steadystateCovariance(covariances, verbose=False):
     return {'worst': np.real(worst_cov), 'best': np.real(best_cov)}
 
 def steadystateCovariance_sdp(covariances, verbose=True):
+    '''
+    Compute the best/worst case covariance matrix that contains a list of 
+    other covariance matrices. Approach based on semi-definite programming.
 
+    Parameters
+    ----------
+    covariances : list of arrays
+        List of numpy arrays describing the covariances.
+
+    Returns
+    -------
+    Dictionary containing the best- and worst-case covariance matrices
+
+    '''
+    
     print('Compute best/worst-case covariance (SDP method)')    
 
     # Dimension of the covariance matrix

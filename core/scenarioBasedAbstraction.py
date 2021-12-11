@@ -9,7 +9,7 @@
 
 Implementation of the method proposed in the paper:
  "Filter-Based Abstractions for Safe Planning of Partially Observable 
-  Autonomous Systems"
+  Dynamical Systems"
 
 Originally coded by:        Thom S. Badings
 Contact e-mail address:     thom.badings@ru.nl
@@ -187,7 +187,7 @@ class scenarioBasedAbstraction(Abstraction):
         approx_idxs = np.zeros(len(counts), dtype=int)
     
         # Enumerate over all the non-zero bins
-        for i, (region,count) in enumerate(counts.items()): #zip(np.arange(abstr['nr_regions'])[nonEmpty], counts[nonEmpty]):
+        for i, (region,count) in enumerate(counts.items()):
             
             k = Nsamples - count + d
             
@@ -354,7 +354,7 @@ class scenarioBasedAbstraction(Abstraction):
             print(' -- Computing required Gaussian random variables...')
         
         if self.setup.montecarlo['init_states'] == False:
-            init_state_idxs = self.abstr['P'].keys() #np.arange(len(self.abstr['P']))
+            init_state_idxs = self.abstr['P'].keys() 
             
         else:
             init_state_idxs = self.setup.montecarlo['init_states']

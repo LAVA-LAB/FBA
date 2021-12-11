@@ -9,7 +9,7 @@
 
 Implementation of the method proposed in the paper:
  "Filter-Based Abstractions for Safe Planning of Partially Observable 
-  Autonomous Systems"
+  Dynamical Systems"
 
 Originally coded by:        Thom S. Badings
 Contact e-mail address:     thom.badings@ru.nl

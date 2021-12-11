@@ -9,7 +9,7 @@
 
 Implementation of the method proposed in the paper:
  "Filter-Based Abstractions for Safe Planning of Partially Observable 
-  Autonomous Systems"
+  Dynamical Systems"
 
 Originally coded by:        Thom S. Badings
 Contact e-mail address:     thom.badings@ru.nl
@@ -73,8 +73,23 @@ class filterBasedAbstraction(Abstraction):
 
         Parameters
         ----------
+        tab : object
+            Object for printing table output
+        mdp_mode : string
+            Is either 'interval' or 'estimate'
+        Sigma_worst : 2d array
+            Worst-case covariance matrix
+        Sigma_best : 2d array
+            Best-case covariance matrix
+        delta : int
+            Adaptive rate for which to do computations
+        allCenters_asArray : array
+            Array of all centers of the regions in the partition
+        GOAL : list
+            List of goal regions
+        CRITICAL : list
+            List of critical regions
         
-
         Returns
         -------
         prob : dict
@@ -146,19 +161,7 @@ class filterBasedAbstraction(Abstraction):
                 
                 prob_critical_worst_sum = 0
                 prob_critical_best_sum = 0
-                
-                '''
-                mu_tuple = tuple(mu)
-                if mu_tuple in self.abstr['allCentersCubic']:
-                    
-                    points = getNeighbors(mu, self.system.partition, depth=2)
-                    idxs   = [self.abstr['allCentersCubic'][tuple(point)] 
-                              for point in points 
-                              if tuple(point) in self.abstr['allCentersCubic']] 
-                    
-                else:
-                '''
-                    
+                 
                 idxs = self.abstr['P'].keys()
                     
                 # For every possible resulting region
@@ -374,7 +377,10 @@ class filterBasedAbstraction(Abstraction):
                 
                 # Print normal row in table
                 if a % printEvery == 0 and verbose:
-                    nr_transitions = len(prob[a]['interval_idxs'])
+                    if mdp_mode == 'interval':
+                        nr_transitions = len(prob[a]['interval_idxs'])
+                    else:
+                        nr_transitions = len(prob[a]['approx_idxs'])
                     tab.print_row([a, 
                        'Transitions: '+str(nr_transitions)+\
                        ' (skipped: '+str(skipped_counter)+')'])
@@ -387,7 +393,16 @@ class filterBasedAbstraction(Abstraction):
 
         Parameters
         ----------
-        
+        Sigma_worst : 2d array
+            Worst-case covariance matrix
+        Sigma_best : 2d array
+            Best-case covariance matrix
+        GOAL : list
+            List of goal regions
+        CRITICAL : list
+            List of critical regions
+        verbose : boolean
+            If true, print additional output
 
         Returns
         -------
@@ -685,8 +700,28 @@ class filterBasedAbstraction(Abstraction):
               self.time['3_probabilities'],'\n\n')
         
 class MonteCarloSim():
+    '''
+    Class to run Monte Carlo simulations under a derived controller
+    '''
     
     def __init__(self, Ab, iterations=100, init_states=False):
+        '''
+        Initialization function
+
+        Parameters
+        ----------
+        Ab : abstraction instance
+        Full object of the abstraction being plotted for
+        iterations : int, optional
+            Number of Monte Carlo iterations. The default is 100.
+        init_states : list, optional
+            List of initial states to start simulations from. Default is False.
+
+        Returns
+        -------
+        None.
+
+        '''
         
         self.results = dict()
         self.traces = dict()
@@ -986,8 +1021,4 @@ class MonteCarloSim():
         mu_prime = mu_goal + K_gain @ (y_prime - self.model[delta]['C'] @ mu_goal)
         
         return x_prime, u, y_prime, mu_prime
-    
-    
-    
-    
     

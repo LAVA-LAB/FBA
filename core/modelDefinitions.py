@@ -9,7 +9,7 @@
 
 Implementation of the method proposed in the paper:
  "Filter-Based Abstractions for Safe Planning of Partially Observable 
-  Autonomous Systems"
+  Dynamical Systems"
 
 Originally coded by:        Thom S. Badings
 Contact e-mail address:     thom.badings@ru.nl
@@ -79,7 +79,7 @@ class double_integrator(master.LTI_master):
 
         # Specification information
         self.spec['goal']     = {1: defSpecBlock(self.partition, a=[-3,3], b=[-3,3])}
-        self.spec['critical'] = {}#{1: defSpecBlock(self.partition, a=[9,11], b=None)}
+        self.spec['critical'] = {}
         
         # Step-bound on property
         self.endTime = 32#64
@@ -258,7 +258,6 @@ class UAV_3D(master.LTI_master):
         
         # Set value of delta (how many time steps are grouped together)
         # Used to make the model fully actuated
-        #self.deltas = [2,3]#,4]
         self.base_delta = 2
             
         self.adaptive = {'rates': [],
@@ -298,7 +297,7 @@ class UAV_3D(master.LTI_master):
                 5: defSpecBlock(self.partition, a=[-3,1], b=None, c=[-7,-3], d=None, e=[-3,1], f=None)
                 }
             
-            self.x0 = np.array([[-6, 0, 6, 0, -6, 0]])#setStateBlock(Ab.system.partition, a=[-6], b=[0], c=[6], d=[0], e=[-6], f=[0])
+            self.x0 = np.array([[-6, 0, 6, 0, -6, 0]])
         
         #######################################
         
@@ -318,7 +317,7 @@ class UAV_3D(master.LTI_master):
                 4: defSpecBlock(self.partition, a=[-12,1], b=None, c=[-7,-3], d=None, e=[-7,-3], f=None)
                 }
             
-            self.x0 = np.array([[-11, 0, 5, 0, -5, 0]])#setStateBlock(Ab.system.partition, a=[-11], b=[0], c=[5], d=[0], e=[-5], f=[0])
+            self.x0 = np.array([[-11, 0, 5, 0, -5, 0]])
             
         #######################################
         
@@ -344,7 +343,7 @@ class UAV_3D(master.LTI_master):
                 9: defSpecBlock(self.partition, a=[-4, 0], b=None, c=[-6.5, -2.5], d=None, e=[-7,-1], f=None)
                 }
             
-            self.x0 = np.array([[-9.5, 0, 9.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
+            self.x0 = np.array([[-9.5, 0, 9.5, 0, -4, 0]])
         
         elif self.scenario == 3:
             # Partition size
@@ -371,8 +370,7 @@ class UAV_3D(master.LTI_master):
                 9: defSpecBlock(self.partition, a=[-4, 1], b=None, c=[-3.4, -0.5], d=None, e=[-5,4], f=None)
                 }
             
-            self.x0 = np.array([[-9.5, 0, 7.5, 0, -4, 0]])#setStateBlock(Ab.system.partition, a=[-9.5], b=[0], c=[9.5], d=[0], e=[-5], f=[0])
-        
+            self.x0 = np.array([[-9.5, 0, 7.5, 0, -4, 0]])
         
         # Step-bound on property
         self.endTime = 24
@@ -805,7 +803,6 @@ class shuttle(master.LTI_master):
         self.spec['goal']     = {1: defSpecBlock(self.partition, a=[-0.2, 0.2], b=[-0.2, 0], c=None, d=None)}
         
         self.spec['critical'] = {1: defSpecBlock(self.partition, a=[-1, -0.2], b=[-0.3, 0], c=None, d=None),
-                                 #2: defSpecBlock(self.partition, a=[-1, -0.2], b=[-0.3, -0.2], c=None, d=None),
                                  2: defSpecBlock(self.partition, a=[-1, -0.3], b=[-0.4, -0.3], c=None, d=None),
                                  3: defSpecBlock(self.partition, a=[-1, -0.4], b=[-0.5, -0.4], c=None, d=None),
                                  4: defSpecBlock(self.partition, a=[-1, -0.5], b=[-0.6, -0.5], c=None, d=None),
@@ -814,7 +811,6 @@ class shuttle(master.LTI_master):
                                  7: defSpecBlock(self.partition, a=[-1, -0.8], b=[-0.9, -0.8], c=None, d=None),
                                  8: defSpecBlock(self.partition, a=[-1, -0.9], b=[-1.0, -0.9], c=None, d=None),
                                  9: defSpecBlock(self.partition, a=[0.2, 1], b=[-0.3, 0], c=None, d=None),
-                                  #11: defSpecBlock(self.partition, a=[0.2, 1], b=[-0.3, -0.2], c=None, d=None),
                                  10: defSpecBlock(self.partition, a=[0.3, 1], b=[-0.4, -0.3], c=None, d=None),
                                  11: defSpecBlock(self.partition, a=[0.4, 1], b=[-0.5, -0.4], c=None, d=None),
                                  12: defSpecBlock(self.partition, a=[0.5, 1], b=[-0.6, -0.5], c=None, d=None),
@@ -875,119 +871,4 @@ class shuttle(master.LTI_master):
             self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.000001
             
             self.filter = {'cov0': 0.0001*np.diag([.001, .001, .0001, .0001])}
-               
-class anaesthesia(master.LTI_master):
-    
-    def __init__(self, preset):
-        '''
-        Initialize the sanaesthesia delivery model class.
-
-        Returns
-        -------
-        None.
-
-        '''
-        
-        # Initialize superclass
-        master.LTI_master.__init__(self)
-        
-        # Set value of delta (how many time steps are grouped together)
-        # Used to make the model fully actuated
-        self.base_delta = 3
-        
-        self.adaptive = {'rates': [],
-                'target_points': np.array([])
-                }
-        
-        # Authority limit for the control u, both positive and negative
-        self.control['limits']['uMin'] = [0]
-        self.control['limits']['uMax'] = [7]
-        
-        # Partition size
-        self.partition['nrPerDim']  = [11, 11, 11]
-        self.partition['width']     = [.01, .01, .01]
-        self.partition['origin']    = [5, 5, 5]
-        
-        # Number of actions per dimension (if 'auto', then equal to nr of regions)
-        self.targets['nrPerDim']    = 'auto'
-        self.targets['domain']      = 'auto'
-        
-        # Specification information
-        self.spec['goal']     = {1: defSpecBlock(self.partition, a=[4.9, 5.1], b=[4.9, 5.1], c=[4.9, 5.1])}
-        self.spec['critical'] = {}
-        
-        # Step-bound on property
-        self.endTime = 16
-
-    def setModel(self, observer, preset):           
-        '''
-        Set linear dynamical system.
-
-        Parameters
-        ----------
-        observer : Boolean
-            If True, an observer is created for the model.
-
-        Returns
-        -------
-        None.
-
-        '''
-        self.LTI = {}
-        
-        # Discretization step size
-        self.LTI['tau'] = 1
-        
-        '''
-        k10 = 0.4436
-        k12 = 0.1140
-        k13 = 0.0419
-        k21 = 0.550
-        k31 = 0.0033
-        V1  = 16.044
-        
-        # Defining Deterministic Model corresponding matrices
-        self.LTI['A'] = np.array([
-                            [-(k10+k12+k13),    k12,    k13],
-                            [k21,               -k21,   0],
-                            [k31,               0,      -k31],
-                            ])
-        
-        self.LTI['B'] = np.array([
-                           [1/V1],
-                           [0],
-                           [0]
-                           ]) / 2
-        '''
-        
-        # Defining Deterministic Model corresponding matrices
-        self.LTI['A'] = np.array([
-                            [0.8192,    0.3412,    0.1265],
-                            [0.1646,   0.9822,     0.0001],
-                            [0.09,    0.00002,    0.9989],
-                            ])
-        
-        self.LTI['B'] = np.array([
-                           [0.01883],
-                           [0.02],
-                           [0.001]
-                           ])
-        
-        self.LTI['Q'] = np.zeros((3,1))
-        
-        # Determine system dimensions
-        self.LTI['n'] = np.size(self.LTI['A'],1)
-        self.LTI['p'] = np.size(self.LTI['B'],1)
-
-        self.LTI['noise'] = dict()
-        self.LTI['noise']['w_cov'] = 10**-3 * np.eye(3)
-        
-        if observer:
-            # Observation matrix
-            self.LTI['C']          = np.eye(3)
-            self.LTI['r']          = len(self.LTI['C'])
             
-            self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.0001
-            
-            self.filter = {'cov0': np.diag([.001, .001, .001])}
-               

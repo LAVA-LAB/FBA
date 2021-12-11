@@ -9,7 +9,7 @@
 
 Implementation of the method proposed in the paper:
  "Filter-Based Abstractions for Safe Planning of Partially Observable 
-  Autonomous Systems"
+  Dynamical Systems"
 
 Originally coded by:        Thom S. Badings
 Contact e-mail address:     thom.badings@ru.nl
@@ -257,10 +257,6 @@ class Abstraction(object):
                                            self.abstr['P'][region]['upp'])).T
                 
                 for R in R_noOverlap:
-                    
-                    # if all([    any(lims[0] < vertices[:,row]) 
-                    #         and any(lims[1] > vertices[:,row]) 
-                    #         for row,lims in enumerate(R) ]):
                         
                     intersect = computeRegionOverlap(limits_region, R)
                     
@@ -378,13 +374,7 @@ class Abstraction(object):
         
             # Set default target points to the center of every region
             target['d'] = [region['center'] for region in self.abstr['P'].values() 
-                           if not self._stateInCritical(region['center']) ] #+ \
-                #[np.array([0,-.1, 0.01, 0.01])]
-        
-        '''
-        targetPointTuples = [tuple(point) for point in target['d']]        
-        target['inv'] = dict(zip(targetPointTuples, range(len(target['d']))))
-        '''
+                           if not self._stateInCritical(region['center']) ]
         
         return target
     
@@ -562,8 +552,8 @@ class Abstraction(object):
         else:
             
             print('\nCompute enabled actions for delta='+str(delta)+' based on convex hull...')
-            
             # Use standard method: check if points are in (skewed) hull
+            
             x_inv_hull = self._defInvHull(x_inv_area)
             
             x_inv_qHull = _Qhull(b"i", x_inv_area,
@@ -579,11 +569,6 @@ class Abstraction(object):
         np.set_printoptions(threshold=sys.maxsize)
         
         # Put goal regions up front of the list of actions
-        '''
-        action_range = f7(np.concatenate(( list(self.abstr['goal'][1][0].keys()),
-                           np.arange(self.abstr['nr_actions']) )))
-        '''
-        
         action_range = np.arange(self.abstr['nr_actions'][delta]) 
         
         print('\nStart to compute the set of enabled actions for delta='+str(delta)+'...')
@@ -644,7 +629,7 @@ class Abstraction(object):
                 print('Create partition plot...')
                 
                 partitionPlot2D((0,1), (2,3), self.abstr['goal'][1][0], 
-                    delta, self.setup, self.model[delta], self.system.partition, self.abstr, 
+                    delta, self.setup, self.model[delta], self.abstr, 
                     self.abstr['allVertices'], predecessor_set)
             
                 # If number of dimensions is 3, create 3D plot
@@ -1067,6 +1052,12 @@ class Abstraction(object):
             Value of delta for the model to plot for.
         max_delta : int
             Maximum value of delta used for any model.
+        case_id : int
+            Index for the current abstraction iteration
+        writer : XlsxWriter
+            Writer object to write results to Excel
+        iterative_results : boolean
+            Boolean which is true in case an iterative scheme is being run
 
         Returns
         -------

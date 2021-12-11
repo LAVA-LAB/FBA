@@ -9,7 +9,7 @@
 
 Implementation of the method proposed in the paper:
  "Filter-Based Abstractions for Safe Planning of Partially Observable 
-  Autonomous Systems"
+  Dynamical Systems"
 
 Originally coded by:        Thom S. Badings
 Contact e-mail address:     thom.badings@ru.nl
@@ -358,10 +358,6 @@ class mdp(object):
                     df_row_string[delta_idx] = action_string
                  
             transition_file_list[index] = df_row_string
-                 
-        '''
-        self.dump = transition_file_list
-        '''  
         
         flatten = lambda t: [item for sublist in t for subsublist in sublist for item in subsublist]
         transition_file_flat = '\n'.join(flatten(transition_file_list))
@@ -399,6 +395,10 @@ class mdp(object):
    
         
 def writePRISMtrans(trans, delta, k_prime, a, mode, string_start, succ_rep_start, overhead):
+    '''
+    Write PRISM transition file
+
+    '''
     
     # Define name of action
     actionLabel = str(a)+"_"+str(delta)+"_"+str(succ_rep_start)
@@ -465,7 +465,7 @@ def writePRISMtrans(trans, delta, k_prime, a, mode, string_start, succ_rep_start
             action_string_a += [string_start+' 1 '+critical_string+' '+actionLabel]
             
         # Add resulting entries to the list
-        action_string_b = [string_start +" "+str(i+overhead+succ_rep_start)+" "+intv+" "+actionLabel 
+        action_string_b = [string_start +" "+str(i+overhead+succ_rep_start)+" "+str(intv)+" "+actionLabel 
                       for (i,intv) in zip(probability_idxs,probability_strings) if intv]
         
     nr_transitions = len(action_string_a) + len(action_string_b)

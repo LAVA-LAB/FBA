@@ -9,7 +9,7 @@
 
 Implementation of the method proposed in the paper:
  "Filter-Based Abstractions for Safe Planning of Partially Observable 
-  Autonomous Systems"
+  Dynamical Systems"
 
 Originally coded by:        Thom S. Badings
 Contact e-mail address:     thom.badings@ru.nl
@@ -317,13 +317,6 @@ def cm2inch(*tupl):
         return tuple(i/inch for i in tupl[0])
     else:
         return tuple(i/inch for i in tupl)
-            
-# def floor_decimal(a, precision=0):
-#     '''
-#     Floor function, but than with a specific precision
-#     '''
-    
-#     return np.round(a - 0.5 * 10**(-precision), precision)
 
 def floor_decimal(a, precision=0):
     '''

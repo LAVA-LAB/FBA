@@ -9,7 +9,7 @@
 
 Implementation of the method proposed in the paper:
  "Filter-Based Abstractions for Safe Planning of Partially Observable 
-  Autonomous Systems"
+  Dynamical Systems"
 
 Originally coded by:        Thom S. Badings
 Contact e-mail address:     thom.badings@ru.nl
@@ -28,7 +28,7 @@ from matplotlib.patches import Rectangle
 
 from ..commons import printWarning, mat_to_vec, cm2inch, confidence_ellipse
 
-def partitionPlot2D(i_tup, j_tup, j, delta_plot, setup, model, partition, \
+def partitionPlot2D(i_tup, j_tup, j, delta_plot, setup, model, \
                         abstr, allVerticesNested, predecessor_set):
     
     '''
@@ -82,32 +82,8 @@ def partitionPlot2D(i_tup, j_tup, j, delta_plot, setup, model, partition, \
         plt.ylabel('$x_'+str(i1)+'$', labelpad=-10)
         
         print(' -- Plot partition plot w.r.t. axes',str(i_tup))
-    
-    '''
-    for k,poly in enumerate(allVerticesNested):
-
-        if model['n'] <= 2 or ( \
-            abstr['P'][k]['center'][j0] == partition['origin'][j0] and \
-            abstr['P'][k]['center'][j1] == partition['origin'][j1]):
-
-            # Convert poly list to numpy array            
-            polyMat = np.array(poly)
-            
-            # Plot partitions and label
-            if k in abstr['goal']['zero_bound']:
-                ax.text(abstr['P'][k]['center'][i0], abstr['P'][k]['center'][i1], k, \
-                          verticalalignment='center', horizontalalignment='center' )  
-            hull = ConvexHull(polyMat, qhull_options='QJ')
-            ax.plot(polyMat[hull.vertices,i0], polyMat[hull.vertices,i1], lw=1)
-            ax.plot([polyMat[hull.vertices[0],i0], polyMat[hull.vertices[-1],i0]], \
-                      [polyMat[hull.vertices[0],i1], polyMat[hull.vertices[-1],i1]], lw=1)
-    '''
         
     for k,target_point in enumerate(abstr['target']['d']):
-          
-        # if model['n'] <= 2 or ( \
-        #     abstr['P'][k]['center'][j0] == partition['origin'][j0] and \
-        #     abstr['P'][k]['center'][j1] == partition['origin'][j1]):
         
         # Plot target point
         plt.scatter(target_point[i0], target_point[i1], c='k', s=6)
@@ -167,12 +143,6 @@ def partitionPlot3D(setup, model, allVerticesNested, predecessor_set):
         # Plot defining corner points
         for t in range(2**model['n']):
             # If contained in the inverse image, plot green. blue otherwise
-            '''
-            if enabledPolypoints[j][k, t]:
-                color = "g"
-            else:
-                color = "b"
-            '''
             color = "b"
             ax.scatter(poly[t,0], poly[t,1], poly[t,2], c=color)
         
@@ -210,7 +180,6 @@ def _set_axes_radius(ax, origin, radius):
     x, y, z = origin
     ax.set_xlim3d([x - radius, x + radius])
     ax.set_ylim3d([y - radius, y + radius])
-    # ax.set_zlim3d([z - radius, z + radius])
 
 def createProbabilityPlots(setup, modelDim, partition, mdp, abstr, mc):
     '''
@@ -222,6 +191,8 @@ def createProbabilityPlots(setup, modelDim, partition, mdp, abstr, mc):
         Setup dictionary.
     modelDim : int
         Dimension of the model.
+    partition : dict
+        Dictionary containing info about the partitioning
     mdp : dict
         Dictionary containing all iMDP data
     abstr : dict
@@ -328,36 +299,6 @@ def createProbabilityPlots(setup, modelDim, partition, mdp, abstr, mc):
         for form in setup.plotting['exportFormats']:
             plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
     
-    ######################
-    # Visualize matrix of action types, based on nr of time steps grouped
-
-    '''
-    fig, ax = plt.subplots(figsize=cm2inch(16,6))
-    
-    # Shortcut to data
-    data = results['policy']['delta'][1]
-    
-    #get discrete colormap
-    cmap = plt.get_cmap('Greys', np.max(data)-np.min(data)+1)
-    
-    # set limits .5 outside true range
-    mat = ax.matshow(data,cmap=cmap,vmin = np.min(data)-.5, vmax = np.max(data)+.5)
-    
-    #tell the colorbar to tick at integers
-    plt.colorbar(mat, ticks=np.arange(np.min(data),np.max(data)+1), shrink=0.5, aspect=5)
-    
-    plt.xlabel('State')
-    plt.ylabel('Time step ($k$)')
-    
-     # Set tight layout
-    fig.tight_layout()
-                
-    # Save figure
-    filename = setup.directories['outputFcase']+'policy_action_delta_value'
-    for form in setup.plotting['exportFormats']:
-        plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
-    '''
-    
 def policyPlot(setup, model, partition, results, abstr):
     '''
     Create the policy plot for the current abstraction instance
@@ -368,6 +309,8 @@ def policyPlot(setup, model, partition, results, abstr):
         Setup dictionary.
     model : dict
         Main dictionary of the LTI system model.
+    partition : dict
+        Dictionary containing info about the partitioning
     results : dict
         Dictionary containing all results from solving the MDP.
     abstr : dict
@@ -542,7 +485,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
     print(' -- Perform simulations for initial states:',state_idxs)
     
     Ab.setup.montecarlo['init_states'] = state_idxs
-    Ab.setup.montecarlo['iterations'] = 100
+    Ab.setup.montecarlo['iterations'] = 1000
     
     mc_obj = MonteCarloSim(Ab, iterations = Ab.setup.montecarlo['iterations'],
                                init_states = Ab.setup.montecarlo['init_states'] )
@@ -643,14 +586,26 @@ def trajectoryPlot2D(i_show, i_hide, plot_time, N, setup, model, partition, spec
 
     Parameters
     ----------
+    i_show : list
+        List of indices to show in plot
+    i_hide : list
+        List of indices to hide in plot
+    plot_time : int
+        Time step to plot results for
+    N : int
+        End time step
     setup : dict
         Setup dictionary.
     model : dict
         Main dictionary of the LTI system model.
+    partition : dict
+        Dictionary containing info about the partitioning
+    spec : dict
+        Dictionary containing info about specification
     abstr : dict
         Dictionay containing all information of the finite-state abstraction.
-    traces : list
-        Nested list containing the trajectories (traces) to plot for
+    max_error_bound : array
+        Error bound by which regions are augmented
 
     Returns
     -------
@@ -690,7 +645,6 @@ def trajectoryPlot2D(i_show, i_hide, plot_time, N, setup, model, partition, spec
             tic.tick1line.set_visible(False)
             tic.tick2line.set_visible(False)
     
-    # plt.grid(which='major', color='#CCCCCC', linewidth=0.3)
     plt.grid(which='minor', color='#CCCCCC', linewidth=0.3)
     
     # Goal x-y limits
@@ -703,8 +657,8 @@ def trajectoryPlot2D(i_show, i_hide, plot_time, N, setup, model, partition, spec
         lower  = region['limits'][:,0]
         size   = region['limits'][:,1] - region['limits'][:,0]
         
-        lower_eps  = lower + max_error_bound[plot_time]#, :]
-        size_eps   = size - 2*max_error_bound[plot_time]#, :]
+        lower_eps  = lower + max_error_bound[plot_time]
+        size_eps   = size - 2*max_error_bound[plot_time]
         
         state = Rectangle(lower[[is1, is2]], width=size[is1], height=size[is2], 
                               color="green", alpha=0.3, linewidth=None)
@@ -778,7 +732,6 @@ def trajectoryPlot2D(i_show, i_hide, plot_time, N, setup, model, partition, spec
             
             # Plot trace
             plt.plot(*interpolated_points.T, '-', color="blue", linewidth=0.5)
-            # plt.plot(x_values, y_values, color="blue")
             
         elif length == 2:
             
@@ -813,14 +766,12 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
     ----------
     setup : dict
         Setup dictionary.
-    model : dict
-        Main dictionary of the LTI system model.
-    abstr : dict
-        Dictionay containing all information of the finite-state abstraction.
-    traces : list
-        Nested list containing the trajectories (traces) to plot for
+    spec : dict
+        Dictionary containing info about specification
     cut_value : array
         Values to create the cross-section for
+    traces : list
+        Nested list containing the trajectories (traces) to plot for
 
     Returns
     -------
@@ -922,19 +873,6 @@ def UAVplot3d_visvis(setup, spec, cut_value, traces):
     filename = setup.directories['outputFcase'] + 'UAV_paths_screenshot.png'
     
     vv.screenshot(filename, sf=3, bg='w', ob=vv.gcf())
-    # app.Run()
-    
-'''
-load_traces_manual(Ab, ['output//FiAb_UAV_3D_ksteadystate=3_wFact=0.1_vFact=0.1_layout=3', 
-                        'output//FiAb_UAV_3D_ksteadystate=3_wFact=0.5_vFact=0.1_layout=3', 
-                        'output//FiAb_UAV_3D_ksteadystate=3_wFact=2_vFact=0.1_layout=3'], 
-                       ['Low process noise', 'Medium process noise', 'High process noise'], [np.arange(3),np.arange(3),np.arange(3)])
-
-load_traces_manual(Ab, ['output//FiAb_UAV_3D_ksteadystate=3_wFact=0.5_vFact=0.1_layout=3', 
-                        'output//FiAb_UAV_3D_ksteadystate=3_wFact=0.5_vFact=0.5_layout=3', 
-                        'output//FiAb_UAV_3D_ksteadystate=3_wFact=0.5_vFact=1_layout=3'], 
-                       ['Low measurement noise', 'Medium measurement noise', 'High measurement noise'], [np.arange(3),np.arange(3),np.arange(3)])
-'''
     
 def load_traces_manual(Ab, paths, labels, idxs=[0]):
     '''
@@ -984,13 +922,13 @@ def UAVplot3d_visvis_multi(setup, spec, cut_value, traces_all, traces_labels):
     ----------
     setup : dict
         Setup dictionary.
-    model : dict
-        Main dictionary of the LTI system model.
-    abstr : dict
-        Dictionay containing all information of the finite-state abstraction.
+    spec : dict
+        Dictionary containing info about specification
     cut_value : array
         Values to create the cross-section for
-    traces_multi : list
+    traces_a; : list
+        Nested list containing the trajectories (traces) to plot for
+   traces_all : list
         Nested list containing the trajectories (traces) to plot for
     traces_labels : list of string
         Legend labels for the instances to plot 
@@ -1095,7 +1033,6 @@ def UAVplot3d_visvis_multi(setup, spec, cut_value, traces_all, traces_labels):
     app = vv.use()
     
     f.relativeFontSize = 1.6
-    # ax.position.Correct(dh=-5)
     vv.axis('tight', axes=ax)
     
     fig.position.w = 1000
@@ -1103,7 +1040,6 @@ def UAVplot3d_visvis_multi(setup, spec, cut_value, traces_all, traces_labels):
     
     im = vv.getframe(vv.gcf())
     
-    #ax.SetView({'zoom':0.03, 'elevation':55, 'azimuth':-20})
     ax.SetView({'zoom':0.03, 'elevation':70, 'azimuth':20})
     
     ax.legend = trace_labels
@@ -1117,7 +1053,6 @@ def UAVplot3d_visvis_multi(setup, spec, cut_value, traces_all, traces_labels):
         filename = setup.directories['outputF'] + 'UAV_multi_instances.png'
     
     vv.screenshot(filename, sf=3, bg='w', ob=vv.gcf())
-    #app.Run()
     
 def reachabilityHeatMap(Ab):
     '''
@@ -1235,9 +1170,6 @@ def reachabilityHeatMap(Ab):
     else:
         printWarning('Heatmap for system of n>2 with skewed regions not (yet) supported.')
         return
-    
-    # xticks = [t if i % 5 == 0 else '' for i,t in enumerate(cut_df.index.values.round(1))]
-    # yticks = [t if i % 5 == 0 else '' for i,t in enumerate(cut_df.columns.values.round(1))]
     
     # ax.set_xticklabels(xticks, size = 13)
     # ax.set_yticklabels(yticks, size = 13)
