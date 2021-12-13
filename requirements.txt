@@ -1,7 +1,7 @@
 # List of used packages
 cvxopt==1.2.7
 cvxpy==1.1.15
-opencv-python==4.5.3.56
+opencv-python-headless==4.5.3.56
 imageio==2.9.0
 matplotlib==3.3.4
 numpy==1.20.1
