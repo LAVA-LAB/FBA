@@ -7,6 +7,9 @@ __pycache__/
 output/*
 !output/.keep
 
+# Avoid options.txt to be changed
+options.txt
+
 # Avoid ancillary folder to be pushed
 _ancillary/*
 
