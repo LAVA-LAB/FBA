@@ -30,7 +30,8 @@ from .mainFunctions import definePartitions, computeRegionOverlap, \
     mergePolys
 from .commons import tocDiff, printWarning, findMinDiff, tic, ticDiff, \
     extractRowBlockDiag
-from .postprocessing.createPlots import partitionPlot2D, partitionPlot3D
+from .postprocessing.createPlots import partitionPlot2D, partitionPlot3D, \
+    createProbabilityPlots, trajectoryPlot, plot_heatmap, plot_trajectory_2D_animated
 
 from .createMDP import mdp
 
@@ -227,9 +228,9 @@ class Abstraction(object):
                     # convervative over-approximation)
                     
                     R = np.vstack((box[:,0] - epsilon, box[:,1] + epsilon)).T
-                    
+
                 # Only store the augmented region if it is valid
-                if not any(box[:,1] - box[:,0] <= 0):
+                if not any(R[:,1] - R[:,0] <= 0):
                     polys += [pc.box2poly(R)]
                 else:
                     printWarning('Warning: augmented '+str(typ)+' region '+str(r)+ \
@@ -1070,8 +1071,6 @@ class Abstraction(object):
         
         if len(self.abstr['P']) <= 1000:
         
-            from .postprocessing.createPlots import createProbabilityPlots
-            
             if self.setup.plotting['probabilityPlots']:
                 createProbabilityPlots(self.setup, self.model[delta_value]['n'],
                                        self.system.partition,
@@ -1081,11 +1080,14 @@ class Abstraction(object):
             
             printWarning("Omit probability plots (nr. of regions too large)")
             
-        # The code below plots the trajectories
-        if self.system.name in ['UAV_2D', 'UAV_3D', 'shuttle']:
+
+        if self.setup.preset.plot_trajectory_2D is not False:
+            plot_trajectory_2D_animated(self, case_id, writer)
             
-            from core.postprocessing.createPlots import trajectoryPlot
-        
+
+        # The code below plots the trajectories
+        if self.system.name in ['UAV_2D', 'UAV_3D', 'shuttle', 'package_delivery']:
+            
             # Create trajectory plot
             performance_df, _ = trajectoryPlot(self, case_id, writer)
             
@@ -1093,12 +1095,11 @@ class Abstraction(object):
                 performance = pd.concat(
                     [iterative_results['performance'], performance_df], axis=0)
     
-        # The code below plots the heat map
-        if self.system.name in ['building_1room','building_2room','double_integrator','UAV_2D']:
-            
-            from core.postprocessing.createPlots import reachabilityHeatMap
-            
+        if self.setup.preset.plot_heatmap is not False:
+            plot_values = self.mdp.MAIN_DF['opt_reward']
+            filename = self.setup.directories['outputFcase']+'safeset_N='+str(self.setup.scenarios['samples'])
+
             # Create heat map
-            reachabilityHeatMap(self)
-            
+            plot_heatmap(self, plot_values, filename, vrange = [0, 1], cmap = 'jet')
+
         return performance

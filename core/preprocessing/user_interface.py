@@ -18,6 +18,102 @@ ______________________________________________________________________________
 
 import glob
 import os
+import sys
+
+import argparse
+from ast import literal_eval
+
+def parse_arguments(run_in_vscode):
+    """
+    Function to parse arguments provided
+
+    Parameters
+    ----------
+    :manualModel: Override model as provided as argument in the command
+    :nobisim: Override bisimulatoin option as provided as argument in the command
+
+    Returns
+    -------
+    :args: Dictionary with all arguments
+
+    """
+    
+    if run_in_vscode:
+        sys.argv = [""]
+
+    parser = argparse.ArgumentParser(description="Filter-based abstractions programme")
+    
+    parser.add_argument('--application_id', type=int, action="store", dest='application_id', 
+                        default=-1, help="Application ID")
+    
+    parser.add_argument('--load_results', dest='load_results', action='store_true',
+                        help="If true, results from a previous run are loaded")
+    parser.set_defaults(load_results=False)
+
+    parser.add_argument('--horizon', type=int, action="store", dest='horizon', 
+                        default=10, help="Time horizon (nr discrete steps) for the reach-avoid problem")
+
+    parser.add_argument('--two_phase_transient_length', type=int, action="store", dest='two_phase_transient_length', 
+                        default=-1, help="Length of the transient phase of the 2-phase horizon (if -1, 2-phase horizon is not enabled)")
+    
+    parser.add_argument('--monte_carlo_iterations', type=int, action="store", dest='monte_carlo_iterations', 
+                        default=-1, help="Number of Monte Carlo iterations (per initial conditions; if -1 is given, no MC is performed)")
+
+    parser.add_argument('--adaptive_rate', dest='adaptive_rate', nargs='+', 
+                        help='List of adaptive rates to use', default=[])
+    
+    parser.add_argument('--R_size', dest='R_size', nargs='+', 
+                        help='Partition: number of regions per dimension', default=[])
+    
+    parser.add_argument('--R_width', dest='R_width', nargs='+', 
+                        help='Partition: width of each region per dimension', default=[])
+
+    parser.add_argument('--wFactor', type=float, action="store", dest='wFactor', 
+                        default=-1, help="Multiplier for the process noise")
+
+    parser.add_argument('--vFactor', type=float, action="store", dest='vFactor', 
+                        default=-1, help="Multiplier for the measurement noise")
+    
+    # Plot functions
+    parser.add_argument('--plot_heatmap', dest='plot_heatmap', nargs='+', 
+                        help='Plot heatmap for the two provided state variables', default=False)
+    
+    parser.add_argument('--plot_trajectory_2D', dest='plot_trajectory_2D', nargs='+', 
+                        help='Plot 2D trajectory for the two provided state variables', default=False)
+
+
+    # Now, parse the command line arguments and store the
+    # values in the `args` variable
+    args = parser.parse_args()    
+
+    try:
+        args.adaptive_rate = list([int(r) for r in args.adaptive_rate])
+    except:
+        print('Could not convert strings to integers for adaptive rate arg.')
+
+    try:
+        args.R_size = list([int(r) for r in args.R_size])
+    except:
+        print('Could not convert strings to integers for partition size arg.')
+
+    try:
+        args.R_width = list([float(r) for r in args.R_width])
+    except:
+        print('Could not convert strings to integers for partition width arg.')
+
+    if args.plot_heatmap is not False:
+        try:
+            args.plot_heatmap = list([int(r) for r in args.plot_heatmap])
+        except:
+            print('Could not convert strings to integers for plot_heatmap arg.')
+
+    if args.plot_trajectory_2D is not False:
+        try:
+            args.plot_trajectory_2D = list([int(r) for r in args.plot_trajectory_2D])
+        except:
+            print('Could not convert strings to integers for plot_trajectory_2D arg.')
+    
+    return args
 
 def user_choice(title, items):
     '''

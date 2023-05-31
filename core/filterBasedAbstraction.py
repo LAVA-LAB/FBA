@@ -97,6 +97,8 @@ class filterBasedAbstraction(Abstraction):
 
         '''
 
+        C = 1e-4
+
         SigmaEqual = np.array_equal(Sigma_worst, Sigma_best)
 
         d = self.system.base_delta
@@ -267,8 +269,8 @@ class filterBasedAbstraction(Abstraction):
                                 ]), threshold_decimals)
                         
                         # Prob. to reach critical cannot exceed whole probability to reach region
-                        if not warningSwitch and (prob_critical_worst > probs_worst + 1e-4 or 
-                                                  prob_critical_best > probs_best + 1e-4):
+                        if not warningSwitch and (prob_critical_worst > probs_worst + C or 
+                                                  prob_critical_best > probs_best + C):
                         
                             # Only show this warning once per action iteration
                             warningSwitch = True
@@ -326,17 +328,17 @@ class filterBasedAbstraction(Abstraction):
                 
                 # Create interval strings (only entries for prob > 0)
                 interval_strings = ["["+
-                                  str(floor_decimal(max(1e-4, lb),nr_decimals))+","+
+                                  str(floor_decimal(max(C, lb),nr_decimals))+","+
                                   str(floor_decimal(min(1,    ub),nr_decimals))+"]"
                                   for lb,ub in zip(probs_lb, probs_ub)]
                 
                 deadlock_string = '['+ \
-                   str(floor_decimal(max(1e-4, deadlock_lb),nr_decimals))+','+ \
+                   str(floor_decimal(max(C, deadlock_lb),nr_decimals))+','+ \
                    str(floor_decimal(min(1,    deadlock_ub),nr_decimals))+']'
                    
                 if goal_approx != 0:
                     goal_string = '['+ \
-                       str(floor_decimal(max(1e-4, goal_lb),nr_decimals))+','+ \
+                       str(floor_decimal(max(C, goal_lb),nr_decimals))+','+ \
                        str(floor_decimal(min(1,    goal_ub),nr_decimals))+']'
                 
                 else:
@@ -345,7 +347,7 @@ class filterBasedAbstraction(Abstraction):
                 if critical_approx != 0:
                     
                     critical_string = '['+ \
-                       str(floor_decimal(max(1e-4, critical_lb),nr_decimals))+','+ \
+                       str(floor_decimal(max(C, critical_lb),nr_decimals))+','+ \
                        str(floor_decimal(min(1,    critical_ub),nr_decimals))+']'
                 
                 else:
@@ -491,12 +493,14 @@ class filterBasedAbstraction(Abstraction):
         
         # Initial belief of Kalman filter
         self.km[1][0] = {'cov': np.eye(self.system.LTI['n'])*self.system.filter['cov0']}
-        
+        self.km[1][0]['cov_eig_max'] = np.max(np.linalg.eigvals(self.km[1][0]['cov']))
+
         for k in range(self.N):
             
             # Perform Kalman filter prediction at current time k for delta-type action
-            self.km[1][k+1] = kalmanFilter(self.model[self.system.base_delta], self.km[1][k]['cov'])
-        
+            self.km[1][k+1] = kalmanFilter(self.model[self.system.base_delta], self.km[1][k]['cov'], self.setup.main['error_bound_beta'])
+            self.km[1][k+1]['cov_eig_max'] = np.max(np.linalg.eigvals(self.km[1][k+1]['cov']))
+
             covsTilde += [self.km[1][k+1]['cov_tilde']]
             covsPred  += [self.km[1][k+1]['cov_pred']]
             covs      += [self.km[1][k+1]['cov']]
@@ -522,7 +526,7 @@ class filterBasedAbstraction(Abstraction):
                 
                 # For every exact covariance at the base rate
                 for i,cov in enumerate(covs):
-                    belief = kalmanFilter(self.model[delta], cov)
+                    belief = kalmanFilter(self.model[delta], cov, self.setup.main['error_bound_beta'])
                     jump_km[0]['cov']         += [belief['cov']]
                     jump_km[0]['cov_pred']    += [belief['cov_pred']]
                     jump_km[0]['cov_tilde']   += [belief['cov_tilde']]
@@ -530,7 +534,7 @@ class filterBasedAbstraction(Abstraction):
                 
                     # Propagate the waiting time steps (recovering steps)
                     for gamma in range(1, self.km['waiting_time'] + 2):
-                        belief = kalmanFilter(self.model[self.system.base_delta], belief['cov'])
+                        belief = kalmanFilter(self.model[self.system.base_delta], belief['cov'], self.setup.main['error_bound_beta'])
                 
                         jump_km[gamma]['cov']         += [belief['cov']]
                         jump_km[gamma]['cov_pred']    += [belief['cov_pred']]
@@ -605,14 +609,15 @@ class filterBasedAbstraction(Abstraction):
         goal        = self.system.spec['goal']
         critical    = self.system.spec['critical']
         
-        Sigma_worst = self.km[1][0]['cov']
-        Sigma_best  = self.km[1][0]['cov']
+        # TODO: Find out if initial transition probabilities are necessary
+        Sigma_worst = self.km[1][0]['cov'] # np.eye(self.system.LTI['n'])*1e-6
+        Sigma_best  = self.km[1][0]['cov'] # np.eye(self.system.LTI['n'])*1e-6
         
         print('Compute transition probabilities for initial time step')
         
         self.trans['prob'][1][0] = \
             self._initProbabilityBounds(Sigma_worst, Sigma_best, goal, critical)
-        
+
         ######
         
         # Compute transition probabilities at the base rate
@@ -636,6 +641,7 @@ class filterBasedAbstraction(Abstraction):
                 self._computeProbabilityBounds(tab, self.setup.mdp['mode'],
                    Sigma_worst, Sigma_best, 1, allCenters_asArray,
                    goal, critical)
+            
             
         # Delete iterable variables
         del k
@@ -945,7 +951,7 @@ class MonteCarloSim():
             if k < self.horizon - delta:
         
                 # Apply 1-step Kalman filter
-                belief = kalmanFilter(self.model[delta], cov[k])        
+                belief = kalmanFilter(self.model[delta], cov[k], self.setup.main['error_bound_beta'])        
         
                 # Move predicted mean to the future belief to the target point of the next state
                 mu_goal[k+delta] = self.abstr['target'][delta]['d'][actionToTake[k]]
@@ -956,7 +962,7 @@ class MonteCarloSim():
                 # Compute state at the next time step
                 x[k+delta], u[k], y[k+delta], mu[k+delta] = \
                     self._computeState(delta, belief['K_gain'],
-                                      mu_goal[k+delta], x[k], w, v)
+                                      mu_goal[k+delta], mu[k], w, v)
         
                 # Update posterior belief covariance
                 cov[k+delta] = belief['cov']

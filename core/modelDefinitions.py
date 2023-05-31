@@ -44,13 +44,7 @@ class double_integrator(master.LTI_master):
         # Used to make the model fully actuated
         self.base_delta = 2
         
-        if 'adaptive_rate' not in preset:
-            rates, _  = ui.user_choice('adaptive measurement rate', \
-                                       [[],[2],[2,4],[2,4,6]])
-        else:
-            rates = preset['adaptive_rate']
-        
-        self.adaptive = {'rates': rates,
+        self.adaptive = {'rates': preset.adaptive_rate,
                          'target_points': np.array([[i, j] for i in range(-20,21,4) for j in range(-8,10,4)])
                          }
         
@@ -58,19 +52,8 @@ class double_integrator(master.LTI_master):
         self.control['limits']['uMin'] =  [-5]
         self.control['limits']['uMax'] =  [5]
         
-        if 'partition_size_id' not in preset:
-            _, partition  = ui.user_choice('partition size (number of regions)', \
-                                       ['21x21', '41x41'])
-        else:
-            partition = preset['partition_size_id']
-        
-        # Partition size
-        if partition == 0:
-            self.partition['nrPerDim']  = [21, 21]
-            self.partition['width']     = [2, 2] 
-        else:
-            self.partition['nrPerDim']  = [41, 41]
-            self.partition['width']     = [1, 1] 
+        self.partition['nrPerDim']  = preset.R_size
+        self.partition['width']     = preset.R_width
         self.partition['origin']    = [0, 0]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
@@ -82,7 +65,7 @@ class double_integrator(master.LTI_master):
         self.spec['critical'] = {}
         
         # Step-bound on property
-        self.endTime = 32#64
+        self.endTime = preset.horizon #32#64
     
     def setModel(self, observer, preset):
         '''
@@ -132,7 +115,111 @@ class double_integrator(master.LTI_master):
         
         # Covariance of the process noise
         self.LTI['noise']['w_cov'] = np.eye(np.size(self.LTI['A'],1))*0.25
+
+class package_delivery(master.LTI_master):
+    
+    def __init__(self, preset):
+        '''
+        Package delivery benchmark from:
+        Huijgevoort et al. (2023). "SySCoRe: Synthesis via Stochastic Coupling Relations"
+        (https://arxiv.org/abs/2302.12294)
+
+        Returns
+        -------
+        None.
+
+        '''
         
+        # Initialize superclass
+        master.LTI_master.__init__(self)
+        
+        # Set value of delta (how many time steps are grouped together)
+        # Used to make the model fully actuated
+        self.base_delta = 1
+        
+        self.adaptive = {'rates': preset.adaptive_rate,
+                         'target_points': np.array([[i, j] for i in range(-20,21,4) for j in range(-8,10,4)])
+                         }
+        
+        # Authority limit for the control u, both positive and negative
+        self.control['limits']['uMin'] =  [-1, -1]
+        self.control['limits']['uMax'] =  [1, 1]
+        
+        # Partition size
+        self.partition['nrPerDim']  = preset.R_size
+        self.partition['width']     = preset.R_width
+        self.tau = min(1.5, 24 / preset.R_size[0])
+
+        # Step-bound on property
+        self.endTime = int(preset.horizon / self.tau)
+
+        self.partition['origin']    = [0, -0.5]
+        
+        # Number of actions per dimension (if 'auto', then equal to nr of regions)
+        self.targets['nrPerDim']    = 'auto'
+        self.targets['domain']      = 'auto'
+
+        # Specification information
+        self.spec['goal']     = {1: defSpecBlock(self.partition, a=[-5, -2], b=[-5, -2])}
+        self.spec['critical'] = {1: defSpecBlock(self.partition, a=[0, 1], b=[-5, 1])}
+
+        self.x0 = np.array([[4.25, -4.25]])
+    
+    def setModel(self, observer, preset):
+        '''
+        Set linear dynamical system.
+
+        Parameters
+        ----------
+        observer : Boolean
+            If True, an observer is created for the model.
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        self.LTI = {}
+        
+        # Discretization step size
+        self.LTI['tau'] = self.tau
+        
+        # State transition matrix
+        self.LTI['A']  = np.array([[0.9-1, 0],
+                                   [0,   0.8-1]])
+        
+        # Input matrix
+        self.LTI['B']  = np.array([[1.4, 0],
+                                   [0, 1.4]])
+        
+        self.LTI['noise'] = dict()
+        
+        if observer:
+            # Observation matrix
+            self.LTI['C'] = np.array([[1, 0], 
+                                      [0, 1]])
+            self.LTI['r'] = len(self.LTI['C'])
+            
+            self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.1
+            
+            self.filter = {'cov0': np.diag([0.5, 0.5])}
+        
+        # Disturbance matrix
+        self.LTI['Q']  = np.array([[0],[0]])
+        
+        # Determine system dimensions
+        self.LTI['n'] = np.size(self.LTI['A'],1)
+        self.LTI['p'] = np.size(self.LTI['B'],1)
+        
+        # Covariance of the process noise
+        self.LTI['noise']['w_cov'] = np.eye(np.size(self.LTI['A'],1)) * 0.1 * self.LTI['tau']**2
+        
+        self.LTI['A'] = np.eye(self.LTI['n']) + self.LTI['A'] * self.LTI['tau']
+        self.LTI['B'] = self.LTI['B'] * self.LTI['tau']
+
+        # self.LTI['A'], self.LTI['B'], _ = discretizeGearsMethod(self.LTI['A'], self.LTI['B'], self.LTI['Q'], self.LTI['tau'])
+
 class UAV_2D(master.LTI_master):
     
     def __init__(self, preset):
@@ -152,8 +239,7 @@ class UAV_2D(master.LTI_master):
         # Used to make the model fully actuated
         self.base_delta = 2
         
-        self.adaptive = {'rates': [],
-            #'target_points': np.array([[i, 0, j, 0] for i in range(-8,10,4) for j in range(-8,10,4)])
+        self.adaptive = {'rates': preset.adaptive_rate,
             'target_points': np.array([[i, x, j, y] for i in [6,8] for j in [-4,-2] for x in [-1.5, 0, 1.5] for y in [-1.5, 0, 1.5]])
             }
 
@@ -179,8 +265,10 @@ class UAV_2D(master.LTI_master):
                                  4: defSpecBlock(self.partition, a=[1.0, 4], b=None, c=[8, 11], d=None) }#,
                                  #5: defSpecBlock(self.partition, a=[4.5, 7], b=None, c=[-11, -6], d=None)}
         
+        self.x0 = np.array([[-8, 0, -8, 0]])
+
         # Step-bound on property
-        self.endTime = 24
+        self.endTime = preset.horizon #24
             
     def setModel(self, observer, preset):
         '''
@@ -212,10 +300,10 @@ class UAV_2D(master.LTI_master):
         Bblock = np.array([[self.LTI['tau']**2/2],
                            [self.LTI['tau']]])
         
-        if 'wFactor' not in preset:
-            preset['wFactor'], _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
-        if 'vFactor' not in preset and observer:
-            preset['vFactor'], _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
+        if preset.wFactor == -1:
+            preset.wFactor, _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
+        if preset.vFactor == -1 and observer:
+            preset.vFactor, _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
         
         self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock)
         self.LTI['B']  = scipy.linalg.block_diag(Bblock, Bblock)
@@ -224,16 +312,16 @@ class UAV_2D(master.LTI_master):
         self.LTI['Q']  = np.array([[0],[0],[0],[0]])
     
         # Covariance of the process noise
-        self.LTI['noise']['w_cov'] = np.repeat(preset['wFactor'], 2) * np.diag([0.10, 0.02, 0.10, 0.02])
-        self.LTI['noise']['wFactor'] = preset['wFactor']
+        self.LTI['noise']['w_cov'] = np.repeat(preset.wFactor, 2) * np.diag([0.10, 0.02, 0.10, 0.02])
+        self.LTI['noise']['wFactor'] = preset.wFactor
     
         if observer:
             # Observation matrix
             self.LTI['C']          = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
             self.LTI['r']          = len(self.LTI['C'])
             
-            self.LTI['noise']['v_cov'] = preset['vFactor'] * np.eye(np.size(self.LTI['C'],0))*0.1
-            self.LTI['noise']['vFactor'] = preset['vFactor']
+            self.LTI['noise']['v_cov'] = preset.vFactor * np.eye(np.size(self.LTI['C'],0))*0.1
+            self.LTI['noise']['vFactor'] = preset.vFactor
 
             self.filter = {'cov0': np.diag([2, .01, 2, .01])}
             
@@ -260,7 +348,7 @@ class UAV_3D(master.LTI_master):
         # Used to make the model fully actuated
         self.base_delta = 2
             
-        self.adaptive = {'rates': [],
+        self.adaptive = {'rates': preset.adaptive_rate,
             'target_points': np.array([])
             }
         
@@ -273,10 +361,10 @@ class UAV_3D(master.LTI_master):
         self.targets['domain']      = 'auto'
         
         # Let the user make a choice for the model dimension
-        if 'scenario' not in preset:
-            _, preset['scenario'] = ui.user_choice('Choose a planning scenario',['Cube','City','Maze','Maze small'])
+        if preset.scenario == -1:
+            _, preset.scenario = ui.user_choice('Choose a planning scenario',['Cube','City','Maze','Maze small'])
         
-        self.scenario = preset['scenario']
+        self.scenario = preset.scenario
         
         #######################################
         
@@ -373,7 +461,7 @@ class UAV_3D(master.LTI_master):
             self.x0 = np.array([[-9.5, 0, 7.5, 0, -4, 0]])
         
         # Step-bound on property
-        self.endTime = 24
+        self.endTime = preset.horizon #24
 
     def setModel(self, observer, preset):
         '''
@@ -411,22 +499,22 @@ class UAV_3D(master.LTI_master):
         # Disturbance matrix
         self.LTI['Q']  = np.array([[0],[0],[0],[0],[0],[0]])
         
-        if 'wFactor' not in preset:
-            preset['wFactor'], _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1,0.1], [0.5,0.5,0.5], [1,1,1], [2,2,2]])
-        if 'vFactor' not in preset and observer:
-            preset['vFactor'], _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1,0.1], [0.5,0.5,0.5], [1,1,1], [2,2,2]])
+        if preset.wFactor == -1:
+            preset.wFactor, _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1,0.1], [0.5,0.5,0.5], [1,1,1], [2,2,2]])
+        if preset.vFactor == -1 and observer:
+            preset.vFactor, _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1,0.1], [0.5,0.5,0.5], [1,1,1], [2,2,2]])
         
         # Covariance of the process noise
-        self.LTI['noise']['w_cov'] = np.repeat(preset['wFactor'], 2) * np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
-        self.LTI['noise']['wFactor'] = preset['wFactor']
+        self.LTI['noise']['w_cov'] = np.repeat(preset.wFactor, 2) * np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
+        self.LTI['noise']['wFactor'] = preset.wFactor
         
         if observer:
             # Observation matrix
             self.LTI['C']          = np.array([[1,0,0,0,0,0], [0,0,1,0,0,0], [0,0,0,0,1,0]])
             self.LTI['r']          = len(self.LTI['C'])
             
-            self.LTI['noise']['v_cov'] = preset['vFactor'] * np.eye(np.size(self.LTI['C'],0))*0.1
-            self.LTI['noise']['vFactor'] = preset['vFactor']
+            self.LTI['noise']['v_cov'] = preset.vFactor * np.eye(np.size(self.LTI['C'],0))*0.1
+            self.LTI['noise']['vFactor'] = preset.vFactor
             
             self.filter = {'cov0': np.diag([.5, .01, .5, .01, .5, .01])}
             
@@ -477,7 +565,7 @@ class building_2room(master.LTI_master):
         # Used to make the model fully actuated
         self.base_delta = 1
         
-        self.adaptive = {'rates': [],
+        self.adaptive = {'rates': preset.adaptive_rate,
                 'target_points': np.array([])
                 }
         
@@ -507,7 +595,7 @@ class building_2room(master.LTI_master):
         self.spec['critical'] = {}
         
         # Step-bound on property
-        self.endTime = 32
+        self.endTime = preset.horizon #32
 
     def setModel(self, observer, preset):           
         '''
@@ -644,15 +732,12 @@ class building_1room(master.LTI_master):
         # Used to make the model fully actuated
         self.base_delta = 1
         
-        self.adaptive = {'rates': [],
+        self.adaptive = {'rates': preset.adaptive_rate,
                 'target_points': np.array([])
                 }
         
         # Let the user make a choice for the model dimension
-        if 'partition_size_id' not in preset:
-            _, partition  = ui.user_choice('grid size',['19x20','40x40'])
-        else:
-            partition = preset['partition_size_id']
+        _, partition  = ui.user_choice('grid size',['19x20','40x40'])
         
         # Authority limit for the control u, both positive and negative
         self.control['limits']['uMin'] = [14, -10]
@@ -682,7 +767,7 @@ class building_1room(master.LTI_master):
         self.spec['critical'] = {}
         
         # Step-bound on property
-        self.endTime = 16#64
+        self.endTime = preset.horizon #16#64
 
     def setModel(self, observer, preset):           
         '''
@@ -782,7 +867,7 @@ class shuttle(master.LTI_master):
         # Used to make the model fully actuated
         self.base_delta = 2
         
-        self.adaptive = {'rates': [],
+        self.adaptive = {'rates': preset.adaptive_rate,
                 'target_points': np.array([])
                 }
         
@@ -820,7 +905,9 @@ class shuttle(master.LTI_master):
                                  16: defSpecBlock(self.partition, a=[0.9, 1], b=[-1.0, -0.9], c=None, d=None),}
         
         # Step-bound on property
-        self.endTime = 16
+        self.endTime = preset.horizon #16
+
+        self.x0 = np.array([[-0.65, -0.85, 0, 0]])
 
     def setModel(self, observer, preset):           
         '''

@@ -142,7 +142,7 @@ def loadScenarioTable(tableFile):
                 
     return memory
 
-def kalmanFilter(model, cov0):    
+def kalmanFilter(model, cov0, beta):    
     '''
     For a given model in `model` and prior belief covariance `cov0`, perform
     The Kalman filter steps related to the covariance (mean is not needed).
@@ -193,7 +193,7 @@ def kalmanFilter(model, cov0):
     # Calculate measure on the covariance matrix of the mean of the future belief
     cov_tilde_measure, _ = covarianceEllipseSize( cov_tilde )
     
-    max_error_bound = np.max( minimumEpsilon( cov, beta=0.01, stepSize=0.01, singleParam = True ) )
+    max_error_bound = np.max( minimumEpsilon( cov, beta=beta, stepSize=0.001, singleParam = True ) )
     
     return {'cov_pred': cov_pred,
             'K_gain': K_gain,

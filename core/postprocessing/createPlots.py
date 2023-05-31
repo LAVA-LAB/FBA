@@ -21,12 +21,17 @@ import pandas as pd             # Import Pandas to store data in frames
 import matplotlib.pyplot as plt # Import Pyplot to generate plots
 import cv2
 
+from core.mainFunctions import definePartitions
+import seaborn as sns
+
 # Load main classes and methods
 from matplotlib import cm
 from scipy.spatial import ConvexHull
 from matplotlib.patches import Rectangle
 
-from ..commons import printWarning, mat_to_vec, cm2inch, confidence_ellipse
+from core.mainFunctions import computeRegionCenters
+
+from ..commons import setStateBlock, printWarning, mat_to_vec, cm2inch, confidence_ellipse
 
 def partitionPlot2D(i_tup, j_tup, j, delta_plot, setup, model, \
                         abstr, allVerticesNested, predecessor_set):
@@ -436,11 +441,10 @@ def trajectoryPlot(Ab, case_id, writer = None):
 
     '''
     
-    from core.mainFunctions import computeRegionCenters
-    from core.commons import setStateBlock
-    
     from ..filterBasedAbstraction import MonteCarloSim
-    
+
+    itersToShow = 1
+
     # Determine desired state IDs
     if Ab.system.name == 'UAV_2D':
         x_init = setStateBlock(Ab.system.partition, a=[-8], b=[0], c=[-8], d=[0])
@@ -453,7 +457,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
                 cut_value[i] = 0
             else:
                 cut_value[i] = Ab.system.partition['width'][d] / 2                
-            
+
     elif Ab.system.name == 'UAV_3D':
             x_init = Ab.system.x0 #setStateBlock(Ab.system.partition, a=[-11], b=[0], c=[5], d=[0], e=[-5], f=[0])
             
@@ -472,6 +476,14 @@ def trajectoryPlot(Ab, case_id, writer = None):
         itersToShow = 10
         
         cut_value = np.array([0.005, 0.005])
+
+    elif Ab.system.name == 'package_delivery':
+        x_init = setStateBlock(Ab.system.partition, a=[4.25], b=[-4.25])
+
+        itersToShow = 3
+
+        i_show = (0,1)
+        i_hide = ()
             
     # Compute all centers of regions associated with points
     x_init_centers = computeRegionCenters(np.array(x_init), Ab.system.partition, Ab.setup.floating_point_precision)
@@ -484,11 +496,8 @@ def trajectoryPlot(Ab, case_id, writer = None):
     
     print(' -- Perform simulations for initial states:',state_idxs)
     
-    Ab.setup.montecarlo['init_states'] = state_idxs
-    Ab.setup.montecarlo['iterations'] = 1000
-    
-    mc_obj = MonteCarloSim(Ab, iterations = Ab.setup.montecarlo['iterations'],
-                               init_states = Ab.setup.montecarlo['init_states'] )
+    mc_obj = MonteCarloSim(Ab, iterations = 25,
+                               init_states = state_idxs )
     
     Ab.mc = {'reachability_probability': mc_obj.results['reachability_probability'],
                  'traces': mc_obj.traces }
@@ -528,50 +537,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
     traces_df = pd.DataFrame(alltraces)
     traces_df.to_pickle(Ab.setup.directories['outputFcase']+'traces.pickle')
     
-    min_delta = int(min(Ab.setup.all_deltas))
-    
-    if Ab.system.name == 'UAV_2D':
-        
-        animate = True
-        
-        if animate:
-            plot_times = np.arange(1, Ab.N+1)
-        else:        
-            plot_times = [Ab.N]
-        
-        i_show = (0,2)
-        i_hide = (1,3)
-        
-        filenames = ['' for i in range(len(plot_times))]
-            
-        # Create list of error bounds
-        error_bound_list = [dic['error_bound'] if 'error_bound' in dic else 0 for dic in Ab.km[Ab.system.base_delta].values()]
-        
-        for i,plot_time in enumerate(plot_times):
-            filenames[i] = trajectoryPlot2D(i_show, i_hide, plot_time, Ab.N, Ab.setup, 
-                Ab.model[min_delta], Ab.system.partition,
-                Ab.system.spec, Ab.abstr, 
-                error_bound_list, traces, belief_traces)
-
-        if animate:
-            
-            img_array = []
-            for filename in filenames:
-                img = cv2.imread(filename)
-                height, width, layers = img.shape
-                size = (width,height)
-                img_array.append(img)
-            
-            
-            video_filename = Ab.setup.directories['outputFcase']+'drone_trajectory_video.mp4'
-            fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-            out = cv2.VideoWriter(video_filename,fourcc, 1, size)
-             
-            for i in range(len(img_array)):
-                out.write(img_array[i])
-            out.release()
-            
-    elif Ab.system.name == 'UAV_3D':
+    if Ab.system.name == 'UAV_3D':
         if Ab.setup.main['iterative'] is False and Ab.setup.plotting['3D_UAV']:
         
             # Only plot trajectory plot in non-iterative mode (because it pauses the script)
@@ -579,6 +545,110 @@ def trajectoryPlot(Ab, case_id, writer = None):
     
     return performance_df, traces
     
+
+
+def plot_trajectory_2D_animated(Ab, case_id, writer = None, itersToShow = 1):
+    '''
+    Ab : abstraction instance
+        Full object of the abstraction being plotted for
+    case_id : int
+        Index for the current abstraction iteration
+    writer : XlsxWriter
+        Writer object to write results to Excel
+    itersToShow : int
+        Number of trajectories to plot
+    
+    '''
+
+    from ..filterBasedAbstraction import MonteCarloSim
+
+    x_init = Ab.system.x0
+    
+    cut_value = np.zeros(2)
+    for i,d in enumerate(range(1, Ab.system.LTI['n'], 2)):
+        if Ab.system.partition['nrPerDim'][d]/2 != round( Ab.system.partition['nrPerDim'][d]/2 ):
+            cut_value[i] = 0
+        else:
+            cut_value[i] = Ab.system.partition['width'][d] / 2                
+
+    # Compute all centers of regions associated with points
+    x_init_centers = computeRegionCenters(np.array(x_init), Ab.system.partition, Ab.setup.floating_point_precision)
+    
+    # Filter to only keep unique centers
+    x_init_unique = np.unique(x_init_centers, axis=0)
+    
+    state_idxs = [Ab.abstr['allCentersCubic'][tuple(c)] for c in x_init_unique 
+                                   if tuple(list(c)) in Ab.abstr['allCentersCubic']]
+    
+    print(' -- Perform simulations for initial states:',state_idxs)
+    
+    mc_obj = MonteCarloSim(Ab, iterations = 25,
+                               init_states = state_idxs )
+    
+    Ab.mc = {'reachability_probability': mc_obj.results['reachability_probability'],
+                 'traces': mc_obj.traces }
+    
+    PRISM_reach = Ab.mdp.MAIN_DF['opt_reward'][state_idxs].to_numpy()
+    empirical_reach = Ab.mc['reachability_probability']
+    
+    print('Probabilistic reachability (PRISM): ',PRISM_reach)
+    print('Empirical reachability (Monte Carlo):',empirical_reach)
+    
+    performance_df = pd.DataFrame( {'PRISM reachability': PRISM_reach.flatten(),
+                                    'Empirical reachability': empirical_reach.flatten() }, index=[case_id] )
+    if writer != None:
+        performance_df.to_excel(writer, sheet_name='Performance')
+    
+    traces = []
+    
+    for i in state_idxs:
+        for j in range(itersToShow):
+            traces += [Ab.mc['traces'][i][j]['x']]
+            
+    if Ab.setup.main['mode'] == 'Filter':
+        belief_traces = {'mu': [], 'cov': []}
+        for i in state_idxs:
+            for j in range(itersToShow):
+                belief_traces['mu'] += [Ab.mc['traces'][i][j]['bel_mu']]
+                belief_traces['cov'] += [Ab.mc['traces'][i][j]['bel_cov']]
+
+    #####
+
+    min_delta = int(min(Ab.setup.all_deltas))
+
+    i_show = tuple(Ab.setup.preset.plot_trajectory_2D)
+    i_hide = tuple([i for i in range(Ab.system.LTI['n']) if i not in i_show])
+
+    plot_times = np.arange(1, Ab.N+1)
+    
+    filenames = ['' for i in range(len(plot_times))]
+        
+    # Create list of error bounds
+    error_bound_list = [dic['error_bound'] if 'error_bound' in dic else 0 for dic in Ab.km[Ab.system.base_delta].values()]
+    
+    for i,plot_time in enumerate(plot_times):
+        filenames[i] = trajectoryPlot2D(i_show, i_hide, plot_time, Ab.N, Ab.setup, 
+            Ab.model[min_delta], Ab.system.partition,
+            Ab.system.spec, Ab.abstr, 
+            error_bound_list, traces, belief_traces)
+
+    img_array = []
+    for filename in filenames:
+        img = cv2.imread(filename)
+        height, width, layers = img.shape
+        size = (width,height)
+        img_array.append(img)
+    
+    video_filename = Ab.setup.directories['outputFcase']+'drone_trajectory_video.mp4'
+    fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+    out = cv2.VideoWriter(video_filename,fourcc, 1, size)
+    
+    for i in range(len(img_array)):
+        out.write(img_array[i])
+    out.release()
+
+
+
 def trajectoryPlot2D(i_show, i_hide, plot_time, N, setup, model, partition, spec, abstr, max_error_bound, 
               traces, belief_traces = None):
     '''
@@ -616,7 +686,7 @@ def trajectoryPlot2D(i_show, i_hide, plot_time, N, setup, model, partition, spec
     from scipy.interpolate import interp1d
     
     is1, is2 = i_show
-    ih1, ih2 = i_hide
+    # ih1, ih2 = i_hide
     
     fig, ax = plt.subplots(figsize=cm2inch(6.1, 5))
     
@@ -1054,7 +1124,7 @@ def UAVplot3d_visvis_multi(setup, spec, cut_value, traces_all, traces_labels):
     
     vv.screenshot(filename, sf=3, bg='w', ob=vv.gcf())
     
-def reachabilityHeatMap(Ab):
+def plot_heatmap(Ab, plot_values, filename, vrange=[-0.2,0.2], cmap=sns.diverging_palette(220, 20, sep=1, as_cmap=True)):
     '''
     Create heat map for the BAS benchmarks
 
@@ -1068,107 +1138,50 @@ def reachabilityHeatMap(Ab):
     None.
 
     '''
+
+    # Create dataframes of values to plot
+    x_nr = Ab.system.partition['nrPerDim'][Ab.setup.preset.plot_heatmap[0]]
+    y_nr = Ab.system.partition['nrPerDim'][Ab.setup.preset.plot_heatmap[1]]
+
+    v = [1 for i in range(Ab.system.LTI['n'])]
+    v[Ab.setup.preset.plot_heatmap[0]] = x_nr
+    v[Ab.setup.preset.plot_heatmap[1]] = y_nr
+
+    cut_centers = definePartitions(Ab.system.LTI['n'], v, 
+        Ab.system.partition['width'], 
+        Ab.system.partition['origin'], onlyCenter=True)
     
-    import seaborn as sns
-    from ..mainFunctions import definePartitions
-
-    if Ab.system.LTI['n'] == 2:
-
-        x_nr = Ab.system.partition['nrPerDim'][0]
-        y_nr = Ab.system.partition['nrPerDim'][1]
-        
-        cut_centers = definePartitions(Ab.system.LTI['n'], [x_nr, y_nr], 
-               Ab.system.partition['width'], 
-               Ab.system.partition['origin'], onlyCenter=True)        
-
-    elif Ab.system.name == 'building_2room':
-    
-        x_nr = Ab.system.partition['nrPerDim'][0]
-        y_nr = Ab.system.partition['nrPerDim'][1]
-        
-        cut_centers = definePartitions(Ab.system.LTI['n'], [x_nr, y_nr, 1, 1], 
-               Ab.system.partition['width'], 
-               Ab.system.partition['origin'], onlyCenter=True)
-        
-    elif Ab.system.name == 'UAV_2D':
-        
-        x_nr = Ab.system.partition['nrPerDim'][0]
-        y_nr = Ab.system.partition['nrPerDim'][2]
-        
-        cut_centers = definePartitions(Ab.system.LTI['n'], [x_nr, 1, y_nr, 1], 
-               Ab.system.partition['width'], 
-               Ab.system.partition['origin'], onlyCenter=True)
-        
-    else:
-        
-        printWarning('No appropriate model detected to plot heatmap')
-        return
-          
     cut_values = np.zeros((x_nr, y_nr))
     cut_coords = np.zeros((x_nr, y_nr, Ab.system.LTI['n']))
     
     cut_idxs = [Ab.abstr['allCentersCubic'][tuple(c)] for c in cut_centers 
-                                   if tuple(c) in Ab.abstr['allCentersCubic']]              
+                                if tuple(c) in Ab.abstr['allCentersCubic']]              
     
     for i,(idx,center) in enumerate(zip(cut_idxs, cut_centers)):
         
         j = i % y_nr
         k = i // y_nr
         
-        cut_values[k,j] = Ab.mdp.MAIN_DF['opt_reward'][idx]
+        cut_values[k,j] = plot_values[idx]
         cut_coords[k,j,:] = center
     
     if Ab.system.name == 'UAV_2D':
         cut_df = pd.DataFrame( cut_values, index=cut_coords[:,0,0], columns=cut_coords[0,:,2] )
     else:
         cut_df = pd.DataFrame( cut_values, index=cut_coords[:,0,0], columns=cut_coords[0,:,1] )
-    
+
     fig = plt.figure(figsize=cm2inch(9, 8))
     
     # If regions are non-skewed, use standard Seaborn heatmap.
-    # If regions are skewed, we need to build the heatmap ourselves.
     if not Ab.setup.main['skewed']:
-        ax = sns.heatmap(cut_df.T, cmap="jet", #YlGnBu
-                 vmin=0, vmax=1)
+        ax = sns.heatmap(cut_df.T, cmap=cmap, #YlGnBu
+                 vmin=vrange[0], vmax=vrange[1], fmt='.1f')
         
         ax.invert_yaxis()
         ax.figure.axes[-1].yaxis.label.set_size(20)
     
-    elif Ab.system.LTI['n'] == 2 or True:
-        ax  = plt.axes()
-    
-        # Create heatmap values for probabilities
-        flat_values = cut_values.flatten()
-        colors = plt.cm.jet( flat_values )
-        
-        for value,color,vertices in zip(flat_values, colors, Ab.abstr['allVertices']):
-            
-            # Plot only if the reachability is above zero
-            if value > 0:
-            
-                # Compute convex hull
-                hull = ConvexHull(vertices, qhull_options='QJ')
-                
-                # Plot heamap based on skewed region
-                ax.fill(vertices[hull.vertices,0], vertices[hull.vertices,1], color=color, lw=0)
-        
-        if Ab.system.name == 'UAV':
-            # Set aspect ratio
-            ax.set_aspect(aspect='equal')
-            
-            xlim=ax.get_xlim()
-            ylim=ax.get_ylim()
-            
-            ax.set_xlim(min(xlim[0],ylim[0]), max(xlim[1],ylim[1]))
-            ax.set_ylim(min(xlim[0],ylim[0]), max(xlim[1],ylim[1]))
-    
-        # Add legend
-        sm = plt.cm.ScalarMappable(cmap='jet', norm=plt.Normalize(vmin=0, vmax=1))
-        cb = plt.colorbar(sm)
-        cb.outline.set_visible(False)
-    
     else:
-        printWarning('Heatmap for system of n>2 with skewed regions not (yet) supported.')
+        printWarning('Heatmap for system with skewed regions not (yet) supported.')
         return
     
     # ax.set_xticklabels(xticks, size = 13)
@@ -1183,8 +1196,9 @@ def reachabilityHeatMap(Ab):
     # Set tight layout
     fig.tight_layout()
 
+    plt.show()
+
     # Save figure
-    filename = Ab.setup.directories['outputFcase']+'safeset_N='+str(Ab.setup.scenarios['samples'])
     for form in Ab.setup.plotting['exportFormats']:
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
         

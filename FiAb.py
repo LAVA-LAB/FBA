@@ -11,12 +11,13 @@ Created on Wed Jun  9 17:15:52 2021
 import pandas as pd             # Import Pandas to store data in frames
 import numpy as np              # Import Numpy for computations
 import matplotlib.pyplot as plt # Import Pyplot to generate plots
+import seaborn as sns
 
 # Load main classes and methods
-from core.commons import createDirectory, tocDiff
-from core.mainFunctions import steadystateCovariance, steadystateCovariance_sdp
-
+from core.commons import createDirectory, tocDiff, printWarning
+from core.mainFunctions import steadystateCovariance, steadystateCovariance_sdp, definePartitions
 from core.filterBasedAbstraction import MonteCarloSim
+from core.postprocessing.createPlots import plot_heatmap
 
 #-----------------------------------------------------------------------------
 # Code below is repeated every iteration of the iterative scheme
@@ -76,6 +77,19 @@ def filterBasedScheme(Ab, case_id):
         policy_df.to_excel(writer, sheet_name='Optimal policy')
         delta_df.to_excel(writer, sheet_name='Optimal delta')
         reward_df.to_excel(writer, sheet_name='Optimal reward')
+
+        # Export Monte Carlo data to Excel sheet
+        min_delta = min(Ab.setup.all_deltas)
+        
+        kalman_dc = {}
+        for key,kalman_sub_df in Ab.km[min_delta].items():
+            kalman_dc[key] = {}
+            for sub_key, val in kalman_sub_df.items():
+                if type(val) in [np.float64, float]:
+                    val = np.round(val, Ab.setup.floating_point_precision)
+                kalman_dc[key][sub_key] = str(val)
+        kalman_df = pd.DataFrame(kalman_dc)
+        kalman_df.to_excel(writer, sheet_name='Kalman filter')
     
     if Ab.setup.montecarlo['enabled']:
         # Perform monte carlo simulation for validation purposes
@@ -89,6 +103,16 @@ def filterBasedScheme(Ab, case_id):
         # Store Monte Carlo results as dataframe
         MCsims_df = pd.DataFrame( Ab.mc['reachability_probability'], 
                                   index=Ab.abstr['P'].keys() )
+        
+        if Ab.setup.preset.plot_heatmap is not False:
+
+            ln = min(len(Ab.mc['reachability_probability']), len(Ab.mdp.MAIN_DF['opt_reward']))
+            plot_values = Ab.mc['reachability_probability'][:ln] - Ab.mdp.MAIN_DF['opt_reward'][:ln]
+
+            filename = Ab.setup.directories['outputFcase']+'empirical_minus_guarantes_heatmap'
+
+            # Create heat map
+            plot_heatmap(Ab, plot_values, filename, vrange=[-1,1], cmap=sns.color_palette("coolwarm", 10))
         
         # Clean monte carlo object to save space
         del mc_obj
