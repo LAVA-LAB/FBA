@@ -68,10 +68,10 @@ def parse_arguments(run_in_vscode):
     parser.add_argument('--R_width', dest='R_width', nargs='+', 
                         help='Partition: width of each region per dimension', default=[])
 
-    parser.add_argument('--wFactor', type=float, action="store", dest='wFactor', 
+    parser.add_argument('--noise_strength_w', type=float, action="store", dest='noise_strength_w', 
                         default=-1, help="Multiplier for the process noise")
 
-    parser.add_argument('--vFactor', type=float, action="store", dest='vFactor', 
+    parser.add_argument('--noise_strength_v', type=float, action="store", dest='noise_strength_v', 
                         default=-1, help="Multiplier for the measurement noise")
     
     # Plot functions

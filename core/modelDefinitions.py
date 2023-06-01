@@ -300,10 +300,10 @@ class UAV_2D(master.LTI_master):
         Bblock = np.array([[self.LTI['tau']**2/2],
                            [self.LTI['tau']]])
         
-        if preset.wFactor == -1:
-            preset.wFactor, _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
-        if preset.vFactor == -1 and observer:
-            preset.vFactor, _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
+        if preset.noise_strength_w == -1:
+            preset.noise_strength_w, _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
+        if preset.noise_strength_v == -1 and observer:
+            preset.noise_strength_v, _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
         
         self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock)
         self.LTI['B']  = scipy.linalg.block_diag(Bblock, Bblock)
@@ -312,16 +312,16 @@ class UAV_2D(master.LTI_master):
         self.LTI['Q']  = np.array([[0],[0],[0],[0]])
     
         # Covariance of the process noise
-        self.LTI['noise']['w_cov'] = np.repeat(preset.wFactor, 2) * np.diag([0.10, 0.02, 0.10, 0.02])
-        self.LTI['noise']['wFactor'] = preset.wFactor
+        self.LTI['noise']['w_cov'] = np.repeat(preset.noise_strength_w, 2) * np.diag([0.10, 0.02, 0.10, 0.02])
+        self.LTI['noise']['noise_strength_w'] = preset.noise_strength_w
     
         if observer:
             # Observation matrix
             self.LTI['C']          = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
             self.LTI['r']          = len(self.LTI['C'])
             
-            self.LTI['noise']['v_cov'] = preset.vFactor * np.eye(np.size(self.LTI['C'],0))*0.1
-            self.LTI['noise']['vFactor'] = preset.vFactor
+            self.LTI['noise']['v_cov'] = preset.noise_strength_v * np.eye(np.size(self.LTI['C'],0))*0.1
+            self.LTI['noise']['noise_strength_v'] = preset.noise_strength_v
 
             self.filter = {'cov0': np.diag([2, .01, 2, .01])}
             
@@ -499,22 +499,22 @@ class UAV_3D(master.LTI_master):
         # Disturbance matrix
         self.LTI['Q']  = np.array([[0],[0],[0],[0],[0],[0]])
         
-        if preset.wFactor == -1:
-            preset.wFactor, _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1,0.1], [0.5,0.5,0.5], [1,1,1], [2,2,2]])
-        if preset.vFactor == -1 and observer:
-            preset.vFactor, _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1,0.1], [0.5,0.5,0.5], [1,1,1], [2,2,2]])
+        if preset.noise_strength_w == -1:
+            preset.noise_strength_w, _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1,0.1], [0.5,0.5,0.5], [1,1,1], [2,2,2]])
+        if preset.noise_strength_v == -1 and observer:
+            preset.noise_strength_v, _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1,0.1], [0.5,0.5,0.5], [1,1,1], [2,2,2]])
         
         # Covariance of the process noise
-        self.LTI['noise']['w_cov'] = np.repeat(preset.wFactor, 2) * np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
-        self.LTI['noise']['wFactor'] = preset.wFactor
+        self.LTI['noise']['w_cov'] = np.repeat(preset.noise_strength_w, 2) * np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
+        self.LTI['noise']['noise_strength_w'] = preset.noise_strength_w
         
         if observer:
             # Observation matrix
             self.LTI['C']          = np.array([[1,0,0,0,0,0], [0,0,1,0,0,0], [0,0,0,0,1,0]])
             self.LTI['r']          = len(self.LTI['C'])
             
-            self.LTI['noise']['v_cov'] = preset.vFactor * np.eye(np.size(self.LTI['C'],0))*0.1
-            self.LTI['noise']['vFactor'] = preset.vFactor
+            self.LTI['noise']['v_cov'] = preset.noise_strength_v * np.eye(np.size(self.LTI['C'],0))*0.1
+            self.LTI['noise']['noise_strength_v'] = preset.noise_strength_v
             
             self.filter = {'cov0': np.diag([.5, .01, .5, .01, .5, .01])}
             

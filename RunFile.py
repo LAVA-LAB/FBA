@@ -151,10 +151,10 @@ Ab = dict()
 model_prefix = ''
 
 if system.name in ['UAV_2D', 'UAV_3D']:
-    model_prefix += '_wFact='+str(system.LTI['noise']['wFactor'])
+    model_prefix += '_wFact='+str(system.LTI['noise']['noise_strength_w'])
     
     if setup.main['mode'] == 'Filter':
-        model_prefix += '_vFact='+str(system.LTI['noise']['vFactor'])
+        model_prefix += '_vFact='+str(system.LTI['noise']['noise_strength_v'])
         
 if system.name == 'UAV_3D':
     model_prefix += '_layout='+str(system.scenario)
