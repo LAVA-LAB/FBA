@@ -1,3 +1,6 @@
+#!/bin/bash
+cd ..;
+
 python3 RunFile.py --application_id 0 --two_phase_transient_length 1 --monte_carlo_iterations -1 --R_size 11 5 11 5 --R_width 2 1.5 2 1.5 --horizon 24 --plot_trajectory_2D 0 2 --noise_strength_w 1 --noise_strength_v 1;
 python3 RunFile.py --application_id 0 --two_phase_transient_length 2 --monte_carlo_iterations -1 --R_size 11 5 11 5 --R_width 2 1.5 2 1.5 --horizon 24 --plot_trajectory_2D 0 2 --noise_strength_w 1 --noise_strength_v 1;
 python3 RunFile.py --application_id 0 --two_phase_transient_length 3 --monte_carlo_iterations -1 --R_size 11 5 11 5 --R_width 2 1.5 2 1.5 --horizon 24 --plot_trajectory_2D 0 2 --noise_strength_w 1 --noise_strength_v 1;

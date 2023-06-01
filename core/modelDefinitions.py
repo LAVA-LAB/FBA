@@ -312,7 +312,7 @@ class UAV_2D(master.LTI_master):
         self.LTI['Q']  = np.array([[0],[0],[0],[0]])
     
         # Covariance of the process noise
-        self.LTI['noise']['w_cov'] = np.repeat(preset.noise_strength_w, 2) * np.diag([0.10, 0.02, 0.10, 0.02])
+        self.LTI['noise']['w_cov'] = preset.noise_strength_w * np.diag([0.10, 0.02, 0.10, 0.02])
         self.LTI['noise']['noise_strength_w'] = preset.noise_strength_w
     
         if observer:
