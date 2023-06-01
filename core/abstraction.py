@@ -1099,9 +1099,6 @@ class Abstraction(object):
             plot_values = self.mdp.MAIN_DF['opt_reward']
             filename = self.setup.directories['outputFcase']+'safeset_N='+str(self.setup.scenarios['samples'])
 
-            print('PLOT HEATMAP!')
-            assert False
-
             # Create heat map
             plot_heatmap(self, plot_values, filename, vrange = [0, 1], cmap = 'jet')
 
