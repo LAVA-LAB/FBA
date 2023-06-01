@@ -444,6 +444,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
     from ..filterBasedAbstraction import MonteCarloSim
 
     itersToShow = 1
+    trajectoriesToCompute = 25
 
     # Determine desired state IDs
     if Ab.system.name == 'UAV_2D':
@@ -476,14 +477,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
         itersToShow = 10
         
         cut_value = np.array([0.005, 0.005])
-
-    elif Ab.system.name == 'package_delivery':
-        x_init = setStateBlock(Ab.system.partition, a=[4.25], b=[-4.25])
-
-        itersToShow = 3
-
-        i_show = (0,1)
-        i_hide = ()
+        
             
     # Compute all centers of regions associated with points
     x_init_centers = computeRegionCenters(np.array(x_init), Ab.system.partition, Ab.setup.floating_point_precision)
@@ -496,7 +490,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
     
     print(' -- Perform simulations for initial states:',state_idxs)
     
-    mc_obj = MonteCarloSim(Ab, iterations = 25,
+    mc_obj = MonteCarloSim(Ab, iterations = trajectoriesToCompute,
                                init_states = state_idxs )
     
     Ab.mc = {'reachability_probability': mc_obj.results['reachability_probability'],
@@ -531,7 +525,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
     
     alltraces = []
     for i in state_idxs:
-        for j in range(Ab.setup.montecarlo['iterations']):
+        for j in range(trajectoriesToCompute):
             alltraces += [Ab.mc['traces'][i][j]['x']]
     
     traces_df = pd.DataFrame(alltraces)

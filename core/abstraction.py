@@ -1086,7 +1086,7 @@ class Abstraction(object):
             
 
         # The code below plots the trajectories
-        if self.system.name in ['UAV_2D', 'UAV_3D', 'shuttle', 'package_delivery']:
+        if self.system.name in ['UAV_2D', 'UAV_3D', 'shuttle']:
             
             # Create trajectory plot
             performance_df, _ = trajectoryPlot(self, case_id, writer)
@@ -1098,6 +1098,9 @@ class Abstraction(object):
         if self.setup.preset.plot_heatmap is not False:
             plot_values = self.mdp.MAIN_DF['opt_reward']
             filename = self.setup.directories['outputFcase']+'safeset_N='+str(self.setup.scenarios['samples'])
+
+            print('PLOT HEATMAP!')
+            assert False
 
             # Create heat map
             plot_heatmap(self, plot_values, filename, vrange = [0, 1], cmap = 'jet')
