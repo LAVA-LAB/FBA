@@ -108,11 +108,10 @@ def filterBasedScheme(Ab, case_id):
 
             ln = min(len(Ab.mc['reachability_probability']), len(Ab.mdp.MAIN_DF['opt_reward']))
             plot_values = Ab.mc['reachability_probability'][:ln] - Ab.mdp.MAIN_DF['opt_reward'][:ln]
-
             filename = Ab.setup.directories['outputFcase']+'empirical_minus_guarantes_heatmap'
 
             # Create heat map
-            plot_heatmap(Ab, plot_values, filename, vrange=[-1,1], cmap=sns.color_palette("coolwarm", 10))
+            plot_heatmap(Ab, plot_values, filename, vrange=[-0.6,0.6], cmap=sns.color_palette("coolwarm_r", 10))
         
         # Clean monte carlo object to save space
         del mc_obj

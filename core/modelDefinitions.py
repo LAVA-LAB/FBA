@@ -148,7 +148,7 @@ class package_delivery(master.LTI_master):
         # Partition size
         self.partition['nrPerDim']  = preset.R_size
         self.partition['width']     = preset.R_width
-        self.tau = min(1.5, 24 / preset.R_size[0])
+        self.tau = 1 # min(1.5, 24 / preset.R_size[0])
 
         # Step-bound on property
         self.endTime = int(preset.horizon / self.tau)

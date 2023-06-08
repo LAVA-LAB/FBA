@@ -21,6 +21,8 @@ import pandas as pd             # Import Pandas to store data in frames
 import matplotlib.pyplot as plt # Import Pyplot to generate plots
 import cv2
 
+plt.ioff()
+
 from core.mainFunctions import definePartitions
 import seaborn as sns
 
@@ -103,7 +105,7 @@ def partitionPlot2D(i_tup, j_tup, j, delta_plot, setup, model, \
     # Set tight layout
     fig.tight_layout()
     
-    plt.show()
+    # plt.show()
                 
     # Save figure
     filename = setup.directories['outputF']+'partitioning_'+str(delta_plot)+'_coords=('+str(i0)+','+str(i1)+')'
@@ -405,7 +407,7 @@ def policyPlot(setup, model, partition, results, abstr):
     for form in setup.plotting['exportFormats']:
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
         
-    plt.show()
+    # plt.show()
         
 def UAV_3D_plotLayout(Ab):
     '''
@@ -818,7 +820,7 @@ def trajectoryPlot2D(i_show, i_hide, plot_time, N, setup, model, partition, spec
         if form != 'pdf' or plot_time == N:
             plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight', dpi=300)
         
-    plt.show()
+    # plt.show()
     
     return filename+'.png'
     
@@ -1190,13 +1192,11 @@ def plot_heatmap(Ab, plot_values, filename, vrange=[-0.2,0.2], cmap=sns.divergin
     # Set tight layout
     fig.tight_layout()
 
-    plt.show()
-
     # Save figure
     for form in Ab.setup.plotting['exportFormats']:
         plt.savefig(filename+'.'+str(form), format=form, bbox_inches='tight')
         
-    plt.show()
+    # plt.show()
     
 def control_plot(Ab, k=0):
     
@@ -1231,5 +1231,5 @@ def control_plot(Ab, k=0):
     # Set tight layout
     fig.tight_layout()
             
-    plt.show()
+    # plt.show()
     
