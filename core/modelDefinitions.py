@@ -303,17 +303,16 @@ class UAV_2D(master.LTI_master):
         if preset.noise_strength_w == -1:
             preset.noise_strength_w, _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
         if preset.noise_strength_v == -1 and observer:
-            preset.noise_strength_v, _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,        self.LTI['noise']['w_cov'] = preset.noise_strength_w * np.diag([0.10, 0.02, 0.10, 0.02])
-py.linalg.block_diag(Bblock, Bblock)
+            preset.noise_strength_v, _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
+        
+        self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock)
+        self.LTI['B']  = scipy.linalg.block_diag(Bblock, Bblock)
     
         # Disturbance matrix
         self.LTI['Q']  = np.array([[0],[0],[0],[0]])
     
         # Covariance of the process noise
-        sel        self.        self.        self.LTI['noise']['w_cov'] = np.repeat(preset.noise_strength_w, 2) * np.diag([0.10, 0.02, 0.10, 0.02])
-
-
-])
+        self.LTI['noise']['w_cov'] = np.repeat(preset.noise_strength_w, 2) * np.diag([0.10, 0.02, 0.10, 0.02])
         self.LTI['noise']['noise_strength_w'] = preset.noise_strength_w
     
         if observer:
@@ -959,4 +958,3 @@ class shuttle(master.LTI_master):
             self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.000001
             
             self.filter = {'cov0': 0.0001*np.diag([.001, .001, .0001, .0001])}
-            
