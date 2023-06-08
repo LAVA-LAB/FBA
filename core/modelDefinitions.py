@@ -148,7 +148,7 @@ class package_delivery(master.LTI_master):
         # Partition size
         self.partition['nrPerDim']  = preset.R_size
         self.partition['width']     = preset.R_width
-        self.tau = min(1.5, 24 / preset.R_size[0])
+        self.tau = 1 # min(1.5, 24 / preset.R_size[0])
 
         # Step-bound on property
         self.endTime = int(preset.horizon / self.tau)
@@ -303,16 +303,17 @@ class UAV_2D(master.LTI_master):
         if preset.noise_strength_w == -1:
             preset.noise_strength_w, _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
         if preset.noise_strength_v == -1 and observer:
-            preset.noise_strength_v, _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
-        
-        self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock)
-        self.LTI['B']  = scipy.linalg.block_diag(Bblock, Bblock)
+            preset.noise_strength_v, _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,        self.LTI['noise']['w_cov'] = preset.noise_strength_w * np.diag([0.10, 0.02, 0.10, 0.02])
+py.linalg.block_diag(Bblock, Bblock)
     
         # Disturbance matrix
         self.LTI['Q']  = np.array([[0],[0],[0],[0]])
     
         # Covariance of the process noise
-        self.LTI['noise']['w_cov'] = preset.noise_strength_w * np.diag([0.10, 0.02, 0.10, 0.02])
+        sel        self.        self.        self.LTI['noise']['w_cov'] = np.repeat(preset.noise_strength_w, 2) * np.diag([0.10, 0.02, 0.10, 0.02])
+
+
+])
         self.LTI['noise']['noise_strength_w'] = preset.noise_strength_w
     
         if observer:
