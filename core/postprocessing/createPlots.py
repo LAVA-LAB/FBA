@@ -72,7 +72,7 @@ def partitionPlot2D(i_tup, j_tup, j, delta_plot, setup, model, \
     ax = fig.add_subplot(111)
     
     # If number of dimensions is 2, create 2D plot
-    if model['n'] <= 2:        
+    if model['n'] <= 2:
         plt.xlabel('$x_1$', labelpad=0)
         plt.ylabel('$x_2$', labelpad=-10)
         
@@ -473,7 +473,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
                 else:
                     cut_value[i] = Ab.system.partition['width'][d] / 2          
                     
-    elif Ab.system.name == 'shuttle':
+    elif Ab.system.name in ['shuttle', 'shuttleB']:
         x_init = setStateBlock(Ab.system.partition, a=[-0.65], b=[-0.85], c=[0], d=[0])
         
         itersToShow = 10
@@ -483,7 +483,7 @@ def trajectoryPlot(Ab, case_id, writer = None):
             
     # Compute all centers of regions associated with points
     x_init_centers = computeRegionCenters(np.array(x_init), Ab.system.partition, Ab.setup.floating_point_precision)
-    
+
     # Filter to only keep unique centers
     x_init_unique = np.unique(x_init_centers, axis=0)
     
@@ -578,7 +578,7 @@ def plot_trajectory_2D_animated(Ab, case_id, writer = None, itersToShow = 1):
     
     print(' -- Perform simulations for initial states:',state_idxs)
     
-    mc_obj = MonteCarloSim(Ab, iterations = 25,
+    mc_obj = MonteCarloSim(Ab, iterations = 1000,
                                init_states = state_idxs )
     
     Ab.mc = {'reachability_probability': mc_obj.results['reachability_probability'],
@@ -1146,13 +1146,13 @@ def plot_heatmap(Ab, plot_values, filename, vrange=[-0.2,0.2], cmap=sns.divergin
     cut_centers = definePartitions(Ab.system.LTI['n'], v, 
         Ab.system.partition['width'], 
         Ab.system.partition['origin'], onlyCenter=True)
-    
+
     cut_values = np.zeros((x_nr, y_nr))
     cut_coords = np.zeros((x_nr, y_nr, Ab.system.LTI['n']))
     
-    cut_idxs = [Ab.abstr['allCentersCubic'][tuple(c)] for c in cut_centers 
-                                if tuple(c) in Ab.abstr['allCentersCubic']]              
-    
+    cut_idxs = [Ab.abstr['allCentersCubic'][tuple(c)] for c in cut_centers]
+                                #if tuple(c) in Ab.abstr['allCentersCubic']]
+
     for i,(idx,center) in enumerate(zip(cut_idxs, cut_centers)):
         
         j = i % y_nr
@@ -1160,7 +1160,7 @@ def plot_heatmap(Ab, plot_values, filename, vrange=[-0.2,0.2], cmap=sns.divergin
         
         cut_values[k,j] = plot_values[idx]
         cut_coords[k,j,:] = center
-    
+
     if Ab.system.name == 'UAV_2D':
         cut_df = pd.DataFrame( cut_values, index=cut_coords[:,0,0], columns=cut_coords[0,:,2] )
     else:

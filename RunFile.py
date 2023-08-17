@@ -35,14 +35,16 @@ from core.masterClasses import settings, loadOptions
 
 preset = parse_arguments(run_in_vscode = False)
 
-# preset.application_id = 5
+# preset.application = "spacecraft"
 # preset.two_phase_transient_length = 4
 # preset.monte_carlo_iterations = -1
-# preset.R_size = [24, 24]
-# preset.R_width = [0.5, 0.5]
+# preset.R_size = [11, 11, 5, 5]
+# preset.R_width = [2, 2, 0.05, 0.05]
 # preset.plot_heatmap = [0, 1]
-# preset.horizon = 24
 # preset.plot_trajectory_2D = [0, 1]
+# preset.noise_strength_w = [1, 1, 1, 1]
+# preset.noise_strength_v = [1, 1]
+# preset.horizon = 32
 
 current_time = datetime.now().strftime("%H:%M:%S")
 print('Program started at {}'.format(current_time))
@@ -55,8 +57,8 @@ print('\n',tabulate(vars(preset).items(), headers=["Argument", "Value"]),'\n')
 # Retreive a list of all available models
 modelClasses = np.array(getmembers(modelDefinitions, isclass))
 
-if preset.application_id == -1:    
-    _, preset.application_id  = user_choice('application',
+if preset.application == -1:
+    preset.application, _  = user_choice('application',
                                                list(modelClasses[:,0]))
 
 np.random.seed(10)
@@ -66,7 +68,9 @@ np.random.seed(10)
 #-----------------------------------------------------------------------------
 
 # Create model object
-system = modelClasses[preset.application_id, 1](preset)
+application_id = np.where(modelClasses[:,0] == preset.application)[0]
+assert len(application_id) == 1
+system = modelClasses[application_id[0], 1](preset)
 
 #-----------------------------------------------------------------------------
 # Create settings object + change manual settings

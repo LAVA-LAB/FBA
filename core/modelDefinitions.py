@@ -248,8 +248,8 @@ class UAV_2D(master.LTI_master):
         self.control['limits']['uMax'] = [4, 4]        
 
         # Partition size
-        self.partition['nrPerDim']  = [11,5,11,5]
-        self.partition['width']     = [2, 1.5, 2, 1.5]
+        self.partition['nrPerDim']  = preset.R_size
+        self.partition['width']     = preset.R_width
         self.partition['origin']    = [0, 0, 0, 0]
         
         # Number of actions per dimension (if 'auto', then equal to nr of regions)
@@ -310,9 +310,9 @@ class UAV_2D(master.LTI_master):
     
         # Disturbance matrix
         self.LTI['Q']  = np.array([[0],[0],[0],[0]])
-    
+
         # Covariance of the process noise
-        self.LTI['noise']['w_cov'] = np.repeat(preset.noise_strength_w, 2) * np.diag([0.10, 0.02, 0.10, 0.02])
+        self.LTI['noise']['w_cov'] = preset.noise_strength_w * np.diag([0.10, 0.02, 0.10, 0.02])
         self.LTI['noise']['noise_strength_w'] = preset.noise_strength_w
     
         if observer:
@@ -498,14 +498,12 @@ class UAV_3D(master.LTI_master):
         
         # Disturbance matrix
         self.LTI['Q']  = np.array([[0],[0],[0],[0],[0],[0]])
-        
-        if preset.noise_strength_w == -1:
-            preset.noise_strength_w, _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1,0.1], [0.5,0.5,0.5], [1,1,1], [2,2,2]])
-        if preset.noise_strength_v == -1 and observer:
-            preset.noise_strength_v, _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1,0.1], [0.5,0.5,0.5], [1,1,1], [2,2,2]])
+
+        assert preset.noise_strength_w != -1
+        assert preset.noise_strength_v != -1
         
         # Covariance of the process noise
-        self.LTI['noise']['w_cov'] = np.repeat(preset.noise_strength_w, 2) * np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
+        self.LTI['noise']['w_cov'] = preset.noise_strength_w * np.diag([0.10, 0.02, 0.10, 0.02, 0.10, 0.02])
         self.LTI['noise']['noise_strength_w'] = preset.noise_strength_w
         
         if observer:
@@ -939,7 +937,7 @@ class shuttle(master.LTI_master):
         self.LTI['B'] = np.array([[0.666643, 0.009112],
                            [-0.00911, 0.666573],
                            [0.66662, 0.001367],
-                           [-0.00137, 0.66648]]) / 2
+                           [-0.00137, 0.66648]]) #/ 2
         
         self.LTI['Q'] = np.zeros((4,1))
         
@@ -958,3 +956,107 @@ class shuttle(master.LTI_master):
             self.LTI['noise']['v_cov'] = np.eye(np.size(self.LTI['C'],0))*0.000001
             
             self.filter = {'cov0': 0.0001*np.diag([.001, .001, .0001, .0001])}
+
+
+class spacecraft(master.LTI_master):
+
+    def __init__(self, preset):
+        '''
+        Initialize the spaceshuttle rendezvous model class.
+
+        Returns
+        -------
+        None.
+
+        '''
+
+        # Initialize superclass
+        master.LTI_master.__init__(self)
+
+        # Set value of delta (how many time steps are grouped together)
+        # Used to make the model fully actuated
+        self.base_delta = 2
+
+        self.adaptive = {'rates': preset.adaptive_rate,
+                'target_points': np.array([])
+                }
+
+        # Authority limit for the control u, both positive and negative
+        self.control['limits']['uMin'] = [-2.5, -2.5]
+        self.control['limits']['uMax'] = [2.5, 2.5]
+
+        # Partition size
+        self.partition['nrPerDim']  = preset.R_size
+        self.partition['width']     = preset.R_width
+        self.partition['origin']    = [0, 0, 0, 0]
+
+        # Number of actions per dimension (if 'auto', then equal to nr of regions)
+        self.targets['nrPerDim']    = 'auto'
+        self.targets['domain']      = 'auto'
+
+        f = 1
+
+        # Specification information
+        self.spec['goal'] = {1: defSpecBlock(self.partition, a=[-11/f, -5/f], b=[5/f, 11/f], c=None, d=None)}
+
+        self.spec['critical'] = {1: defSpecBlock(self.partition, a=[-10/f, -3.5/f], b=[-2/f, 3/f], c=None, d=None),
+                                 2: defSpecBlock(self.partition, a=[0, 4.5/f], b=[-10/f, -6/f], c=None, d=None),
+                                 3: defSpecBlock(self.partition, a=[-0.7/f, 5/f], b=[-1.5/f, 3/f], c=None, d=None),
+                                 4: defSpecBlock(self.partition, a=[1.0/f, 4/f], b=[8/f, 11/f], c=None, d=None)}  # ,
+
+        self.x0 = np.array([[-8/f, -8/f, 0.075, 0]])
+
+        # Step-bound on property
+        self.endTime = preset.horizon #16
+
+    def setModel(self, observer, preset):
+        '''
+        Set linear dynamical system.
+
+        Parameters
+        ----------
+        observer : Boolean
+            If True, an observer is created for the model.
+
+        Returns
+        -------
+        None.
+
+        '''
+        self.LTI = {}
+
+        # Discretization step size
+        self.LTI['tau'] = 1
+
+        # Defining Deterministic Model corresponding matrices
+        self.LTI['A'] = np.array([[1.000631, 0, 19.9986, 0.410039],
+                                  [-8.62e-6, 1, -0.41004, 19.9944],
+                                  [6.30e-05, 0, 0.99979, 0.041002],
+                                  [-1.29e-6, 0, -0.041, 0.999159]])
+
+        self.LTI['B'] = np.array([[0.666643, 0.009112],
+                                  [-0.00911, 0.666573],
+                                  [0.066662, 0.001367],
+                                  [-0.00137, 0.066648]])
+
+        self.LTI['Q'] = np.zeros((4, 1))
+
+        # Determine system dimensions
+        self.LTI['n'] = np.size(self.LTI['A'], 1)
+        self.LTI['p'] = np.size(self.LTI['B'], 1)
+
+        self.LTI['noise'] = dict()
+
+        # Covariance of the process noise
+        self.LTI['noise']['w_cov'] = preset.noise_strength_w * np.diag([0.02, 0.02, 1e-4, 1e-4])
+        self.LTI['noise']['noise_strength_w'] = preset.noise_strength_w
+
+        if observer:
+            # Observation matrix
+            self.LTI['C'] = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
+            self.LTI['r'] = len(self.LTI['C'])
+
+            self.LTI['noise']['v_cov'] = preset.noise_strength_v * np.diag([0.02, 0.02])
+            self.LTI['noise']['noise_strength_v'] = preset.noise_strength_v
+
+            self.filter = {'cov0': 0.0001*np.diag([5e-3, 5e-3, 1e-8, 1e-8])}

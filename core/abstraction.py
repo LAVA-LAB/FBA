@@ -179,7 +179,7 @@ class Abstraction(object):
         
         return abstr
     
-    def _defStateLabelSet(self, allVertices, regions, typ="goal", epsilon=0):
+    def _defStateLabelSet(self, allVertices, bbox, regions, typ="goal", epsilon=0):
         '''
         Returns the indices of regions associated with the unique centers.
 
@@ -196,7 +196,7 @@ class Abstraction(object):
             List of unique center points.
 
         '''
-        
+
         if len(regions) == 0:
             return {}
         
@@ -228,6 +228,14 @@ class Abstraction(object):
                     # convervative over-approximation)
                     
                     R = np.vstack((box[:,0] - epsilon, box[:,1] + epsilon)).T
+
+                # Make sure that the augmented region never intersects with the
+                # portion outside of the state space
+
+                # Lower bound
+                R[:, 0] = np.maximum(R[:, 0], bbox['low'])
+                # Upper bound
+                R[:, 1] = np.minimum(R[:, 1], bbox['upp'])
 
                 # Only store the augmented region if it is valid
                 if not any(R[:,1] - R[:,0] <= 0):
@@ -677,7 +685,12 @@ class Abstraction(object):
         
         # Create partition
         print('\nComputing partition of the state space...')
-        
+
+        # Store bounding box of state space partitioning
+        self.system.partition['bbox'] = \
+            {'low': self.system.partition['origin'] - np.array(self.system.partition['nrPerDim']) * np.array(self.system.partition['width']),
+             'upp': self.system.partition['origin'] + np.array(self.system.partition['nrPerDim']) * np.array(self.system.partition['width'])}
+
         self.abstr = self._defPartition()
 
         self.time['1_partition'] = tocDiff(False)
@@ -751,12 +764,12 @@ class Abstraction(object):
         
             # Determine goal regions
             self.abstr['goal'][1][k] = self._defStateLabelSet(
-                self.abstr['allVertices'],
+                self.abstr['allVertices'], self.system.partition['bbox'],
                 self.system.spec['goal'], typ="goal", epsilon=epsilon)
             
             # Determine critical regions
             self.abstr['critical'][1][k] = self._defStateLabelSet(
-                self.abstr['allVertices'],
+                self.abstr['allVertices'], self.system.partition['bbox'],
                 self.system.spec['critical'], typ="critical", epsilon=epsilon)
            
         self.abstr['goal'][1][0] = self.abstr['goal'][1][1]
@@ -781,22 +794,22 @@ class Abstraction(object):
             
                 # Determine goal regions
                 self.abstr['goal'][delta][gamma] = self._defStateLabelSet(
-                    self.abstr['allVertices'],
+                    self.abstr['allVertices'], self.system.partition['bbox'],
                     self.system.spec['goal'], typ="goal", epsilon=epsilon)
                 
                 # Determine critical regions
                 self.abstr['critical'][delta][gamma] = self._defStateLabelSet(
-                    self.abstr['allVertices'],
+                    self.abstr['allVertices'], self.system.partition['bbox'],
                     self.system.spec['critical'], typ="critical", epsilon=epsilon)
             
         print( ' - Compute non-augmented regions')
             
         # Compute goal and critical regions without augmented bounds (for plotting)
         self.abstr['goal']['zero_bound'] = self._defStateLabelSet(
-                self.abstr['allVertices'],
+                self.abstr['allVertices'], self.system.partition['bbox'],
                 self.system.spec['goal'], typ="goal", epsilon=0)
         self.abstr['critical']['zero_bound'] = self._defStateLabelSet(
-                self.abstr['allVertices'],
+                self.abstr['allVertices'], self.system.partition['bbox'],
                 self.system.spec['critical'], typ="critical", epsilon=0)
         
         print(' -- Number of regions:',self.abstr['nr_regions'])
@@ -1082,24 +1095,23 @@ class Abstraction(object):
             
 
         if self.setup.preset.plot_trajectory_2D is not False:
+            print('Create animated trajectory plot...')
             plot_trajectory_2D_animated(self, case_id, writer)
-            
 
-        # The code below plots the trajectories
-        if self.system.name in ['UAV_2D', 'UAV_3D', 'shuttle']:
-            
             # Create trajectory plot
-            performance_df, _ = trajectoryPlot(self, case_id, writer)
-            
-            if self.setup.main['iterative'] is True and iterative_results != None:
-                performance = pd.concat(
-                    [iterative_results['performance'], performance_df], axis=0)
-    
+            # print('Create static trajectory plot...')
+            # performance_df, _ = trajectoryPlot(self, case_id, writer)
+            #
+            # if self.setup.main['iterative'] is True and iterative_results != None:
+            #     performance = pd.concat(
+            #         [iterative_results['performance'], performance_df], axis=0)
+            #
         if self.setup.preset.plot_heatmap is not False:
             plot_values = self.mdp.MAIN_DF['opt_reward']
             filename = self.setup.directories['outputFcase']+'safeset_N='+str(self.setup.scenarios['samples'])
 
             # Create heat map
+            print('Create heatmap...')
             plot_heatmap(self, plot_values, filename, vrange = [0, 1], cmap = 'jet')
 
         return performance

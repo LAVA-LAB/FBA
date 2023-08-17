@@ -412,10 +412,11 @@ def defSpecBlock(partition, **kwargs):
     if nrArgs != len(partition['nrPerDim']):
         print('State dimension is',stateDim,'but only',nrArgs,'arguments given.')
         sys.exit()
+
+    k = 100
+    maxLimit = partition['origin'] + np.array(partition['nrPerDim']) * np.array(partition['width']) * k
     
-    extr = partition['origin'] + np.array(partition['nrPerDim']) * np.array(partition['width']) * 2
-    
-    limits = np.array([value if value != None else [-extr[d], extr[d]] 
+    limits = np.array([value if value != None else [-maxLimit[d], maxLimit[d]]
                        for d,value in enumerate(kwargs.values())])
     
     vertices = np.array(list(itertools.product(*limits)))

@@ -406,7 +406,7 @@ def steadystateCovariance_sdp(covariances, verbose=True):
         if not is_invertible(cov):
         
             eigvals, eigvecs = np.linalg.eig(cov)
-            
+
             eigvals = np.maximum(1e-9, eigvals)
             cov = eigvecs @ np.diag(eigvals) @ np.linalg.inv(eigvecs)
         
@@ -515,7 +515,7 @@ def definePartitions(dim, nrPerDim, regionWidth, origin, onlyCenter=False):
                                               for i in range(dim)]
     
     if onlyCenter:        
-        partitions = np.array(list(itertools.product(*widthArrays))) + origin
+        partitions = np.round(np.array(list(itertools.product(*widthArrays))) + origin, 5)
         
     else:
         partitions = dict()

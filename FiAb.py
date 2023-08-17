@@ -118,7 +118,9 @@ def filterBasedScheme(Ab, case_id):
             
         # Write Monte Carlo results to Excel
         MCsims_df.to_excel(writer, sheet_name='Empirical reach.')
-    
+
+    print('Generate plots...')
+
     # Plot results
     Ab.generatePlots( delta_value = 1, 
                       max_delta = max(Ab.setup.all_deltas),

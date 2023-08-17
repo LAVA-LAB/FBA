@@ -43,8 +43,8 @@ def parse_arguments(run_in_vscode):
 
     parser = argparse.ArgumentParser(description="Filter-based abstractions programme")
     
-    parser.add_argument('--application_id', type=int, action="store", dest='application_id', 
-                        default=-1, help="Application ID")
+    parser.add_argument('--application', type=str, action="store", dest='application',
+                        default=-1, help="Application/class name")
     
     parser.add_argument('--load_results', dest='load_results', action='store_true',
                         help="If true, results from a previous run are loaded")
@@ -68,12 +68,16 @@ def parse_arguments(run_in_vscode):
     parser.add_argument('--R_width', dest='R_width', nargs='+', 
                         help='Partition: width of each region per dimension', default=[])
 
-    parser.add_argument('--noise_strength_w', type=float, action="store", dest='noise_strength_w', 
-                        default=-1, help="Multiplier for the process noise")
+    parser.add_argument('--noise_strength_w', dest='noise_strength_w', nargs='+',
+                        help='Multiplier for the process noise', default=[1])
 
-    parser.add_argument('--noise_strength_v', type=float, action="store", dest='noise_strength_v', 
-                        default=-1, help="Multiplier for the measurement noise")
-    
+    parser.add_argument('--noise_strength_v', dest='noise_strength_v', nargs='+',
+                        help='Multiplier for the measurement noise', default=[1])
+
+    # 3D UAV settings
+    parser.add_argument('--scenario', type=int, action="store", dest='scenario',
+                        default=3, help="Planning scenario")
+
     # Plot functions
     parser.add_argument('--plot_heatmap', dest='plot_heatmap', nargs='+', 
                         help='Plot heatmap for the two provided state variables', default=False)
@@ -100,6 +104,16 @@ def parse_arguments(run_in_vscode):
         args.R_width = list([float(r) for r in args.R_width])
     except:
         print('Could not convert strings to integers for partition width arg.')
+
+    try:
+        args.noise_strength_w = list([float(r) for r in args.noise_strength_w])
+    except:
+        print('Could not convert strings to floats for process noise strength')
+
+    try:
+        args.noise_strength_v = list([float(r) for r in args.noise_strength_v])
+    except:
+        print('Could not convert strings to floats for measurement noise strength')
 
     if args.plot_heatmap is not False:
         try:
