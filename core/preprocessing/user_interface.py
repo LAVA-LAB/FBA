@@ -85,6 +85,10 @@ def parse_arguments(run_in_vscode):
     parser.add_argument('--plot_trajectory_2D', dest='plot_trajectory_2D', nargs='+', 
                         help='Plot 2D trajectory for the two provided state variables', default=False)
 
+    # Empirical performance validation
+    parser.add_argument('--validate_performance', type=int, action="store", dest='validate_performance',
+                        default=-1,
+                        help="Compute empirical performance through Monte Carlo simulation; if -1 is given, no MC is performed)")
 
     # Now, parse the command line arguments and store the
     # values in the `args` variable

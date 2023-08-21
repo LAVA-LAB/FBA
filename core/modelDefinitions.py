@@ -1004,7 +1004,7 @@ class spacecraft(master.LTI_master):
                                  3: defSpecBlock(self.partition, a=[-0.7/f, 5/f], b=[-1.5/f, 3/f], c=None, d=None),
                                  4: defSpecBlock(self.partition, a=[1.0/f, 4/f], b=[8/f, 11/f], c=None, d=None)}  # ,
 
-        self.x0 = np.array([[-8/f, -8/f, 0.075, 0]])
+        self.x0 = np.array([[-8/f, -8/f, 0.05, 0]])
 
         # Step-bound on property
         self.endTime = preset.horizon #16
@@ -1059,4 +1059,4 @@ class spacecraft(master.LTI_master):
             self.LTI['noise']['v_cov'] = preset.noise_strength_v * np.diag([0.02, 0.02])
             self.LTI['noise']['noise_strength_v'] = preset.noise_strength_v
 
-            self.filter = {'cov0': 0.0001*np.diag([5e-3, 5e-3, 1e-8, 1e-8])}
+            self.filter = {'cov0': np.diag([1, 1, 0.001, 0.001])}

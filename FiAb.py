@@ -15,7 +15,7 @@ import seaborn as sns
 
 # Load main classes and methods
 from core.commons import createDirectory, tocDiff, printWarning
-from core.mainFunctions import steadystateCovariance, steadystateCovariance_sdp, definePartitions
+from core.mainFunctions import steadystateCovariance, steadystateCovariance_sdp, computeRegionCenters
 from core.filterBasedAbstraction import MonteCarloSim
 from core.postprocessing.createPlots import plot_heatmap
 
@@ -119,6 +119,10 @@ def filterBasedScheme(Ab, case_id):
         # Write Monte Carlo results to Excel
         MCsims_df.to_excel(writer, sheet_name='Empirical reach.')
 
+    # Performance Monte Carlo validation of performance in *single* initial state
+    if Ab.setup.preset.validate_performance != -1:
+        validate_performance(Ab, Ab.setup.preset.validate_performance, writer)
+
     print('Generate plots...')
 
     # Plot results
@@ -140,8 +144,33 @@ def filterBasedScheme(Ab, case_id):
         
     return Ab
             
-    
-    
-    
-    
-    
+
+def validate_performance(Ab, iterations, writer = None):
+
+    # Compute all centers of regions associated with points
+    x_init_centers = computeRegionCenters(np.array(Ab.system.x0), Ab.system.partition, Ab.setup.floating_point_precision)
+
+    # Filter to only keep unique centers
+    x_init_unique = np.unique(x_init_centers, axis=0)
+
+    state_idxs = [Ab.abstr['allCentersCubic'][tuple(c)] for c in x_init_unique
+                  if tuple(list(c)) in Ab.abstr['allCentersCubic']]
+
+    print(' -- Perform simulations for initial states:', state_idxs)
+
+    mc_obj = MonteCarloSim(Ab, iterations=iterations,
+                           init_states=state_idxs)
+
+    Ab.mc = {'reachability_probability': mc_obj.results['reachability_probability'],
+             'traces': mc_obj.traces}
+
+    PRISM_reach = Ab.mdp.MAIN_DF['opt_reward'][state_idxs].to_numpy()
+    empirical_reach = Ab.mc['reachability_probability']
+
+    print('Probabilistic reachability (PRISM): ', PRISM_reach)
+    print('Empirical reachability (Monte Carlo):', empirical_reach)
+
+    performance_df = pd.DataFrame({'PRISM reachability': PRISM_reach.flatten(),
+                                   'Empirical reachability': empirical_reach.flatten()})
+    if writer is not None:
+        performance_df.to_excel(writer, sheet_name='Performance')

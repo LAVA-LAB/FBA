@@ -36,7 +36,7 @@ from core.masterClasses import settings, loadOptions
 preset = parse_arguments(run_in_vscode = False)
 
 # preset.application = "spacecraft"
-# preset.two_phase_transient_length = 4
+# preset.two_phase_transient_length = 1
 # preset.monte_carlo_iterations = -1
 # preset.R_size = [11, 11, 5, 5]
 # preset.R_width = [2, 2, 0.05, 0.05]
@@ -44,6 +44,7 @@ preset = parse_arguments(run_in_vscode = False)
 # preset.plot_trajectory_2D = [0, 1]
 # preset.noise_strength_w = [1, 1, 1, 1]
 # preset.noise_strength_v = [1, 1]
+# preset.validate_performance = 100
 # preset.horizon = 32
 
 current_time = datetime.now().strftime("%H:%M:%S")

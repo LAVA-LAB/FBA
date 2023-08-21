@@ -578,35 +578,21 @@ def plot_trajectory_2D_animated(Ab, case_id, writer = None, itersToShow = 1):
     
     print(' -- Perform simulations for initial states:',state_idxs)
     
-    mc_obj = MonteCarloSim(Ab, iterations = 1000,
+    mc_obj = MonteCarloSim(Ab, iterations = itersToShow,
                                init_states = state_idxs )
-    
-    Ab.mc = {'reachability_probability': mc_obj.results['reachability_probability'],
-                 'traces': mc_obj.traces }
-    
-    PRISM_reach = Ab.mdp.MAIN_DF['opt_reward'][state_idxs].to_numpy()
-    empirical_reach = Ab.mc['reachability_probability']
-    
-    print('Probabilistic reachability (PRISM): ',PRISM_reach)
-    print('Empirical reachability (Monte Carlo):',empirical_reach)
-    
-    performance_df = pd.DataFrame( {'PRISM reachability': PRISM_reach.flatten(),
-                                    'Empirical reachability': empirical_reach.flatten() }, index=[case_id] )
-    if writer != None:
-        performance_df.to_excel(writer, sheet_name='Performance')
     
     traces = []
     
     for i in state_idxs:
         for j in range(itersToShow):
-            traces += [Ab.mc['traces'][i][j]['x']]
+            traces += [mc_obj.traces[i][j]['x']]
             
     if Ab.setup.main['mode'] == 'Filter':
         belief_traces = {'mu': [], 'cov': []}
         for i in state_idxs:
             for j in range(itersToShow):
-                belief_traces['mu'] += [Ab.mc['traces'][i][j]['bel_mu']]
-                belief_traces['cov'] += [Ab.mc['traces'][i][j]['bel_cov']]
+                belief_traces['mu'] += [mc_obj.traces[i][j]['bel_mu']]
+                belief_traces['cov'] += [mc_obj.traces[i][j]['bel_cov']]
 
     #####
 
