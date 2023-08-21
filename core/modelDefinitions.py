@@ -293,20 +293,26 @@ class UAV_2D(master.LTI_master):
         self.LTI['noise'] = dict()
         
         # State transition matrix
-        Ablock = np.array([[1, self.LTI['tau']],
-                          [0, 1]])
+        Ablock1 = np.array([[1, 0.95*self.LTI['tau']],
+                          [0, 0.90]])
+
+        Ablock2 = np.array([[1, 0.93*self.LTI['tau']],
+                            [0, 0.96]])
         
         # Input matrix
-        Bblock = np.array([[self.LTI['tau']**2/2],
-                           [self.LTI['tau']]])
+        Bblock1 = np.array([[0.48*self.LTI['tau'] ** 2],
+                           [0.94*self.LTI['tau']]])
+
+        Bblock2 = np.array([[0.43*self.LTI['tau'] ** 2],
+                           [0.92*self.LTI['tau']]])
         
         if preset.noise_strength_w == -1:
             preset.noise_strength_w, _  = ui.user_choice('Process noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
         if preset.noise_strength_v == -1 and observer:
             preset.noise_strength_v, _  = ui.user_choice('Masurement noise strength (per direction)',[[0.1,0.1], [0.5,0.5], [1,1], [2,2]])
         
-        self.LTI['A']  = scipy.linalg.block_diag(Ablock, Ablock)
-        self.LTI['B']  = scipy.linalg.block_diag(Bblock, Bblock)
+        self.LTI['A']  = scipy.linalg.block_diag(Ablock1, Ablock2)
+        self.LTI['B']  = scipy.linalg.block_diag(Bblock1, Bblock2)
     
         # Disturbance matrix
         self.LTI['Q']  = np.array([[0],[0],[0],[0]])
