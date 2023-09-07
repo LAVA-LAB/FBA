@@ -16,7 +16,7 @@ Python version: `3.8.3`. For a list of the required Python packages, please see 
 
 We have tested the artefact on MacOS Ventura 13.4.1, and on Ubuntu 22.04.2.
 
-## 3. Install dependencies
+## 1. Install dependencies
 
 In addition to Python, a number of dependencies must be installed on your machine:
 
@@ -55,7 +55,7 @@ In addition to Python, a number of dependencies must be installed on your machin
    $ sudo apt-get install -y libdbus-1-3 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0                          libxcb-render-util0 libxcb-xinerama0 libxcb-xinput0 libxcb-xfixes0
    ```
 
-## 4. Copy artefact files and install packages
+## 2. Copy artefact files and install packages
 
 Download and extract the artefact files to a desired folder on your machine. Then, run the following command in the folder where you extracted the artefact to install the required packages:
 
@@ -67,7 +67,7 @@ For a full list of all packages installed, please see `requirements.txt`.
 
 **<u>Note:</u>** It can be critical to install the headless version of opencv. This is important because both cv2 (opencv) and pyqt5 come with a version of the XCB plugin, but these versions are incompatible.
 
-## 5. Set default folders and options
+## 3. Set default folders and options
 
 To ensure that PRISM can be found by the script, **you need to modify the PRISM folder** in the  `options.txt` file. Set the PRISM folder to the one where you installed it (the filename should end with `/prism/`, such that it points to the folder in which the `bin/` folder is located), and save your changes. For example, this line of the `options.txt` file can look like this:
 
@@ -82,7 +82,7 @@ If desired, you may also make other changes in the configuration of the script i
 - `mdp.prism_java_memory` : the memory allocated to Java when running PRISM. The default value is 2 GB, but when solving large models, this may be increased (the benchmarks in the paper all ran on a machine with 32 GB of memory allocated to Java).
 - `plotting.3D_UAV` : if True, the 3D plots for the 3D UAV benchmark are created. Note that **<u>this plot pauses the script until it is closed</u>**. If you do not want this behavior, you need to disable this option.
 
-## 6. Run the script
+## 4. Run the script
 
 The `RunFile.py` file, which executes the main program, expects a number of arguments. For examples, see the shell scripts in the `experiments/` folder. For example, the following commands runs the 2D UAV benchmark, with the two-phase time horizon with a transient phase of length 3:
 
@@ -96,11 +96,11 @@ To reproduce all the results presented in the experiments in the paper, navigate
 $ bash run_all_experiments.sh
 ```
 
-## 7. Inspect the results 
+## 5. Inspect the results 
 
 All results are stored in the `output/` folder. When running a new benchmark instance, a new folder is created that contains the application name and the current datetime, such as `FiAB_<model>_<more options>_<date>/`.
 
-Within this folder, all results specific to that single iteration are saved. This includes:
+Within this folder, all results specific to that single iteration are saved. This includes, for example:
 
 - The PRISM model files in explicit format (a `.lab`, `.sta`, and `.tra` and `.pctl` file are created).
 - An Excel file that describes all results, such as the optimal policy, model size, run times, etc., of the current iteration.
