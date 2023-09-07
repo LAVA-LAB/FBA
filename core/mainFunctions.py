@@ -202,7 +202,7 @@ def kalmanFilter(model, cov0, beta):
             'cov_tilde_measure': cov_tilde_measure,
             'error_bound': max_error_bound}
     
-def minimumEpsilon(cov, beta=0.01, stepSize=0.01, singleParam=True):
+def minimumEpsilon(cov, beta=0.01, stepSize=0.01, inf_dims=[], singleParam=True):
     '''
     Compute the minimum error bound (epsilon) by which regions are augmented
 
@@ -214,6 +214,8 @@ def minimumEpsilon(cov, beta=0.01, stepSize=0.01, singleParam=True):
         Confidence probability. The default is 0.01.
     stepSize : float, optional
         Step size by which error bound is increased. The default is 0.01.
+    inf_dims : list of indices, optional
+        List of state variable indices to exclude in computing the error bound
     singleParam : boolean, optional
         If true, than a single epsilon is used in all dimensions. 
         The default is True.
@@ -255,7 +257,6 @@ def minimumEpsilon(cov, beta=0.01, stepSize=0.01, singleParam=True):
         
         cumprob = 0
         epsilon = 0
-        inf_dims = [] #[1,3,5]
         inf_lim = 10
         
         count = 0

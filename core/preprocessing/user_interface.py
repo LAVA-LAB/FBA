@@ -90,6 +90,10 @@ def parse_arguments(run_in_vscode):
                         default=-1,
                         help="Compute empirical performance through Monte Carlo simulation; if -1 is given, no MC is performed)")
 
+    parser.add_argument('--epsilon_inf_dims', dest='epsilon_inf_dims', nargs='+',
+                        help='State variables to exclude in computing the error bound epsilon', default=[])
+
+
     # Now, parse the command line arguments and store the
     # values in the `args` variable
     args = parser.parse_args()    
@@ -118,6 +122,11 @@ def parse_arguments(run_in_vscode):
         args.noise_strength_v = list([float(r) for r in args.noise_strength_v])
     except:
         print('Could not convert strings to floats for measurement noise strength')
+
+    try:
+        args.epsilon_inf_dims = list([int(r) for r in args.epsilon_inf_dims])
+    except:
+        print('Could not convert strings to integers for epsilon_inf_dims')
 
     if args.plot_heatmap is not False:
         try:

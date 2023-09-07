@@ -126,7 +126,8 @@ class filterBasedAbstraction(Abstraction):
         maxCov = func([SigmaCubic_worst, SigmaCubic_best], verbose=False)['worst']            
         beta = 10**-(threshold_decimals+1)
         
-        limit_norm = minimumEpsilon( cov=maxCov, beta=beta, stepSize=0.1, singleParam = False ) + \
+        limit_norm = minimumEpsilon( cov=maxCov, beta=beta, stepSize=0.1, inf_dims=self.setup.preset.epsilon_inf_dims,
+                                     singleParam = False ) + \
                         0.5*np.array(self.system.partition['width'])
         
         # (Re)initialize probability memory dictionary
