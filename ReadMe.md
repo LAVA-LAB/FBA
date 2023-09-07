@@ -33,11 +33,11 @@ In addition to Python, a number of dependencies must be installed on your machin
    $ sudo apt install default-jdk
    ```
 
-3. PRISM (iMDP branch) - In the desired PRISM installation folder, run the following commands:
+3. PRISM 4.8 - In the desired PRISM installation folder, run the following commands:
 
    ```bash
-   $ git clone -b imc https://github.com/davexparker/prism prism-imc
-   $ cd prism-imc/prism; make
+   $ git clone -b v4.8 https://github.com/prismmodelchecker/prism.git
+   $ cd prism/prism; make
    ```
 
    For more details on using PRISM, we refer to the PRISM documentation on 
