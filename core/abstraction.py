@@ -944,10 +944,10 @@ class Abstraction(object):
               mode.upper()+'...')
     
         file_prefix = self.setup.directories['outputFcase'] + "PRISM_" + mode
-        policy_file = file_prefix + '_policy.csv'
+        policy_file = file_prefix + '_policy.txt'
         vector_file = file_prefix + '_vector.csv'
     
-        options = ' -ex -exportadv "'+policy_file+'"'+ \
+        options = ' -exportstrat "'+policy_file+'"'+ \
                   ' -exportvector "'+vector_file+'"'
     
         # Switch between PRISM command for explicit model vs. default model
@@ -991,13 +991,13 @@ class Abstraction(object):
 
         '''
         
-        def _split_policy(value):
+        def _split_action(value):
             
             if value == 'step':
                 # If action is to wait one step (for jump delta)
                 return [-2, -2, -2]
                 
-            elif value != -1:
+            elif value != -1 and value != 'null':
                 # Split string
                 values_split = value.split('_')
                 # Store action and delta value separately
@@ -1010,11 +1010,20 @@ class Abstraction(object):
         import pandas as pd
         
         ovh = self.mdp.overhead
-        
-        policy_all = pd.read_csv(policy_file, header=None).iloc[:, ovh:].fillna(-1).to_numpy()
-        
-        # Flip policy upside down (PRISM generates last time step at top!)
-        policy_all = np.flipud(policy_all)
+
+        # Updated for new PRISM policy/strategy generation (September 2023)
+        with open(policy_file) as f:
+            policy_raw = f.readlines()
+
+        import re
+        policy_all = np.full((self.mdp.N, self.mdp.nr_states), fill_value='-1', dtype='<U16')
+
+        # Fill a numpy array with the policy (rows are time steps, columns are states)
+        for line in policy_raw:
+            line = line.replace('(', '').replace(')', '').replace('\n', '')
+            state, time, action = re.split(r",|:", line)
+            if int(state) >= 0:
+                policy_all[int(time), int(state)] = action
         
         self.mdp.opt_reward = pd.read_csv(vector_file, header=None).iloc[
                 ovh:ovh+self.mdp.nr_regions].to_numpy().flatten()
@@ -1047,7 +1056,7 @@ class Abstraction(object):
         for index, row in self.mdp.MAIN_DF.iterrows():
             
             # Create policy matrix (every row is a time step)
-            split_matrix = np.array([ _split_policy(value) for value in policy_all[:, index] ]).T
+            split_matrix = np.array([ _split_action(value) for value in policy_all[:, index] ]).T
             
             self.mdp.MAIN_DF['opt_action'].loc[index]   = split_matrix[0]
             self.mdp.MAIN_DF['opt_delta'].loc[index]    = split_matrix[1]

@@ -255,7 +255,7 @@ def minimumEpsilon(cov, beta=0.01, stepSize=0.01, singleParam=True):
         
         cumprob = 0
         epsilon = 0
-        inf_dims = [1,3,5]
+        inf_dims = [] #[1,3,5]
         inf_lim = 10
         
         count = 0
