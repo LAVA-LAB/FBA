@@ -84,7 +84,7 @@ setup.preset = preset
 setup.setOptions(category='main',
         skewed=False,
         mode='Filter',
-        error_bound_beta = 0.001)
+        error_bound_beta = 0.01)
 
 if setup.main['mode'] == 'Filter':
     # Filter-based abstraction

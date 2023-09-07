@@ -255,7 +255,7 @@ def minimumEpsilon(cov, beta=0.01, stepSize=0.01, singleParam=True):
         
         cumprob = 0
         epsilon = 0
-        inf_dims = []
+        inf_dims = [1,3,5]
         inf_lim = 10
         
         count = 0
@@ -276,7 +276,9 @@ def minimumEpsilon(cov, beta=0.01, stepSize=0.01, singleParam=True):
             
         max_error_bound = np.array([epsilon if d not in inf_dims else inf_lim 
                                     for d in range(n)])
-        
+
+    print('Epsilon:', max_error_bound)
+
     return max_error_bound
 
 def steadystateCovariance(covariances, verbose=False):
